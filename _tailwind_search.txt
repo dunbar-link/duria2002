@@ -1,0 +1,65 @@
+ nextjs-server@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.23:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1391ms
+ GET / 200 in 1048ms (compile: 867ms, render: 181ms)
+Error: Can't resolve 'tailwindcss' in 'C:\work'
+    [at finishWithoutResolve (C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:586:18)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:678:14]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:16:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)] {
+  details: "resolve 'tailwindcss' in 'C:\\work'\n" +
+    '  Parsed request is a module\n' +
+    '  No description file found in C:\\work or above\n' +
+    '  resolve as module\n' +
+    "    C:\\work\\node_modules doesn't exist or is not a directory\n" +
+    "    C:\\node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in 'C:\work'
+    [at finishWithoutResolve (C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:586:18)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:678:14]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:16:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)] {
+  details: "resolve 'tailwindcss' in 'C:\\work'\n" +
+    '  Parsed request is a module\n' +
+    '  No description file found in C:\\work or above\n' +
+    '  resolve as module\n' +
+    "    C:\\work\\node_modules doesn't exist or is not a directory\n" +
+    "    C:\\node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in 'C:\work'
+    [at finishWithoutResolve (C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:586:18)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:678:14]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:16:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)]
+    [at C:\work\nextjs-server\node_modules\enhanced-resolve\lib\Resolver.js:739:5]
+    [at eval (eval at create (C:\work\nextjs-server\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)] {
+  details: "resolve 'tailwindcss' in 'C:\\work'\n" +
+    '  Parsed request is a module\n' +
+    '  No description file found in C:\\work or above\n' +
+    '  resolve as module\n' +
+    "    C:\\work\\node_modules doesn't exist or is not a directory\n" +
+    "    C:\\node_modules doesn't exist or is not a directory"
+}
