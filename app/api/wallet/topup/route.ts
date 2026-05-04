@@ -1,121 +1,38 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
-const DL_DEMO_USER_ID = process.env.DL_DEMO_USER_ID ?? "";
-
-function nowIso() {
-  return new Date().toISOString();
+function requireEnv(name: string) {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing env: ${name}`);
+  return value;
 }
 
 export async function POST(req: Request) {
-  const startedAt = nowIso();
-
-  let tester_name = "";
-  let amount = 0;
-
   try {
-    const body = await req.json();
-    tester_name = String(body?.tester_name ?? "").trim();
-    amount = Number(body?.amount ?? 0);
+    const supabase = getSupabaseAdmin();
+    const body = await req.json().catch(() => ({}));
+    const userId = String(body?.user_id ?? body?.userId ?? requireEnv("DL_DEMO_USER_ID"));
+    const amount = Number(body?.amount ?? 0);
 
-    if (!tester_name) {
-      return NextResponse.json({ ok: false, error: "tester_name is required" }, { status: 400 });
-    }
     if (!Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ ok: false, error: "amount must be > 0" }, { status: 400 });
-    }
-    if (!DL_DEMO_USER_ID) {
-      return NextResponse.json({ ok: false, error: "Missing env: DL_DEMO_USER_ID" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "amount must be positive" }, { status: 400 });
     }
 
-    // balance_before
-    let balance_before: number | null = null;
-    {
-      const { data } = await supabaseAdmin
-        .from("dl_wallets")
-        .select("balance")
-        .eq("user_id", DL_DEMO_USER_ID)
-        .maybeSingle();
+    const { data: current } = await supabase.from("dl_wallets").select("balance").eq("user_id", userId).maybeSingle();
+    const before = Number(current?.balance ?? 0);
+    const after = before + amount;
 
-      if (data?.balance != null) balance_before = Number(data.balance);
-    }
-
-    // upsert/update wallets
-    const { data: existing } = await supabaseAdmin
+    const { data, error } = await supabase
       .from("dl_wallets")
-      .select("user_id,balance")
-      .eq("user_id", DL_DEMO_USER_ID)
-      .maybeSingle();
+      .upsert({ user_id: userId, balance: after, updated_at: new Date().toISOString() }, { onConflict: "user_id" })
+      .select("*")
+      .single();
 
-    if (!existing) {
-      await supabaseAdmin.from("dl_wallets").insert({ user_id: DL_DEMO_USER_ID, balance: amount });
-    } else {
-      await supabaseAdmin
-        .from("dl_wallets")
-        .update({ balance: Number(existing.balance) + amount })
-        .eq("user_id", DL_DEMO_USER_ID);
-    }
-
-    // ledger insert
-    await supabaseAdmin.from("dl_coin_ledger").insert({
-      user_id: DL_DEMO_USER_ID,
-      delta: amount,
-      reason: "cbt_topup",
-    });
-
-    // balance_after
-    let balance_after: number | null = null;
-    {
-      const { data } = await supabaseAdmin
-        .from("dl_wallets")
-        .select("balance")
-        .eq("user_id", DL_DEMO_USER_ID)
-        .maybeSingle();
-
-      if (data?.balance != null) balance_after = Number(data.balance);
-    }
-
-    // 이벤트 기록(스키마 고정)
-    await supabaseAdmin.from("dl_events").insert({
-      user_id: DL_DEMO_USER_ID,
-      event_type: "coin_topup_result",
-      payload: {
-        status: "ok",
-        http_ok: true,
-        error: null,
-        started_at: startedAt,
-        finished_at: nowIso(),
-        tester_name,
-        balance_before,
-        balance_after,
-        amount,
-      },
-    });
-
-    return NextResponse.json({ ok: true, balance_before, balance_after, amount }, { status: 200 });
-  } catch (e: any) {
-    try {
-      if (DL_DEMO_USER_ID) {
-        await supabaseAdmin.from("dl_events").insert({
-          user_id: DL_DEMO_USER_ID,
-          event_type: "coin_topup_result",
-          payload: {
-            status: "error",
-            http_ok: false,
-            error: e?.message ?? String(e),
-            started_at: startedAt,
-            finished_at: nowIso(),
-            tester_name,
-            amount,
-          },
-        });
-      }
-    } catch {
-      // ignore
-    }
-
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, before, after, wallet: data });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

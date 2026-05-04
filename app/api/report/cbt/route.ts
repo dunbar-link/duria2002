@@ -1,24 +1,20 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    const url = new URL(req.url);
-    const days = Math.max(1, Math.min(365, Number(url.searchParams.get("days") ?? "30")));
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("dl_events")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-    const { data, error } = await supabaseAdmin.rpc("dl_cbt_report", { p_days: days });
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message, hint: error.hint ?? null },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ ok: true, days, rows: data ?? [] }, { status: 200 });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, items: data ?? [] });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

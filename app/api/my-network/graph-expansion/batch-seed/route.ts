@@ -1,5 +1,5 @@
-﻿import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type SeedRpcResult = {
   ok: boolean;
@@ -22,46 +22,18 @@ type SeedRpcResult = {
   error: string | null;
 };
 
-
-
-  return createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
-
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseAdmin();
     const body = await request.json().catch(() => ({}));
-
     const candidateIds = Array.isArray(body?.candidateIds) ? body.candidateIds : [];
-    const ownerUserId =
-      body?.ownerUserId ??
-      body?.owner_user_id ??
-      "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
-
-    const seedCost =
-      typeof body?.seedCost === "number"
-        ? body.seedCost
-        : typeof body?.coinCost === "number"
-        ? body.coinCost
-        : 10;
+    const ownerUserId = body?.ownerUserId ?? body?.owner_user_id ?? "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
+    const seedCost = typeof body?.seedCost === "number" ? body.seedCost : typeof body?.coinCost === "number" ? body.coinCost : 10;
 
     if (!candidateIds.length) {
-      return NextResponse.json(
-        {
-          ok: false,
-          count: 0,
-          results: [],
-          error: "candidateIds is required",
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, count: 0, results: [], error: "candidateIds is required" }, { status: 400 });
     }
 
-    const supabase = getsupabaseAdmin;
     const results: SeedRpcResult[] = [];
 
     for (const candidateId of candidateIds) {
@@ -101,25 +73,11 @@ export async function POST(request: NextRequest) {
     const successCount = results.filter((item) => item.ok).length;
     const failureCount = results.length - successCount;
 
-    return NextResponse.json({
-      ok: failureCount === 0,
-      count: results.length,
-      successCount,
-      failureCount,
-      results,
-    });
+    return NextResponse.json({ ok: failureCount === 0, count: results.length, successCount, failureCount, results });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown_error";
-
     return NextResponse.json(
-      {
-        ok: false,
-        count: 0,
-        results: [],
-        error: message,
-      },
-      { status: 500 }
+      { ok: false, count: 0, results: [], error: error instanceof Error ? error.message : "unknown_error" },
+      { status: 500 },
     );
   }
 }
-

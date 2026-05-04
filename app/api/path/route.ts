@@ -1,59 +1,25 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const body = await req.json();
+    const supabase = getSupabaseAdmin();
+    const { searchParams } = new URL(req.url);
+    const ownerUserId = searchParams.get("ownerUserId") ?? "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
+    const targetPid = searchParams.get("targetPid") ?? searchParams.get("target_pid") ?? "";
 
-    const userId = body.userId;
-    const targetPid = body.targetPid;
-    const cost = body.cost ?? 10;
-    const maxHops = body.maxHops ?? 6;
+    if (!targetPid) return NextResponse.json({ ok: false, error: "targetPid is required" }, { status: 400 });
 
-    if (!userId) {
-      return NextResponse.json(
-        { ok: false, error: "userId is required" },
-        { status: 400 }
-      );
-    }
+    const { data, error } = await supabase.rpc("dl_find_path", {
+      p_owner_user_id: ownerUserId,
+      p_target_pid: targetPid,
+    });
 
-    if (!targetPid) {
-      return NextResponse.json(
-        { ok: false, error: "targetPid is required" },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin.rpc(
-      "dl_path_probe_paid_v2",
-      {
-        p_user_id: userId,
-        p_target_pid: targetPid,
-        p_cost: cost,
-        p_max_hops: maxHops,
-      }
-    );
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        ok: true,
-        result: data,
-      },
-      { status: 200 }
-    );
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message ?? String(e) },
-      { status: 500 }
-    );
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, result: data });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

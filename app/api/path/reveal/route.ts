@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
@@ -9,123 +9,75 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export async function POST(req: Request) {
-  const startedAt = nowIso();
+function readText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-  let tester_name = "";
-  let target_pid = "";
+export async function POST(req: Request) {
+  const supabase = getSupabaseAdmin();
+  const startedAt = nowIso();
+  let testerName = "";
+  let targetPid = "";
   let cost = 0;
-  let max_hops = 5;
+  let maxHops = 5;
 
   try {
     const body = await req.json();
-
-    tester_name = String(body?.tester_name ?? "").trim();
-    target_pid = String(body?.target_pid ?? "").trim();
+    testerName = readText(body?.tester_name);
+    targetPid = readText(body?.target_pid);
     cost = Number(body?.cost ?? 0);
-    max_hops = Number(body?.max_hops ?? 5);
+    maxHops = Number(body?.max_hops ?? 5);
 
-    if (!tester_name) {
-      return NextResponse.json({ ok: false, error: "tester_name is required" }, { status: 400 });
-    }
-    if (!target_pid) {
-      return NextResponse.json({ ok: false, error: "target_pid is required" }, { status: 400 });
-    }
-    if (!DL_DEMO_USER_ID) {
-      return NextResponse.json({ ok: false, error: "Missing env: DL_DEMO_USER_ID" }, { status: 500 });
-    }
+    if (!testerName) return NextResponse.json({ ok: false, error: "tester_name is required" }, { status: 400 });
+    if (!targetPid) return NextResponse.json({ ok: false, error: "target_pid is required" }, { status: 400 });
+    if (!DL_DEMO_USER_ID) return NextResponse.json({ ok: false, error: "Missing env: DL_DEMO_USER_ID" }, { status: 500 });
 
-    // balance_before
-    let balance_before: number | null = null;
-    {
-      const { data } = await supabaseAdmin
-        .from("dl_wallets")
-        .select("balance")
-        .eq("user_id", DL_DEMO_USER_ID)
-        .maybeSingle();
+    const { data: beforeWallet } = await supabase.from("dl_wallets").select("balance").eq("user_id", DL_DEMO_USER_ID).maybeSingle();
+    const balanceBefore = beforeWallet?.balance != null ? Number(beforeWallet.balance) : null;
 
-      if (data?.balance != null) balance_before = Number(data.balance);
-    }
-
-    // ✅ supabaseAdmin는 "함수"가 아니라 "클라이언트 객체"라서 호출하면 안 됨
-    const { data, error } = await supabaseAdmin.rpc("dl_path_probe_paid", {
+    const { data, error } = await supabase.rpc("dl_path_probe_paid", {
       p_user_id: DL_DEMO_USER_ID,
-      p_target_pid: target_pid,
+      p_target_pid: targetPid,
       p_cost: cost,
-      p_max_hops: max_hops,
+      p_max_hops: maxHops,
     });
 
-    const http_ok = !error;
+    const { data: afterWallet } = await supabase.from("dl_wallets").select("balance").eq("user_id", DL_DEMO_USER_ID).maybeSingle();
+    const balanceAfter = afterWallet?.balance != null ? Number(afterWallet.balance) : null;
 
-    // balance_after
-    let balance_after: number | null = null;
-    {
-      const { data } = await supabaseAdmin
-        .from("dl_wallets")
-        .select("balance")
-        .eq("user_id", DL_DEMO_USER_ID)
-        .maybeSingle();
-
-      if (data?.balance != null) balance_after = Number(data.balance);
-    }
-
-    // 이벤트 기록(스키마 고정)
     const payload = {
-      status: http_ok ? "ok" : "error",
-      http_ok,
-      error: http_ok ? null : error?.message ?? "rpc_failed",
+      status: error ? "error" : "ok",
+      http_ok: !error,
+      error: error ? error.message : null,
       started_at: startedAt,
       finished_at: nowIso(),
-
-      tester_name,
-
-      balance_before,
-      balance_after,
-
+      tester_name: testerName,
+      balance_before: balanceBefore,
+      balance_after: balanceAfter,
       cost,
-      max_hops,
-      target_pid,
-
-      found: http_ok ? Boolean((data as any)?.found) : null,
-      hops: http_ok ? Number((data as any)?.hops ?? 0) : null,
-      sumTrust: http_ok ? Number((data as any)?.sumTrust ?? 0) : null,
-      bottleneckTrust: http_ok ? Number((data as any)?.bottleneckTrust ?? 0) : null,
+      max_hops: maxHops,
+      target_pid: targetPid,
+      found: error ? null : Boolean((data as any)?.found),
+      hops: error ? null : Number((data as any)?.hops ?? 0),
+      sumTrust: error ? null : Number((data as any)?.sumTrust ?? 0),
+      bottleneckTrust: error ? null : Number((data as any)?.bottleneckTrust ?? 0),
     };
 
-    await supabaseAdmin.from("dl_events").insert({
-      user_id: DL_DEMO_USER_ID,
-      event_type: "path_reveal_paid_result",
-      payload,
-    });
+    await supabase.from("dl_events").insert({ user_id: DL_DEMO_USER_ID, event_type: "path_reveal_paid_result", payload });
 
-    if (!http_ok) {
-      return NextResponse.json({ ok: false, error: error?.message ?? "rpc_failed" }, { status: 500 });
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, result: data, balance_before: balanceBefore, balance_after: balanceAfter });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (DL_DEMO_USER_ID) {
+      await supabase.from("dl_events").insert({
+        user_id: DL_DEMO_USER_ID,
+        event_type: "path_reveal_paid_result",
+        payload: { status: "error", http_ok: false, error: message, started_at: startedAt, finished_at: nowIso(), tester_name: testerName, target_pid: targetPid, cost, max_hops: maxHops },
+      });
     }
 
-    return NextResponse.json({ ok: true, result: data, balance_before, balance_after }, { status: 200 });
-  } catch (e: any) {
-    try {
-      if (DL_DEMO_USER_ID) {
-        await supabaseAdmin.from("dl_events").insert({
-          user_id: DL_DEMO_USER_ID,
-          event_type: "path_reveal_paid_result",
-          payload: {
-            status: "error",
-            http_ok: false,
-            error: e?.message ?? String(e),
-            started_at: startedAt,
-            finished_at: nowIso(),
-            tester_name,
-            target_pid,
-            cost,
-            max_hops,
-          },
-        });
-      }
-    } catch {
-      // ignore
-    }
-
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

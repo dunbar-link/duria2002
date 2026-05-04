@@ -1,96 +1,40 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+
+export const runtime = "nodejs";
 
 function requireEnv(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
-
-function toInt(v: any, def: number) {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.trunc(n) : def;
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing env: ${name}`);
+  return value;
 }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const supabase = getSupabaseAdmin();
+    const body = await req.json().catch(() => ({}));
+    const demoUserId = String(body?.user_id ?? body?.userId ?? requireEnv("DL_DEMO_USER_ID"));
+    const targetPid = String(body?.target_pid ?? body?.targetPid ?? "").trim();
+    const cost = Number(body?.cost ?? 0);
 
-    const tester_name = String(body?.tester_name ?? "").trim() || "(unknown)";
-    const target_pid = String(body?.target_pid ?? "").trim();
-    const cost = toInt(body?.cost, 10);
-    const max_hops = toInt(body?.max_hops, 5);
+    if (!targetPid) return NextResponse.json({ ok: false, error: "target_pid is required" }, { status: 400 });
 
-    if (!target_pid) {
-      return NextResponse.json({ ok: false, error: "Missing target_pid" }, { status: 400 });
-    }
-    if (cost < 0) {
-      return NextResponse.json({ ok: false, error: "Invalid cost" }, { status: 400 });
-    }
-    if (max_hops < 1 || max_hops > 10) {
-      return NextResponse.json({ ok: false, error: "Invalid max_hops" }, { status: 400 });
-    }
+    const beforeRes = await supabase.from("dl_wallets").select("balance").eq("user_id", demoUserId).maybeSingle();
+    const balanceBefore = beforeRes.data?.balance != null ? Number(beforeRes.data.balance) : null;
 
-    const demoUserId = requireEnv("DL_DEMO_USER_ID"); // uuid string
-    const sb = supabaseAdmin;
-
-    // ✅ balance_before
-    const beforeRes = await sb
-      .from("dl_wallets")
-      .select("balance")
-      .eq("user_id", demoUserId)
-      .maybeSingle();
-
-    let balance_before: number | null = null;
-
-    if (beforeRes.error) {
-      return NextResponse.json({ ok: false, error: beforeRes.error.message }, { status: 500 });
-    }
-
-    if (!beforeRes.data) {
-      // wallet row 없으면 만들어둠(0부터)
-      const ins = await sb.from("dl_wallets").insert({ user_id: demoUserId, balance: 0 });
-      if (ins.error) return NextResponse.json({ ok: false, error: ins.error.message }, { status: 500 });
-      balance_before = 0;
-    } else {
-      balance_before = Number(beforeRes.data.balance);
-    }
-
-    // ✅ RPC: dl_path_probe_paid 호출
-    const { data, error } = await sb.rpc("dl_path_probe_paid", {
+    const { data, error } = await supabase.rpc("dl_path_probe_paid", {
       p_user_id: demoUserId,
-      p_target_pid: target_pid,
+      p_target_pid: targetPid,
       p_cost: cost,
-      p_max_hops: max_hops,
+      p_max_hops: Number(body?.max_hops ?? 5),
     });
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message, balance_before }, { status: 500 });
-    }
+    const afterRes = await supabase.from("dl_wallets").select("balance").eq("user_id", demoUserId).maybeSingle();
+    const balanceAfter = afterRes.data?.balance != null ? Number(afterRes.data.balance) : null;
 
-    // ✅ balance_after
-    const afterRes = await sb
-      .from("dl_wallets")
-      .select("balance")
-      .eq("user_id", demoUserId)
-      .maybeSingle();
-
-    if (afterRes.error) {
-      return NextResponse.json({ ok: false, error: afterRes.error.message, balance_before }, { status: 500 });
-    }
-
-    const balance_after = afterRes.data ? Number(afterRes.data.balance) : null;
-
-    // RPC가 jsonb 리턴이므로 그대로 펼쳐서 + before/after 붙임
-    const payload =
-      data && typeof data === "object"
-        ? { ...data, balance_before, balance_after }
-        : { result: data, balance_before, balance_after };
-
-    // (참고) tester_name은 프론트에서 events/track로 따로 기록하므로
-    // 여기서는 응답에만 참고용으로 포함
-    return NextResponse.json({ ...payload, tester_name });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
+    if (error) return NextResponse.json({ ok: false, error: error.message, balanceBefore, balanceAfter }, { status: 500 });
+    return NextResponse.json({ ok: true, result: data, balanceBefore, balanceAfter });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

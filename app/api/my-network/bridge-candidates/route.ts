@@ -1,11 +1,13 @@
-﻿import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+
+type BridgeStatus = "saved" | "reviewing" | "approved" | "rejected" | "expanded" | "archived";
 
 type SaveBridgeCandidateBody = {
   ownerUserId?: string;
   otherOwnerUserId?: string | null;
   sourceType?: "overlap" | "manual" | "operator" | "path";
-  status?: "saved" | "reviewing" | "approved" | "rejected" | "expanded" | "archived";
+  status?: BridgeStatus;
   bridgeName?: string | null;
   bridgeCity?: string | null;
   bridgeSchool?: string | null;
@@ -22,10 +24,10 @@ type SaveBridgeCandidateBody = {
 type UpdateBridgeCandidateBody = {
   id?: string;
   ownerUserId?: string;
-  status?: "saved" | "reviewing" | "approved" | "rejected" | "expanded" | "archived";
+  status?: BridgeStatus;
 };
 
-const ALLOWED_STATUS = new Set([
+const ALLOWED_STATUS = new Set<BridgeStatus>([
   "saved",
   "reviewing",
   "approved",
@@ -33,16 +35,6 @@ const ALLOWED_STATUS = new Set([
   "expanded",
   "archived",
 ]);
-
-
-
-  return createClient(url, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
 
 function cleanText(value: unknown, maxLength = 300) {
   if (typeof value !== "string") return "";
@@ -71,17 +63,9 @@ function buildEvidenceSummary(input: {
   if (input.evidenceSummary) return input.evidenceSummary;
 
   const parts: string[] = [];
-
-  if (input.bridgeSchool) {
-    parts.push(`school=${input.bridgeSchool}`);
-  }
-  if (input.bridgeCompany) {
-    parts.push(`company=${input.bridgeCompany}`);
-  }
-  if (input.bridgeCity) {
-    parts.push(`city=${input.bridgeCity}`);
-  }
-
+  if (input.bridgeSchool) parts.push(`school=${input.bridgeSchool}`);
+  if (input.bridgeCompany) parts.push(`company=${input.bridgeCompany}`);
+  if (input.bridgeCity) parts.push(`city=${input.bridgeCity}`);
   parts.push(`matchScore=${input.matchScore}`);
 
   return parts.join(" | ");
@@ -89,18 +73,14 @@ function buildEvidenceSummary(input: {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getsupabaseAdmin;
+    const supabase = getSupabaseAdmin();
     const { searchParams } = new URL(req.url);
-
-    const ownerUserId = cleanText(searchParams.get("ownerUserId"));
-    const status = cleanText(searchParams.get("status"));
+    const ownerUserId = cleanText(searchParams.get("ownerUserId"), 100);
+    const status = cleanText(searchParams.get("status"), 50);
     const limit = Math.min(Number(searchParams.get("limit") || "50"), 200);
 
     if (!ownerUserId) {
-      return NextResponse.json(
-        { ok: false, error: "ownerUserId is required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "ownerUserId is required." }, { status: 400 });
     }
 
     let query = supabase
@@ -110,49 +90,33 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (status) {
-      query = query.eq("status", status);
-    }
+    if (status) query = query.eq("status", status);
 
     const { data, error } = await query;
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      items: data ?? [],
-    });
+    return NextResponse.json({ ok: true, items: data ?? [] });
   } catch (error) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown server error",
-      },
-      { status: 500 }
+      { ok: false, error: error instanceof Error ? error.message : "Unknown server error" },
+      { status: 500 },
     );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getsupabaseAdmin;
+    const supabase = getSupabaseAdmin();
     const body = (await req.json()) as SaveBridgeCandidateBody;
 
     const ownerUserId = cleanText(body.ownerUserId, 100);
     const otherOwnerUserId = cleanText(body.otherOwnerUserId, 100);
     const sourceType = cleanText(body.sourceType || "overlap", 50) || "overlap";
-    const status = cleanText(body.status || "saved", 50) || "saved";
-
+    const status = (cleanText(body.status || "saved", 50) || "saved") as BridgeStatus;
     const bridgeName = cleanText(body.bridgeName, 200);
     const bridgeCity = cleanText(body.bridgeCity, 200);
     const bridgeSchool = cleanText(body.bridgeSchool, 200);
     const bridgeCompany = cleanText(body.bridgeCompany, 200);
-
     const matchScore = toSafeScore(body.matchScore);
     const matchLabel = cleanText(body.matchLabel, 100);
     const suggestedTargetPid = cleanText(body.suggestedTargetPid, 200);
@@ -166,36 +130,16 @@ export async function POST(req: NextRequest) {
       evidenceSummary: cleanText(body.evidenceSummary, 500),
     });
 
-    if (!ownerUserId) {
-      return NextResponse.json(
-        { ok: false, error: "ownerUserId is required." },
-        { status: 400 }
-      );
-    }
-
-    if (!ALLOWED_STATUS.has(status)) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid status." },
-        { status: 400 }
-      );
-    }
-
+    if (!ownerUserId) return NextResponse.json({ ok: false, error: "ownerUserId is required." }, { status: 400 });
+    if (!ALLOWED_STATUS.has(status)) return NextResponse.json({ ok: false, error: "Invalid status." }, { status: 400 });
     if (!bridgeName && !bridgeSchool && !bridgeCompany) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "At least one bridge identity field is required: bridgeName, bridgeSchool, or bridgeCompany.",
-        },
-        { status: 400 }
+        { ok: false, error: "At least one bridge identity field is required." },
+        { status: 400 },
       );
     }
-
     if (!suggestedTargetPid) {
-      return NextResponse.json(
-        { ok: false, error: "suggestedTargetPid is required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "suggestedTargetPid is required." }, { status: 400 });
     }
 
     const payload = {
@@ -218,8 +162,7 @@ export async function POST(req: NextRequest) {
       suggested_target_pid: suggestedTargetPid,
       suggested_target_name: suggestedTargetName || null,
       preview_path_hint: previewPathHint || null,
-      metadata:
-        body.metadata && typeof body.metadata === "object" ? body.metadata : {},
+      metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
       updated_at: new Date().toISOString(),
     };
 
@@ -232,95 +175,44 @@ export async function POST(req: NextRequest) {
       .select("*")
       .single();
 
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      item: data,
-    });
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, item: data });
   } catch (error) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown server error",
-      },
-      { status: 500 }
+      { ok: false, error: error instanceof Error ? error.message : "Unknown server error" },
+      { status: 500 },
     );
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = getsupabaseAdmin;
+    const supabase = getSupabaseAdmin();
     const body = (await req.json()) as UpdateBridgeCandidateBody;
-
     const id = cleanText(body.id, 100);
     const ownerUserId = cleanText(body.ownerUserId, 100);
-    const status = cleanText(body.status, 50);
+    const status = cleanText(body.status, 50) as BridgeStatus;
 
-    if (!id) {
-      return NextResponse.json(
-        { ok: false, error: "id is required." },
-        { status: 400 }
-      );
-    }
-
-    if (!ownerUserId) {
-      return NextResponse.json(
-        { ok: false, error: "ownerUserId is required." },
-        { status: 400 }
-      );
-    }
-
-    if (!ALLOWED_STATUS.has(status)) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid status." },
-        { status: 400 }
-      );
-    }
+    if (!id) return NextResponse.json({ ok: false, error: "id is required." }, { status: 400 });
+    if (!ownerUserId) return NextResponse.json({ ok: false, error: "ownerUserId is required." }, { status: 400 });
+    if (!ALLOWED_STATUS.has(status)) return NextResponse.json({ ok: false, error: "Invalid status." }, { status: 400 });
 
     const { data, error } = await supabase
       .from("dl_bridge_candidates")
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("owner_user_id", ownerUserId)
       .select("*")
       .single();
 
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
-    }
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ ok: false, error: "Bridge candidate not found." }, { status: 404 });
 
-    if (!data) {
-      return NextResponse.json(
-        { ok: false, error: "Bridge candidate not found." },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      item: data,
-    });
+    return NextResponse.json({ ok: true, item: data });
   } catch (error) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown server error",
-      },
-      { status: 500 }
+      { ok: false, error: error instanceof Error ? error.message : "Unknown server error" },
+      { status: 500 },
     );
   }
 }
-

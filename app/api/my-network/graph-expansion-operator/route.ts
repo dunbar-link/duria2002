@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { computeOperatorIntelligence } from "@/lib/graph-expansion/operator-intelligence";
 
@@ -165,7 +165,16 @@ type ErrorResponse = {
 
 const DEFAULT_OWNER_USER_ID = "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
 
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  if (!url || !key) {
+    throw new Error("Supabase environment variables are missing.");
+  }
 
   return createClient(url, key, {
     auth: {
@@ -393,7 +402,7 @@ function toOperatorItem(row: GraphExpansionCandidateRow): OperatorItem & {
     seedPriority,
   });
 
-  // ?뵦 Auto Execute 異붿텧
+  // 🔥 Auto Execute 추출
   const lastLog =
     (row as any).last_execution_log ??
     metadata.last_execution_log ??
@@ -445,7 +454,7 @@ function toOperatorItem(row: GraphExpansionCandidateRow): OperatorItem & {
     metadata,
     intelligence,
 
-    // ?뵦 ?ш린 異붽???遺遺?
+    // 🔥 여기 추가된 부분
     autoExecuteDecision,
     autoExecuteReason:
       lastLog?.reason ??
@@ -652,7 +661,7 @@ function buildActionResult(
 }
 
 async function fetchAllRows(ownerUserId: string) {
-  const supabase = getsupabaseAdmin;
+  const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
     .from("dl_graph_expansion_candidates")
@@ -807,7 +816,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getsupabaseAdmin;
+    const supabase = getSupabaseAdmin();
     const nextStatusByAction: Record<OperatorAction, CandidateStatus> = {
       approve: "approved",
       reject: "rejected",
@@ -903,4 +912,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(response, { status: 500 });
   }
 }
-
