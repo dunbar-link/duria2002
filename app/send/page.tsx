@@ -1,8 +1,46 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import SendbirdChat from "@sendbird/chat";
-import { GroupChannelModule } from "@sendbird/chat/groupChannel";
+
+type SendbirdClient = {
+  connect: (userId: string, accessToken?: string) => Promise<unknown>;
+  updateCurrentUserInfo: (params: { nickname: string }) => Promise<unknown>;
+  groupChannel: {
+    getChannel: (channelUrl: string) => Promise<{
+      sendUserMessage: (params: { message: string }) => Promise<unknown>;
+    }>;
+  };
+};
+
+type SendbirdInitResult = SendbirdClient | null;
+
+async function loadSendbird(appId: string): Promise<SendbirdInitResult> {
+  try {
+    const dynamicImport = new Function("specifier", "return import(specifier)") as (
+      specifier: string,
+    ) => Promise<any>;
+
+    const chatModule = await dynamicImport("@sendbird/chat");
+    const groupChannelModule = await dynamicImport(
+      "@sendbird/chat/groupChannel",
+    );
+
+    const SendbirdChat = chatModule.default ?? chatModule.SendbirdChat;
+    const GroupChannelModule = groupChannelModule.GroupChannelModule;
+
+    if (!SendbirdChat || !GroupChannelModule) {
+      throw new Error("Sendbird 모듈을 불러오지 못했어요.");
+    }
+
+    return SendbirdChat.init({
+      appId,
+      modules: [new GroupChannelModule()],
+    }) as SendbirdClient;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
 
 export default function SendPage() {
   const appId = process.env.NEXT_PUBLIC_SENDBIRD_APP_ID;
@@ -14,27 +52,30 @@ export default function SendPage() {
   const [text, setText] = useState("테스트 메시지");
   const [status, setStatus] = useState<string>("");
 
-  // ✅ /send?channel=... 로 들어오면 자동 채움
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const ch = sp.get("channel");
     if (ch) setChannelUrl(ch);
   }, []);
 
-  const sb = useMemo(() => {
-    if (!appId) return null;
-    return SendbirdChat.init({
-      appId,
-      modules: [new GroupChannelModule()],
-    });
-  }, [appId]);
+  const canUseSendbird = useMemo(() => Boolean(appId), [appId]);
 
   async function send() {
     try {
       setStatus("connecting...");
 
-      if (!appId) throw new Error("NEXT_PUBLIC_SENDBIRD_APP_ID가 없습니다 (.env.local 확인)");
-      if (!sb) throw new Error("Sendbird init failed");
+      if (!appId) {
+        throw new Error("NEXT_PUBLIC_SENDBIRD_APP_ID가 없습니다 (.env.local 확인)");
+      }
+
+      const sb = await loadSendbird(appId);
+
+      if (!sb) {
+        throw new Error(
+          "Sendbird 패키지가 설치되어 있지 않거나 불러오지 못했어요. 현재 베타에서는 홈의 신호 기능을 사용하세요.",
+        );
+      }
+
       if (!userId.trim()) throw new Error("userId를 입력하세요");
       if (!channelUrl.trim()) throw new Error("channelUrl을 입력하세요");
 
@@ -54,23 +95,57 @@ export default function SendPage() {
       await channel.sendUserMessage({ message: text });
 
       setStatus("sent ✅ (webhook → DB까지 몇 초 후 반영)");
-    } catch (e: any) {
-      console.error(e);
-      setStatus(`error: ${e?.message ?? String(e)}`);
+    } catch (error: unknown) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`error: ${message}`);
     }
   }
 
   return (
-    <main style={{ padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto", maxWidth: 720 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Sendbird Test Sender</h1>
-        <a href="/" style={{ fontSize: 12, opacity: 0.8 }}>← Back to DB</a>
+    <main
+      style={{
+        padding: 16,
+        fontFamily: "system-ui, -apple-system, Segoe UI, Roboto",
+        maxWidth: 720,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>
+          Sendbird Test Sender
+        </h1>
+        <a href="/dashboard" style={{ fontSize: 12, opacity: 0.8 }}>
+          ← Back to Home
+        </a>
       </div>
 
       <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
         <div style={{ fontSize: 12, opacity: 0.75 }}>
           App ID: <code>{appId ?? "(missing)"}</code>
         </div>
+
+        {!canUseSendbird ? (
+          <div
+            style={{
+              border: "1px solid #f5c2c7",
+              borderRadius: 12,
+              background: "#fff5f5",
+              color: "#9f1239",
+              fontSize: 12,
+              lineHeight: 1.55,
+              padding: 12,
+            }}
+          >
+            Sendbird 환경변수가 없어요. 베타에서는 홈 화면의 신호 기능을 우선 사용하면 됩니다.
+          </div>
+        ) : null}
 
         <label style={{ display: "grid", gap: 6 }}>
           <div style={{ fontSize: 12, opacity: 0.8 }}>User ID</div>
@@ -120,7 +195,9 @@ export default function SendPage() {
         </label>
 
         <button
-          onClick={send}
+          onClick={() => {
+            void send();
+          }}
           style={{
             padding: 12,
             borderRadius: 12,

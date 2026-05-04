@@ -50,17 +50,17 @@ function showSignalNotification() {
 import { readUnreadSignalCount } from "@/lib/signal/read-signals";
 import Link from "next/link";
 import { sendSignal } from "@/lib/signal/send-signal";
-import HomeRecommendationList from "./_components/recommendation/HomeRecommendationList";
+import HomeRecommendationList from "../../dashboard/_components/recommendation/HomeRecommendationList";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import DashboardHomeHeader from "./_components/dashboard-home-header";
-import DashboardHomeShell from "./_components/dashboard-home-shell";
-import HomeLayerSection from "./_components/home/home-layer-section";
-import FolderBottomSheet from "./_components/home/folder-bottom-sheet";
-import LayerBottomSheet from "./_components/home/layer-bottom-sheet";
-import LayerStrip from "./_components/home/layer-strip";
-import HomeConnectableSearchSheet from "./_components/home/home-connectable-search-sheet";
-import SignalBottomSheet from "./_components/home/signal-bottom-sheet";
+import DashboardHomeHeader from "../../dashboard/_components/dashboard-home-header";
+import DashboardHomeShell from "../../dashboard/_components/dashboard-home-shell";
+import HomeLayerSection from "../../dashboard/_components/home/home-layer-section";
+import FolderBottomSheet from "../../dashboard/_components/home/folder-bottom-sheet";
+import LayerBottomSheet from "../../dashboard/_components/home/layer-bottom-sheet";
+import LayerStrip from "../../dashboard/_components/home/layer-strip";
+import HomeConnectableSearchSheet from "../../dashboard/_components/home/home-connectable-search-sheet";
+import SignalBottomSheet from "../../dashboard/_components/home/signal-bottom-sheet";
 import {
   CONNECTABLE_SOURCE_LAYER_ID,
   type ConnectableCandidateStateMap,
@@ -69,7 +69,7 @@ import {
   buildDynamicConnectableEntityId,
   layerBlueprints,
   personCatalog,
-} from "./_components/home/home-page-types";
+} from "../../dashboard/_components/home/home-page-types";
 import {
   createInitialLayoutState,
   getHomeLayerDerivedStateMap,
@@ -82,16 +82,16 @@ import {
   readConnectableCandidateStateMap,
   syncConnectableStateWithLayout,
   writeConnectableCandidateStateMap,
-} from "./_components/home/home-page-utils";
-import { useHomeDragDrop } from "./_components/home/use-home-drag-drop";
-import { useHomeFolderInteractions } from "./_components/home/use-home-folder-interactions";
-import { useHomeLayerSheet } from "./_components/home/use-home-layer-sheet";
-import { useHomeLayoutStorage } from "./_components/home/use-home-layout-storage";
-import HomeMoveMenu from "./_components/home-move-menu";
-import type { ConnectableCandidate } from "./_components/home/connectable-candidate-types";
-import { usePeopleStore, type InviteDraft } from "./people/store";
+} from "../../dashboard/_components/home/home-page-utils";
+import { useHomeDragDrop } from "../../dashboard/_components/home/use-home-drag-drop";
+import { useHomeFolderInteractions } from "../../dashboard/_components/home/use-home-folder-interactions";
+import { useHomeLayerSheet } from "../../dashboard/_components/home/use-home-layer-sheet";
+import { useHomeLayoutStorage } from "../../dashboard/_components/home/use-home-layout-storage";
+import HomeMoveMenu from "../../dashboard/_components/home-move-menu";
+import type { ConnectableCandidate } from "../../dashboard/_components/home/connectable-candidate-types";
+import { usePeopleStore, type InviteDraft } from "../../dashboard/people/store";
 
-import { setRelationshipActionStarted } from "./people/relationship-status";
+import { setRelationshipActionStarted } from "../../dashboard/people/relationship-status";
 
 const FIXED_OWNER_USER_ID = "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
 
