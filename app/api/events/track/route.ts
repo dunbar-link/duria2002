@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const {
-      user_id,
-      event_type,
-      payload = {},
-    } = body;
+    const { user_id, event_type, payload = {} } = body;
 
     if (!event_type) {
       return NextResponse.json(
         { error: "event_type is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -23,8 +19,7 @@ export async function POST(req: Request) {
       user_id,
     };
 
-    // ❗ 수정된 핵심 부분
-    const sb = supabaseAdmin;
+    const sb = getSupabaseAdmin();
 
     const { error } = await sb.from("dl_events").insert({
       user_id,
@@ -34,18 +29,20 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error("event insert error:", error);
+
       return NextResponse.json(
         { error: "insert failed" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("event api error:", err);
+
     return NextResponse.json(
       { error: "unexpected error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
