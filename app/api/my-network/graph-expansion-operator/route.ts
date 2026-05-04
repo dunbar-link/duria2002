@@ -394,9 +394,10 @@ function toOperatorItem(row: GraphExpansionCandidateRow): OperatorItem & {
   const dangerousReasons = getDangerousReasons(row);
 
   const intelligence = computeOperatorIntelligence({
+    id: row.id,
     qualityScore,
     evidenceStrength,
-    duplicateRisk: String(duplicateRisk),
+    duplicateRisk,
     dangerous: dangerousReasons.length > 0,
     seedPriority,
   });
