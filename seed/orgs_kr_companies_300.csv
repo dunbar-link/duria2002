@@ -1,0 +1,11 @@
+﻿external_ref,name,org_type,country,city,industry,tags
+"KR-COMP-SAMSUNG-ELECTRONICS,Samsung Electronics,company,KR,Seoul,Semiconductor,chaebol;electronics"
+"KR-COMP-SK-HYNIX,SK hynix,company,KR,Icheon,Semiconductor,memory"
+"KR-COMP-LG-ELECTRONICS,LG Electronics,company,KR,Seoul,Electronics,home;device"
+"KR-COMP-HYUNDAI-MOTOR,Hyundai Motor,company,KR,Seoul,Mobility,auto"
+"KR-COMP-KIA,Kia,company,KR,Seoul,Mobility,auto"
+"KR-COMP-NAVER,NAVER,company,KR,Seongnam,IT,search;portal"
+"KR-COMP-KAKAO,Kakao,company,KR,Seongnam,IT,messaging;platform"
+"KR-COMP-KB-FINANCIAL,KB Financial Group,company,KR,Seoul,Finance,bank"
+"KR-COMP-SHINHAN-FINANCIAL,Shinhan Financial Group,company,KR,Seoul,Finance,bank"
+"KR-COMP-NH-INVESTMENT,NH Investment & Securities,company,KR,Seoul,Finance,securities"

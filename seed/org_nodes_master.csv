@@ -1,0 +1,11 @@
+pid,name,node_type,country_code,meta_json
+org:univ:korea-university,Korea University,organization,KR,"{""orgType"":""university"",""city"":""Seoul""}"
+org:univ:seoul-national-university,Seoul National University,organization,KR,"{""orgType"":""university"",""city"":""Seoul""}"
+org:univ:yonsei-university,Yonsei University,organization,KR,"{""orgType"":""university"",""city"":""Seoul""}"
+org:company:samsung-electronics,Samsung Electronics,organization,KR,"{""orgType"":""company"",""city"":""Suwon""}"
+org:company:naver,Naver,organization,KR,"{""orgType"":""company"",""city"":""Seongnam""}"
+org:company:kakao,Kakao,organization,KR,"{""orgType"":""company"",""city"":""Seongnam""}"
+org:city:seoul,Seoul,organization,KR,"{""orgType"":""city"",""region"":""Seoul""}"
+org:city:busan,Busan,organization,KR,"{""orgType"":""city"",""region"":""Busan""}"
+org:city:daegu,Daegu,organization,KR,"{""orgType"":""city"",""region"":""Daegu""}"
+org:company:tesla,Tesla,organization,US,"{""orgType"":""company"",""city"":""Austin""}"

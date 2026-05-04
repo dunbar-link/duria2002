@@ -1,0 +1,6 @@
+external_ref,name,org_type,country,city,industry,tags
+"KR-UNIV-KOREA,Korea University,university,KR,Seoul,Education,korea;university",,,,,,
+KR-COMP-NAVER,NAVER,company,KR,Seongnam,IT,search;portal
+KR-COMP-KAKAO,Kakao,company,KR,Seongnam,IT,messaging;platform
+KR-CITY-SEOUL,Seoul,city,KR,Seoul,,capital;metro
+KR-IND-IT,IT,industry,KR,,," ""tech;software"""

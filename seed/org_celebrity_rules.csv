@@ -1,0 +1,7 @@
+﻿"org_pid,celeb_pid,match_type,trust,tier,label"
+"org:KR-UNIV-KOREA,celeb:elon-musk,university,80,50,seed"
+"org:KR-UNIV-KOREA,celeb:jensen-huang,university,74,50,seed"
+"org:KR-CITY-SEOUL,celeb:psy,city,88,50,seed"
+"org:KR-COMPANY-SAMSUNG,celeb:lee-jae-yong,company,92,15,seed"
+"org:KR-COMPANY-MICROSOFT,celeb:satya-nadella,company,90,15,seed"
+"org:KR-COMPANY-META,celeb:mark-zuckerberg,company,86,15,seed"

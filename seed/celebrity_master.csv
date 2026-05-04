@@ -1,0 +1,8 @@
+pid,display_name,country,schools,companies,cities
+celeb:jay-y-lee,이재용,KR,"Seoul National University","Samsung Electronics","Seoul"
+celeb:kakao-founder-sample,Kakao Founder Sample,KR,"Korea University","Kakao","Seoul"
+celeb:naver-founder-sample,Naver Founder Sample,KR,"Yonsei University","Naver","Seoul"
+celeb:seoul-person-sample,Seoul Person Sample,KR,"Korea University","","Seoul"
+celeb:busan-person-sample,Busan Person Sample,KR,"","","Busan"
+celeb:daegu-person-sample,Daegu Person Sample,KR,"","","Daegu"
+celeb:elon-musk,Elon Musk,US,,Tesla,Austin

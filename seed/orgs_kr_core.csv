@@ -1,0 +1,26 @@
+"external_ref,name,org_type,country,city,industry,tags"
+"KR-UNIV-KOREA,Korea University,university,KR,Seoul,Education,korea;university"
+"KR-COMP-NAVER,NAVER,company,KR,Seongnam,IT,search;portal"
+"KR-COMP-KAKAO,Kakao,company,KR,Seongnam,IT,messaging;platform"
+"KR-CITY-SEOUL,Seoul,city,KR,Seoul,,capital;metro"
+"KR-IND-IT,IT,industry,KR,,,tech;software"
+org:seed:Tesla,Tesla,company,US,,Automotive
+org:seed:SpaceX,SpaceX,company,US,,Aerospace
+org:seed:Microsoft,Microsoft,company,US,,Software
+org:seed:NVIDIA,NVIDIA,company,US,,Semiconductor
+org:seed:Apple,Apple,company,US,,Hardware
+org:seed:Google,Google,company,US,,Platform
+org:seed:Meta,Meta,company,US,,Platform
+org:seed:Amazon,Amazon,company,US,,Ecommerce
+org:seed:OpenAI,OpenAI,org,US,,AI
+org:seed:Samsung,Samsung,company,KR,Seoul,Electronics
+org:seed:Kakao,Kakao,company,KR,Seoul,Platform
+org:seed:Naver,Naver,company,KR,Seongnam,Platform
+org:seed:SK,SK,company,KR,Seoul,Conglomerate
+org:seed:Korea University,Korea University,university,KR,Seoul,Education
+org:seed:Seoul,Seoul,city,KR,Seoul,
+org:seed:AI,AI,industry,,,AI
+org:seed:Semiconductor,Semiconductor,industry,,,Semiconductor
+org:seed:Platform,Platform,industry,,,Platform
+org:seed:Software,Software,industry,,,Software
+org:seed:Electronics,Electronics,industry,,,Electronics

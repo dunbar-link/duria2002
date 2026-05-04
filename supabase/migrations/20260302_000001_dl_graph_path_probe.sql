@@ -3,6 +3,7 @@
 -- 1) 그래프 테이블: dl_people, dl_edges
 -- 2) 최단 경로 + 신뢰 tie-break 계산 RPC
 -- 3) 코인 차감 + 경로 계산을 한 트랜잭션에서 처리하는 paid RPC (SECURITY DEFINER)
+-- 4) Confidence Score Model v2 서버 계산 반환
 
 begin;
 
@@ -138,17 +139,7 @@ order by c.hops asc, c.bottleneck_trust desc, c.sum_trust desc
 limit 1;
 $$;
 
--- 6) paid RPC: 코인 차감 + 경로 계산을 1트랜잭션으로 원자화
--- 전제: 이미 존재하는 dl_wallets, dl_coin_ledger, dl_spend_coins()가 있음
--- 여기서는 dl_spend_coins를 호출해도 되지만,
--- "결제+계산"을 완전 원자화하려면 지갑 row를 직접 lock하고 ledger 기록까지 같이 하는 게 가장 확실함.
---
--- ✅ 이 함수는:
--- - wallet을 FOR UPDATE로 잠그고
--- - balance 충분하면 차감 + ledger 기록
--- - dl_ensure_me로 source pid 생성
--- - dl_path_probe로 계산
--- - 결과를 "설명 가능한 path[]" JSON으로 변환해 반환
+-- 6) paid RPC: 코인 차감 + 경로 계산 + Confidence v2 서버 계산
 create or replace function public.dl_path_probe_paid(
   p_user_id uuid,
   p_target_pid text,
@@ -168,6 +159,13 @@ declare
   v_sum int;
   v_path_pids text[];
   v_path jsonb;
+
+  -- Confidence v2
+  v_avg_trust numeric;
+  v_hop_penalty int;
+  v_confidence_raw numeric;
+  v_confidence int;
+  v_confidence_label text;
 begin
   -- 1) 지갑 잠금 + 잔액 확인 + 차감
   select w.balance
@@ -177,7 +175,7 @@ begin
   for update;
 
   if v_balance is null then
-    -- 지갑 없으면 0으로 생성 (정책에 따라 초기 코인 지급도 가능)
+    -- 지갑 없으면 0으로 생성
     insert into public.dl_wallets(user_id, balance)
     values (p_user_id, 0)
     returning balance into v_balance;
@@ -224,6 +222,7 @@ begin
       'source_pid', v_source_pid,
       'target_pid', p_target_pid,
       'max_hops', p_max_hops,
+      'confidenceVersion', 'v2',
       'path', jsonb_build_array()
     );
   end if;
@@ -244,6 +243,34 @@ begin
   from unnest(v_path_pids) with ordinality as x(pid, ord)
   join public.dl_people p on p.pid = x.pid;
 
+  -- 5) Confidence v2 계산
+  -- avgTrust = sumTrust / hops
+  -- hopPenalty = max(0, hops - 1) * 6
+  -- confidenceRaw = (0.55 * bottleneckTrust) + (0.45 * avgTrust) - hopPenalty
+  -- confidence = clamp(round(confidenceRaw), 0, 100)
+  v_avg_trust := case
+    when v_hops is not null and v_hops > 0
+      then (v_sum::numeric / v_hops::numeric)
+    else 0
+  end;
+
+  v_hop_penalty := greatest(0, v_hops - 1) * 6;
+
+  v_confidence_raw :=
+      (0.55 * coalesce(v_bottleneck, 0))
+    + (0.45 * coalesce(v_avg_trust, 0))
+    - v_hop_penalty;
+
+  v_confidence := least(100, greatest(0, round(v_confidence_raw)::int));
+
+  v_confidence_label := case
+    when v_confidence >= 80 then 'Strong Path'
+    when v_confidence >= 60 then 'Good Path'
+    when v_confidence >= 40 then 'Possible Path'
+    when v_confidence >= 20 then 'Weak Path'
+    else 'Fragile Path'
+  end;
+
   return jsonb_build_object(
     'ok', true,
     'found', true,
@@ -255,6 +282,11 @@ begin
     'hops', v_hops,
     'bottleneckTrust', v_bottleneck,
     'sumTrust', v_sum,
+    'avgTrust', round(v_avg_trust, 2),
+    'hopPenalty', v_hop_penalty,
+    'confidence', v_confidence,
+    'confidenceLabel', v_confidence_label,
+    'confidenceVersion', 'v2',
     'path', v_path
   );
 end

@@ -1,0 +1,8 @@
+"from_external_ref,from_type,to_external_ref,to_type,edge_type,verified,weight_base"
+"KR-UNIV-KOREA,org,KR-COMP-NAVER,org,member_of,false,1"
+"KR-UNIV-KOREA,org,KR-COMP-KAKAO,org,member_of,false,1"
+"KR-UNIV-KOREA,org,KR-CITY-SEOUL,org,located_in,true,1"
+"KR-COMP-NAVER,org,KR-CITY-SEOUL,org,located_in,true,1"
+"KR-COMP-KAKAO,org,KR-CITY-SEOUL,org,located_in,true,1"
+"KR-COMP-NAVER,org,KR-IND-IT,org,in_industry,false,1"
+"KR-COMP-KAKAO,org,KR-IND-IT,org,in_industry,false,1"

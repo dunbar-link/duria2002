@@ -1,0 +1,9 @@
+created_at,tier,status,id,trust,from_pid,to_pid,label
+2026-03-08T06:11:28.079Z,50,accepted,3cd586a4-4483-4280-aec8-cdee2b654245,80,org:company:kakao,celeb:kakao-founder-sample,connection
+2026-03-08T06:11:28.079Z,50,accepted,57eed45b-453c-4a13-af18-f1e881ba4fe6,80,org:company:naver,celeb:naver-founder-sample,connection
+2026-03-08T06:11:28.079Z,50,accepted,dabf18ef-f62a-44ec-ab26-1e2eba431145,80,org:company:samsung-electronics,celeb:jay-y-lee,connection
+2026-03-08T06:11:28.079Z,50,accepted,62427650-92be-4bfe-ae5f-dfae720e0072,80,org:company:tesla,celeb:elon-musk,connection
+2026-03-08T06:11:28.079Z,50,accepted,286ea740-7c61-4656-a451-fcb8eeef79c3,80,org:univ:korea-university,celeb:kakao-founder-sample,connection
+2026-03-08T06:11:28.079Z,50,accepted,5e499623-05d6-40f5-ac8f-d4348a30ee4f,80,org:univ:korea-university,celeb:seoul-person-sample,connection
+2026-03-08T06:11:28.079Z,50,accepted,4a4a93b3-838a-41fc-a838-f02a266649f2,80,org:univ:seoul-national-university,celeb:jay-y-lee,connection
+2026-03-08T06:11:28.079Z,50,accepted,150f4329-07ce-4ec3-a6f7-932d703ee8e7,80,org:univ:yonsei-university,celeb:naver-founder-sample,connection
