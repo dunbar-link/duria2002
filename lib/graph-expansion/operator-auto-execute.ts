@@ -1,4 +1,4 @@
-// C:\work\nextjs-server\lib\graph-expansion\operator-auto-execute.ts
+﻿// C:\work\nextjs-server\lib\graph-expansion\operator-auto-execute.ts
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -146,7 +146,7 @@ export type ExecuteAutoExecutePlanResult = {
   decisions: AutoExecuteDecision[];
 };
 
-function getSupabaseAdmin() {
+function getsupabaseAdmin {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -644,7 +644,7 @@ export async function executeAutoExecutePlan(params: {
   limit?: number;
   origin: string;
 }): Promise<ExecuteAutoExecutePlanResult> {
-  const supabase = getSupabaseAdmin();
+  const supabase = getsupabaseAdmin;
   const safeLimit = clamp(params.limit ?? 20, 1, 100);
 
   const { data, error } = await supabase

@@ -1,4 +1,4 @@
-// C:\work\nextjs-server\app\api\my-network\graph-expansion-operator\create-safe-approved-test-candidate\route.ts
+﻿// C:\work\nextjs-server\app\api\my-network\graph-expansion-operator\create-safe-approved-test-candidate\route.ts
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -15,7 +15,7 @@ type CreatePayload = {
   bridgeCompany?: string;
 };
 
-function createSupabaseAdmin() {
+function createsupabaseAdmin {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
 
     const metadata = buildSafeMetadata(targetPid);
 
-    const supabase = createSupabaseAdmin();
+    const supabase = createsupabaseAdmin;
 
     const insertPayload = {
       status: "approved",
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: "safe approved seedReady=true 테스트 후보 생성 완료",
+      message: "safe approved seedReady=true ?뚯뒪???꾨낫 ?앹꽦 ?꾨즺",
       candidate: data,
     });
   } catch (error) {

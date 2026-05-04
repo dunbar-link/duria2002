@@ -1,4 +1,4 @@
-// app/api/onboarding/route.ts
+﻿// app/api/onboarding/route.ts
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "../../../lib/supabase-admin";
 
@@ -120,7 +120,7 @@ async function upsertMembership(
 }
 
 export async function POST(req: Request) {
-  const admin = getSupabaseAdmin();
+  const admin = getsupabaseAdmin;
 
   const userId = await getUserIdFromBearer(admin, req);
   if (!userId) {

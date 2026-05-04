@@ -1,4 +1,4 @@
-// app/api/me/memberships/route.ts
+﻿// app/api/me/memberships/route.ts
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "../../../../lib/supabase-admin";
 
@@ -15,7 +15,7 @@ async function getUserIdFromBearer(admin: ReturnType<typeof getSupabaseAdmin>, r
 }
 
 export async function GET(req: Request) {
-  const admin = getSupabaseAdmin();
+  const admin = getsupabaseAdmin;
   const userId = await getUserIdFromBearer(admin, req);
 
   if (!userId) {

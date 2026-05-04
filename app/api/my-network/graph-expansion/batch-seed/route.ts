@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 type SeedRpcResult = {
@@ -22,7 +22,7 @@ type SeedRpcResult = {
   error: string | null;
 };
 
-function getSupabaseAdmin() {
+function getsupabaseAdmin {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabase = getsupabaseAdmin;
     const results: SeedRpcResult[] = [];
 
     for (const candidateId of candidateIds) {

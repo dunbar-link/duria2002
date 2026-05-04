@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 type SaveBridgeCandidateBody = {
@@ -34,7 +34,7 @@ const ALLOWED_STATUS = new Set([
   "archived",
 ]);
 
-function getSupabaseAdmin() {
+function getsupabaseAdmin {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -95,7 +95,7 @@ function buildEvidenceSummary(input: {
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = getsupabaseAdmin;
     const { searchParams } = new URL(req.url);
 
     const ownerUserId = cleanText(searchParams.get("ownerUserId"));
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = getsupabaseAdmin;
     const body = (await req.json()) as SaveBridgeCandidateBody;
 
     const ownerUserId = cleanText(body.ownerUserId, 100);
@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = getSupabaseAdmin();
+    const supabase = getsupabaseAdmin;
     const body = (await req.json()) as UpdateBridgeCandidateBody;
 
     const id = cleanText(body.id, 100);

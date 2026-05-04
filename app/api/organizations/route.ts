@@ -1,4 +1,4 @@
-// app/api/organizations/route.ts
+﻿// app/api/organizations/route.ts
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "../../../lib/supabase-admin";
 
@@ -11,7 +11,7 @@ function norm(v: string | null, max = 80) {
 }
 
 export async function GET(req: Request) {
-  const admin = getSupabaseAdmin();
+  const admin = getsupabaseAdmin;
   const url = new URL(req.url);
 
   const type = norm(url.searchParams.get("type"));

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getSupabaseAdmin, getSupabaseEnvDebug } from "@/lib/supabase-admin";
 
 type DlPersonDbRow = {
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     const q = sanitizeQuery(searchParams.get("q") || "");
     const terms = buildSearchTerms(q);
 
-    const supabase = getSupabaseAdmin();
+    const supabase = getsupabaseAdmin;
 
     let query = supabase
       .from("dl_people")

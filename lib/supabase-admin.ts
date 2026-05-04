@@ -1,4 +1,4 @@
-// lib/supabase-admin.ts
+﻿// lib/supabase-admin.ts
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 function normalizeText(value: unknown) {
@@ -43,7 +43,7 @@ function readServiceRoleKey() {
   return key;
 }
 
-export function getSupabaseAdmin(): SupabaseClient {
+export function getsupabaseAdmin: SupabaseClient {
   const url = readSupabaseUrl();
   const serviceKey = readServiceRoleKey();
 

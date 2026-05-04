@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     }
 
     const demoUserId = requireEnv("DL_DEMO_USER_ID"); // uuid string (wallets.user_id는 text라 문자열로 저장)
-    const sb = supabaseAdmin();
+    const sb = supabaseAdmin;
 
     // ✅ balance_before (없으면 생성)
     const beforeRes = await sb

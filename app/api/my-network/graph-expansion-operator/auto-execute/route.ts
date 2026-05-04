@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const DEFAULT_OWNER_USER_ID = "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
@@ -76,7 +76,7 @@ type AutoDecision = {
   edgeLabel?: string | null;
 };
 
-function getSupabaseAdmin() {
+function getsupabaseAdmin {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -438,7 +438,7 @@ export async function POST(request: NextRequest) {
 
     const requestedBy = body?.requestedBy ?? "api";
 
-    const supabase = getSupabaseAdmin();
+    const supabase = getsupabaseAdmin;
 
     const { data: walletRow } = await supabase
       .from("dl_wallet_balances")
