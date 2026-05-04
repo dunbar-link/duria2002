@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mapRpcResult } from "@/lib/path/pathMapper";
-import { getSupabaseEnvDebug } from "@/lib/supabase-admin";
 import { runPathProbe } from "@/lib/path/pathService";
 
 const FIXED_OWNER_USER_ID = "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
+
+function getSupabaseEnvDebug() {
+  const url =
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
+  return {
+    hasUrl: Boolean(url),
+    urlHost: url ? new URL(url).host : null,
+    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    hasAnonKey: Boolean(
+      process.env.SUPABASE_ANON_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    ),
+  };
+}
+
 
 type LooseRecord = Record<string, unknown>;
 

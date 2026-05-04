@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from "next/server";
-import { getSupabaseAdmin, getSupabaseEnvDebug } from "@/lib/supabase-admin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type DlPersonDbRow = {
   pid: string;
@@ -21,6 +21,22 @@ type TargetItem = {
   company: string | null;
   school: string | null;
 };
+
+
+function getSupabaseEnvDebug() {
+  const url =
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
+  return {
+    hasUrl: Boolean(url),
+    urlHost: url ? new URL(url).host : null,
+    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    hasAnonKey: Boolean(
+      process.env.SUPABASE_ANON_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    ),
+  };
+}
 
 function sanitizeQuery(value: string) {
   return value.replace(/[%_]/g, "").trim();
@@ -48,7 +64,7 @@ export async function GET(req: Request) {
     const q = sanitizeQuery(searchParams.get("q") || "");
     const terms = buildSearchTerms(q);
 
-    const supabase = getsupabaseAdmin;
+    const supabase = getSupabaseAdmin();
 
     let query = supabase
       .from("dl_people")
