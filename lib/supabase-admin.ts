@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+﻿import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let cachedClient: SupabaseClient | null = null;
 
@@ -43,4 +43,5 @@ export function getSupabaseAdmin(): SupabaseClient {
   return cachedClient;
 }
 
-export default getSupabaseAdmin;
+export default getSupabaseAdmin();
+

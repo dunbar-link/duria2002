@@ -146,7 +146,7 @@ export type ExecuteAutoExecutePlanResult = {
   decisions: AutoExecuteDecision[];
 };
 
-function getsupabaseAdmin {
+function getSupabaseAdmin {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -644,7 +644,7 @@ export async function executeAutoExecutePlan(params: {
   limit?: number;
   origin: string;
 }): Promise<ExecuteAutoExecutePlanResult> {
-  const supabase = getsupabaseAdmin;
+  const supabase = getSupabaseAdmin();
   const safeLimit = clamp(params.limit ?? 20, 1, 100);
 
   const { data, error } = await supabase
@@ -894,3 +894,4 @@ export async function executeAutoExecutePlan(params: {
     decisions,
   };
 }
+

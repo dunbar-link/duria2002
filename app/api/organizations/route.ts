@@ -11,7 +11,7 @@ function norm(v: string | null, max = 80) {
 }
 
 export async function GET(req: Request) {
-  const admin = getsupabaseAdmin;
+  const admin = getSupabaseAdmin();
   const url = new URL(req.url);
 
   const type = norm(url.searchParams.get("type"));
@@ -68,3 +68,4 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ ok: true, count: items.length, items });
 }
+

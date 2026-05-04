@@ -120,7 +120,7 @@ async function upsertMembership(
 }
 
 export async function POST(req: Request) {
-  const admin = getsupabaseAdmin;
+  const admin = getSupabaseAdmin();
 
   const userId = await getUserIdFromBearer(admin, req);
   if (!userId) {
@@ -218,3 +218,4 @@ export async function POST(req: Request) {
     items: created,
   });
 }
+
