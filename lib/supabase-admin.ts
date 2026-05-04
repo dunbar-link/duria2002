@@ -43,7 +43,7 @@ function readServiceRoleKey() {
   return key;
 }
 
-export function getsupabaseAdmin: SupabaseClient {
+export function getSupabaseAdmin(): SupabaseClient {
   const url = readSupabaseUrl();
   const serviceKey = readServiceRoleKey();
 
@@ -77,3 +77,7 @@ export function getSupabaseEnvDebug() {
     hasServiceRoleKey: Boolean(normalizeText(process.env.SUPABASE_SERVICE_ROLE_KEY)),
   };
 }
+
+export const supabaseAdmin = getSupabaseAdmin();
+
+export default getSupabaseAdmin;
