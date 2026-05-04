@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     }
 
     const demoUserId = requireEnv("DL_DEMO_USER_ID"); // uuid string
-    const sb = supabaseAdmin();
+    const sb = supabaseAdmin;
 
     // ✅ balance_before
     const beforeRes = await sb
