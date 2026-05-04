@@ -232,7 +232,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const rows = ((data ?? []) as ContactRow[]).filter((row) => {
+    const rows = ((data ?? []) as unknown as ContactRow[]).filter((row) => {
       return !!norm(row.name);
     });
 
