@@ -35,7 +35,7 @@ function isPersonActionNeeded(
 ) {
   const person = people.find((item) => item.id === entityId);
 
-  if (!person || person.isMe) {
+  if (!person || person.id === "me") {
     return false;
   }
 
