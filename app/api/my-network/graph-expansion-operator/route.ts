@@ -439,7 +439,7 @@ function toOperatorItem(row: GraphExpansionCandidateRow): OperatorItem & {
     qualityScore,
     qualityLabel,
     evidenceStrength,
-    duplicateRisk: String(duplicateRisk),
+    duplicateRisk,
     duplicateLabel: duplicateRisk ? "risky" : "safe",
     seedPriority,
     seedPriorityLabel: getSeedPriorityLabel(seedPriority),
