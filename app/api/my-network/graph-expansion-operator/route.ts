@@ -397,7 +397,7 @@ function toOperatorItem(row: GraphExpansionCandidateRow): OperatorItem & {
     id: row.id,
     qualityScore,
     evidenceStrength,
-    duplicateRisk,
+    duplicateRisk: String(duplicateRisk),
     dangerous: dangerousReasons.length > 0,
     seedPriority,
   });
@@ -439,7 +439,7 @@ function toOperatorItem(row: GraphExpansionCandidateRow): OperatorItem & {
     qualityScore,
     qualityLabel,
     evidenceStrength,
-    duplicateRisk,
+    duplicateRisk: String(duplicateRisk),
     duplicateLabel: duplicateRisk ? "risky" : "safe",
     seedPriority,
     seedPriorityLabel: getSeedPriorityLabel(seedPriority),
