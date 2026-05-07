@@ -807,7 +807,63 @@ export const usePeopleStore = create<PeopleState>()(
             });
           }
 
-          const dedupedPeople = dedupePeopleByIdentity(updatedPeople);
+          const existingKeys = new Set(
+            updatedPeople.map((person) => {
+              const extended = person as DashboardPerson & Record<string, unknown>;
+              const storedUserId = getStoredUserId(extended);
+              const nameKey = normalizePersonName(person.name);
+              return storedUserId
+                ? `user:${storedUserId}`
+                : nameKey
+                  ? `name:${nameKey}`
+                  : `id:${person.id}`;
+            }),
+          );
+
+          const missingAcceptedPeople = normalizedRows
+            .filter((item) => item.status === "accepted")
+            .map((item) => {
+              const acceptedName =
+                cleanText(item.acceptedPersonName) ||
+                cleanText(item.inviteeName) ||
+                "초대받은 사람";
+              const acceptedUserId = cleanText(item.acceptedPersonId);
+              const key = acceptedUserId
+                ? `user:${acceptedUserId}`
+                : `name:${normalizePersonName(acceptedName)}`;
+
+              if (existingKeys.has(key)) {
+                return null;
+              }
+
+              existingKeys.add(key);
+
+              const nextPerson = buildAddedPerson({
+                name: acceptedName,
+                tier: item.tier,
+                relationshipType: item.relationshipType,
+                roleLabel:
+                  item.relationshipLabel ||
+                  getDefaultRelationshipLabel(item.relationshipType),
+              });
+
+              return {
+                ...nextPerson,
+                id: item.sourcePersonId || nextPerson.id,
+                isJoined: true,
+                userId: acceptedUserId || undefined,
+                dlUserId: acceptedUserId || undefined,
+                acceptedPersonId: acceptedUserId || undefined,
+                lastContactAt: item.acceptedAt ?? now,
+                lastContactedAt: item.acceptedAt ?? now,
+              } as DashboardPerson;
+            })
+            .filter((item): item is DashboardPerson => Boolean(item));
+
+          const dedupedPeople = dedupePeopleByIdentity([
+            ...updatedPeople,
+            ...missingAcceptedPeople,
+          ]);
           const nextChannels = buildChannelState(dedupedPeople);
 
           return {

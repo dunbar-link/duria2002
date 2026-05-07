@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentUserId } from "@/lib/auth/current-user";
+import { sendSignal } from "@/lib/signal/send-signal";
+import SignalBottomSheet from "../../_components/home/signal-bottom-sheet";
 import { DashboardPerson } from "../data";
 import {
   buildActionDraft,
@@ -229,6 +232,7 @@ export default function PersonDetailClient({ person }: Props) {
     useState<QuickActionFeedbackTone>("success");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [signalOpen, setSignalOpen] = useState(false);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -344,6 +348,33 @@ export default function PersonDetailClient({ person }: Props) {
   const inviteStatusMeta = useMemo(() => {
     return getInviteStatusMeta(latestInviteDraft);
   }, [latestInviteDraft]);
+
+  const receiverUserId = useMemo(() => {
+    const personRecord = person as DashboardPerson & Record<string, unknown>;
+
+    return (
+      (typeof personRecord.userId === "string" ? personRecord.userId : "") ||
+      (typeof personRecord.dlUserId === "string" ? personRecord.dlUserId : "") ||
+      (typeof personRecord.acceptedPersonId === "string"
+        ? personRecord.acceptedPersonId
+        : "") ||
+      latestInviteDraft?.acceptedPersonId ||
+      ""
+    );
+  }, [person, latestInviteDraft]);
+
+  const isJoined = useMemo(() => {
+    const personRecord = person as DashboardPerson & Record<string, unknown>;
+
+    return (
+      personRecord.isJoined === true ||
+      personRecord.joined === true ||
+      personRecord.status === "joined" ||
+      personRecord.connectionStatus === "joined" ||
+      Boolean(receiverUserId) ||
+      latestInviteDraft?.status === "accepted"
+    );
+  }, [person, receiverUserId, latestInviteDraft]);
 
   async function syncInviteDraftToRemote(inviteDraft: InviteDraft) {
     const supabase = createClient();
@@ -566,227 +597,158 @@ export default function PersonDetailClient({ person }: Props) {
   }
 
   return (
-    <main className="hide-scrollbar flex h-full min-h-0 flex-col overflow-y-auto bg-slate-50 pb-[108px] [overscroll-behavior-y:contain] [scrollbar-width:none]">
-      <div className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/92 px-5 pb-4 pt-4 backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex h-10 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200"
-          >
-            뒤로
-          </button>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="text-sm font-semibold text-slate-500"
+    <>
+      <main className="hide-scrollbar flex h-full min-h-0 flex-col overflow-y-auto bg-[#F5F3EE] pb-[112px] text-[#0F172A] [overscroll-behavior-y:contain] [scrollbar-width:none]">
+        <div className="sticky top-0 z-20 border-b border-[#D3D1C7] bg-[#FAFAF8] px-5 pb-4 pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
             >
+              뒤로
+            </button>
+
+            <Link href="/dashboard" className="text-sm font-semibold text-[#334155]">
               홈
             </Link>
-
-            <Link
-              href="/dashboard/people"
-              className="text-sm font-semibold text-slate-700"
-            >
-              People
-            </Link>
           </div>
-        </div>
 
-        <div className="mt-4">
-          <p className="text-sm font-semibold text-slate-500">관계 상세</p>
-          <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-slate-900">
-            {person.name}
-          </h1>
-        </div>
-
-        {savedMessage ? (
-          <div
-            className={`mt-3 rounded-2xl px-4 py-3 text-sm font-semibold ${feedbackClass(
-              savedMessageTone,
-            )}`}
-          >
-            {savedMessage}
-          </div>
-        ) : null}
-      </div>
-
-      <section className="px-4 pt-4">
-        <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+          <div className="mt-5 flex items-center gap-3">
+            <div className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[16px] border-[2.5px] border-[#7E57C2] bg-[#EFE7FA] text-[20px] font-bold text-[#4B2E83]">
+              {person.name.trim().slice(0, 2) || "?"}
+            </div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-[17px] font-semibold text-slate-900">
-                  초대 / 가입 상태
-                </h2>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${inviteStatusMeta.badgeClass}`}
-                >
-                  {inviteStatusMeta.badge}
+                <h1 className="truncate text-[28px] font-bold tracking-[-0.04em]">
+                  {person.name}
+                </h1>
+                {isJoined ? <span className="h-2 w-2 rounded-full bg-[#079863]" /> : null}
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="rounded-full bg-[#EFE7FA] px-2.5 py-1 text-[12px] font-semibold text-[#4B2E83]">
+                  {person.roleLabel || inviteStatusMeta.badge}
+                </span>
+                <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${inviteStatusMeta.badgeClass}`}>
+                  {isJoined ? "가입 완료" : inviteStatusMeta.badge}
                 </span>
               </div>
-
-              <p className="mt-2 text-sm text-slate-800">
-                {inviteStatusMeta.title}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                {inviteStatusMeta.body}
-              </p>
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                void handleSendInvite();
-              }}
-              className="h-11 rounded-2xl bg-slate-900 px-3 text-sm font-semibold text-white"
-            >
-              초대
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                void handleCheckInviteStatus();
-              }}
-              className="h-11 rounded-2xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-300"
-            >
-              상태
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                void handleCopyInviteLink();
-              }}
-              className="h-11 rounded-2xl bg-white px-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-300"
-            >
-              링크
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-4 px-4">
-        <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-[17px] font-semibold text-slate-900">
-                  지금 행동
-                </h2>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                  {reason.urgencyLabel}
-                </span>
-              </div>
-
-              <p className="mt-2 text-sm font-semibold text-slate-800">
-                {relativeStatusText}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                {reason.body}
-              </p>
+          {savedMessage ? (
+            <div className={`mt-3 rounded-2xl px-4 py-3 text-sm font-semibold ${feedbackClass(savedMessageTone)}`}>
+              {savedMessage}
             </div>
-          </div>
+          ) : null}
+        </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {rankedChannels.slice(0, 4).map((channel) => (
-              <button
-                key={channel.channel}
-                type="button"
-                onClick={() => handleQuickAction(channel.channel)}
-                className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
-              >
-                {getChannelLabel(channel.channel)}
-              </button>
-            ))}
+        <section className="px-4 pt-4">
+          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+            <p className="text-[13px] font-semibold text-[#079863]">
+              {isJoined ? "던바링크에 가입했어요." : "아직 가입 전이에요."}
+            </p>
+            <p className="mt-2 text-[14px] leading-6 text-[#64748B]">
+              {isJoined
+                ? "바로 짧은 신호를 보낼 수 있어요."
+                : "가입 완료 후 신호 보내기가 열려요."}
+            </p>
           </div>
+        </section>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
+        <section className="mt-3 px-4">
+          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
             <button
               type="button"
-              onClick={handleDone}
-              className={`h-11 rounded-2xl text-sm font-semibold ${filledButtonClass(
-                isCompletedActive,
-              )}`}
+              onClick={() => {
+                if (!isJoined || !receiverUserId) {
+                  setSavedMessageTone("neutral");
+                  setSavedMessage("가입 완료 후 신호를 보낼 수 있어요.");
+                  return;
+                }
+                setSignalOpen(true);
+              }}
+              className="flex h-[52px] w-full items-center justify-center rounded-[18px] bg-[#0F172A] text-[15px] font-bold text-white active:scale-95"
             >
-              완료
+              신호 보내기
             </button>
 
             <button
               type="button"
               onClick={() => handleSnooze(3)}
-              className={`h-11 rounded-2xl text-sm font-semibold ${outlinedButtonClass(
-                isSnooze3Active,
-              )}`}
+              className="mt-3 flex h-[48px] w-full items-center justify-center rounded-[18px] bg-white text-[14px] font-bold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
             >
-              3일
+              3일 보류하기
             </button>
 
-            <button
-              type="button"
-              onClick={() => handleSnooze(7)}
-              className={`h-11 rounded-2xl text-sm font-semibold ${outlinedButtonClass(
-                isSnooze7Active,
-              )}`}
-            >
-              7일
-            </button>
+            {remainingSnoozeDays > 0 ? (
+              <p className="mt-3 text-center text-[12px] font-semibold text-[#936018]">
+                현재 {remainingSnoozeDays}일 보류 중
+              </p>
+            ) : null}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="mt-4 px-4">
-        <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-[17px] font-semibold text-slate-900">핵심 정보</h2>
-
-          <div className="mt-4 grid gap-2">
-            <CompactInfoRow label="요약" value={compactSummary} />
-            <CompactInfoRow label="연락 채널" value={compactContactSummary} />
-            <CompactInfoRow label="전화번호" value={person.phone} />
+        <section className="mt-3 px-4">
+          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+            <h2 className="text-[17px] font-bold">기본 정보</h2>
+            <div className="mt-4 grid gap-2">
+              <CompactInfoRow label="이름" value={person.name} />
+              <CompactInfoRow label="관계" value={compactSummary || person.roleLabel} />
+              <CompactInfoRow label="연락" value={compactContactSummary} />
+              <CompactInfoRow label="전화번호" value={person.phone} />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="mt-4 px-4">
-        <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-[17px] font-semibold text-slate-900">노트 / 문구</h2>
-
-          <textarea
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="기억할 점을 짧게 남겨둘 수 있어요."
-            className="mt-4 min-h-[110px] w-full rounded-2xl border-0 bg-slate-50 px-4 py-4 text-base text-slate-900 outline-none ring-1 ring-slate-200 placeholder:text-slate-400"
-          />
-
+        <section className="mt-3 px-4">
           <button
             type="button"
-            onClick={handleSaveNote}
-            className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200"
+            onClick={() => router.push("/dashboard/people")}
+            className="flex h-[46px] w-full items-center justify-center rounded-[18px] bg-white text-[14px] font-bold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
           >
-            노트 저장
+            친구 목록으로
           </button>
+        </section>
+      </main>
 
-          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Draft
-            </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-              {draft}
-            </p>
-          </div>
+      <SignalBottomSheet
+        open={signalOpen}
+        onClose={() => setSignalOpen(false)}
+        onSelect={async (emoji) => {
+          if (!receiverUserId) {
+            setSavedMessageTone("neutral");
+            setSavedMessage("상대 사용자 ID가 아직 연결되지 않았어요.");
+            return;
+          }
 
-          {availableChannels.length > 0 ? (
-            <p className="mt-3 text-[13px] leading-5 text-slate-500">
-              사용 가능:{" "}
-              {availableChannels.map((item) => getChannelLabel(item.channel)).join(" · ")}
-            </p>
-          ) : null}
-        </div>
-      </section>
-    </main>
+          const success = await sendSignal(getCurrentUserId(), [receiverUserId], emoji);
+
+          if (!success) {
+            setSavedMessageTone("neutral");
+            setSavedMessage("신호 전송에 실패했어요.");
+            return;
+          }
+
+          markContacted(person.id);
+          setRelationshipCompleted(person.id);
+          setSavedMessageTone("success");
+          setSavedMessage("신호를 보냈어요.");
+          setSignalOpen(false);
+          setRefreshKey((value) => value + 1);
+
+          void fetch("/api/push/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              receiverIds: [receiverUserId],
+              title: "새 신호가 도착했어요",
+              body: `${emoji} 신호가 왔어요.`,
+              url: "/dashboard/signals",
+            }),
+          });
+        }}
+      />
+    </>
   );
 }

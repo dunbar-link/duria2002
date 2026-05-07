@@ -1918,7 +1918,7 @@ const isJoined =
                 onClick={() => {
                   void handleEnableNotification();
                 }}
-                className="relative isolate flex h-[42px] items-center justify-center gap-[7px] overflow-hidden whitespace-nowrap rounded-[20px] border border-[#D3D1C7] bg-[#FAFAF8] px-[13px] text-[13px] font-semibold text-[#2C2C2A] shadow-none active:scale-95"
+                className="relative flex h-[42px] items-center justify-center gap-[7px] overflow-hidden whitespace-nowrap rounded-[20px] border border-[#D3D1C7] bg-[#FAFAF8] px-[13px] text-[13px] font-semibold text-[#2C2C2A] shadow-none active:scale-95"
               >
                 <span className="h-[6px] w-[6px] rounded-full bg-[#1D9E75]" />
                 {notificationEnabled ? "알림 ON" : "알림"}

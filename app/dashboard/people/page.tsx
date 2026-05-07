@@ -432,6 +432,9 @@ export default function DashboardPeoplePage() {
   const syncInviteDraftsFromRemote = usePeopleStore(
     (state) => state.syncInviteDraftsFromRemote,
   );
+  const syncAcceptedInvitesToPeople = usePeopleStore(
+    (state) => state.syncAcceptedInvitesToPeople,
+  );
 
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [needFilter, setNeedFilter] = useState<NeedFilter>("all");
@@ -498,6 +501,7 @@ export default function DashboardPeoplePage() {
       const rows = (data as RemoteInviteRow[] | null) ?? [];
       setRemoteInvites(rows);
       syncInviteDraftsFromRemote(rows);
+      await syncAcceptedInvitesToPeople();
     }
 
     void loadRemoteInvites();
@@ -505,7 +509,7 @@ export default function DashboardPeoplePage() {
     return () => {
       isMounted = false;
     };
-  }, [syncInviteDraftsFromRemote]);
+  }, [syncInviteDraftsFromRemote, syncAcceptedInvitesToPeople]);
 
   useEffect(() => {
     if (!actionMessage) {
@@ -964,10 +968,8 @@ export default function DashboardPeoplePage() {
 
   const needTabs: NeedFilter[] = ["all", "need", "ok", "later", "done"];
 
-  const summaryPendingCount =
-    remoteInvites.length > 0 ? remotePendingInvites.length : pendingInvites.length;
-  const summaryAcceptedCount =
-    remoteInvites.length > 0 ? remoteAcceptedInvites.length : acceptedInvites.length;
+  const summaryPendingCount = remotePendingInvites.length + pendingInvites.length;
+  const summaryAcceptedCount = enrichedPeople.length;
 
   if (!hasHydrated) {
     return (
@@ -1063,7 +1065,7 @@ export default function DashboardPeoplePage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[120px] pt-4">
         {filteredPeople.length === 0 ? (
-          <EmptyState title="아직 없어요" body="홈에서 사람을 추가하면 여기에 보여요." />
+          <EmptyState title="아직 없어요" body="가입 완료된 사람이 여기에 보여요." />
         ) : (
           <div className="space-y-3">
             {filteredPeople.map((person) => {
