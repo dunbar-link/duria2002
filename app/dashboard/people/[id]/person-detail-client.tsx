@@ -23,7 +23,7 @@ import {
   getRecommendedChannels,
   runPersonContactAction,
 } from "../contact-actions";
-import { InviteDraft, usePeopleStore } from "../store";
+import { InviteDraft, RemoteInviteDraftLike, usePeopleStore } from "../store";
 
 type Props = {
   person: DashboardPerson;
@@ -44,6 +44,32 @@ type RemoteInviteRow = {
   accepted_person_name: string | null;
   accepted_at: string | null;
 };
+
+function normalizeInviteTier(tier: number | null | undefined): InviteDraft["tier"] {
+  if (tier === 1) return 1;
+  if (tier === 5) return 5;
+  if (tier === 15) return 15;
+  if (tier === 50) return 50;
+  return 150;
+}
+
+function normalizeInviteRelationshipType(
+  value: string | null | undefined,
+): InviteDraft["relationshipType"] {
+  if (
+    value === "friend" ||
+    value === "family" ||
+    value === "school" ||
+    value === "work" ||
+    value === "senior_junior" ||
+    value === "business" ||
+    value === "other"
+  ) {
+    return value;
+  }
+
+  return "friend";
+}
 
 function getEmptyStatus(personId: string): RelationshipStatusItem {
   return {
@@ -167,15 +193,18 @@ function getInviteStatusMeta(inviteDraft: InviteDraft | null) {
   };
 }
 
-function mapRemoteInviteRow(row: RemoteInviteRow, sourcePersonId: string | null) {
+function mapRemoteInviteRow(
+  row: RemoteInviteRow,
+  sourcePersonId: string | null,
+): RemoteInviteDraftLike {
   return {
     token: row.token,
     createdAt: row.accepted_at ?? new Date().toISOString(),
     invitePath: `/invite/${row.token}`,
     inviteeName: row.invitee_name ?? "",
     sourcePersonId,
-    tier: row.tier ?? 50,
-    relationshipType: row.relationship_type ?? "friend",
+    tier: normalizeInviteTier(row.tier),
+    relationshipType: normalizeInviteRelationshipType(row.relationship_type),
     relationshipLabel: row.relationship_label ?? "",
     inviterNote: row.inviter_note ?? "",
     status: row.status === "accepted" ? "accepted" : "pending",
@@ -405,8 +434,8 @@ export default function PersonDetailClient({ person }: Props) {
       createInviteDraft({
         sourcePersonId: person.id,
         inviteeName: person.name,
-        tier: person.tier,
-        relationshipType: person.relationshipType,
+        tier: normalizeInviteTier(person.tier),
+        relationshipType: normalizeInviteRelationshipType(person.relationshipType),
         relationshipLabel: person.roleLabel,
       })
     );

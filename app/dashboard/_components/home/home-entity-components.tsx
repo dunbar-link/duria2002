@@ -124,11 +124,11 @@ function isPersonActionNeeded(
 ) {
   const person = people.find((item) => item.id === entityId);
 
-  if (!person || person.isMe) {
+  if (!person || person.id === "me") {
     return false;
   }
 
-  if (!person.isJoined) {
+  if (!(person as any).isJoined) {
     return true;
   }
 
@@ -259,11 +259,12 @@ export function PersonFace({
   layerId?: string;
   tileSize?: number;
 }) {
-  const [meProfileImageDataUrl, setMeProfileImageDataUrl] = useState(() =>
-    isMe ? readMeProfileImageUrl() : "",
-  );
+  const [hasMounted, setHasMounted] = useState(false);
+  const [meProfileImageDataUrl, setMeProfileImageDataUrl] = useState("");
 
   useEffect(() => {
+    setHasMounted(true);
+
     if (!isMe) {
       return;
     }
@@ -283,7 +284,11 @@ export function PersonFace({
   }, [isMe]);
 
   const layerColor = getLayerColor(layerId ?? "friendly");
-  const effectiveImageUrl = isMe && meProfileImageDataUrl ? meProfileImageDataUrl : imageUrl;
+  const effectiveImageUrl = hasMounted
+    ? isMe && meProfileImageDataUrl
+      ? meProfileImageDataUrl
+      : imageUrl
+    : "";
   const faceBackground = isMe ? SELF_PURPLE_BG : layerColor.bg;
   const faceBorder = isMe
     ? `2.5px solid ${SELF_PURPLE_BORDER}`

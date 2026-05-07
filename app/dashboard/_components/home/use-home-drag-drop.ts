@@ -396,10 +396,14 @@ export function useHomeDragDrop({
     [clearDragUiState, dragState, onExternalEntityAdded, setLayoutState]
   );
 
+  const isConnectableDragActive =
+    dragState?.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID;
+
   return {
     dragState,
     dragOverState,
     specialDropTargetKey,
+    isConnectableDragActive,
     clearDragUiState,
     handleDragStart,
     handleDragEnd,

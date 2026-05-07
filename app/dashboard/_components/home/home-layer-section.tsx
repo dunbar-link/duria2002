@@ -13,5 +13,4 @@ export default function HomeLayerSection<TLayer>({
 }: Props<TLayer>) {
   return <div className="space-y-[8px]">{layers.map(renderLayer)}</div>;
 
-if (!person.isJoined) return false;
 }

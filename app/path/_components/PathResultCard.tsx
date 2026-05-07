@@ -17,6 +17,8 @@ type BridgeEvidence = {
   label: string;
 };
 
+type BridgeEvidenceLike = BridgeEvidence | string | null | undefined;
+
 type RecommendationType =
   | "PRIMARY"
   | "FASTEST"
@@ -26,10 +28,13 @@ type RecommendationType =
 
 type DiscoverPathCandidate = {
   people?: DiscoverPathNode[];
+  nodes?: DiscoverPathNode[];
+  hops?: number | null;
   stepCount?: number | null;
+  firstConnector?: DiscoverPathNode | null;
   firstConnectorPid?: string | null;
   firstConnectorName?: string | null;
-  firstConnectorEvidence?: BridgeEvidence | null;
+  firstConnectorEvidence?: BridgeEvidenceLike;
   tierAverage?: number | null;
   score?: number | null;
   presentedPath?: string;
@@ -50,7 +55,7 @@ type DiscoverPayload = {
   userMessage?: string;
   path?: DiscoverPathNode[];
   firstConnectorName?: string;
-  firstConnectorEvidence?: BridgeEvidence | null;
+  firstConnectorEvidence?: BridgeEvidenceLike;
   presentedPathText?: string;
   bestPath?: DiscoverPathCandidate | null;
   allPaths?: DiscoverPathCandidate[];
@@ -92,6 +97,14 @@ function formatDecimal(value: number | null | undefined) {
   return value.toFixed(2);
 }
 
+function getEvidenceLabel(evidence: BridgeEvidenceLike) {
+  if (typeof evidence === "string") {
+    return normalizeText(evidence);
+  }
+
+  return normalizeText(evidence?.label);
+}
+
 function buildCandidatePathLine(candidate: DiscoverPathCandidate) {
   const explicit = normalizeText(candidate.presentedPath);
 
@@ -99,7 +112,11 @@ function buildCandidatePathLine(candidate: DiscoverPathCandidate) {
     return explicit;
   }
 
-  const people = Array.isArray(candidate.people) ? candidate.people : [];
+  const people = Array.isArray(candidate.people)
+    ? candidate.people
+    : Array.isArray(candidate.nodes)
+    ? candidate.nodes
+    : [];
 
   if (people.length === 0) {
     return "";
@@ -277,7 +294,7 @@ function buildAlternativeReason(
   targetName: string
 ) {
   const firstConnector = normalizeText(candidate.firstConnectorName);
-  const evidence = normalizeText(candidate.firstConnectorEvidence?.label);
+  const evidence = getEvidenceLabel(candidate.firstConnectorEvidence);
   const stepCount =
     typeof candidate.stepCount === "number" ? candidate.stepCount : null;
   const safeTargetName = normalizeText(targetName) || "이 타겟";
@@ -353,7 +370,7 @@ export default function PathResultCard({
   children,
 }: PathResultCardProps) {
   const connectorName = normalizeText(result?.firstConnectorName);
-  const evidenceLabel = normalizeText(result?.firstConnectorEvidence?.label);
+  const evidenceLabel = getEvidenceLabel(result?.firstConnectorEvidence);
   const presentedPath =
     normalizeText(result?.presentedPathText) || normalizeText(pathLine);
 
@@ -582,7 +599,7 @@ export default function PathResultCard({
               const altPathLine = buildCandidatePathLine(candidate);
               const altFirstConnector = normalizeText(candidate.firstConnectorName);
               const altEvidence = normalizeText(
-                candidate.firstConnectorEvidence?.label
+                getEvidenceLabel(candidate.firstConnectorEvidence)
               );
               const altStepCount =
                 typeof candidate.stepCount === "number"

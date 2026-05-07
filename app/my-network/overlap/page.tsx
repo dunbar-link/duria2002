@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 const FIXED_OWNER_USER_ID = "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
@@ -73,9 +73,10 @@ function metaLine(person: SharedPerson) {
   return items.length > 0 ? items.join(" · ") : "추가 메타데이터 없음";
 }
 
-function buildExploreHref(ownerUserId: string, person: SharedPerson) {
+function buildExploreHref(ownerUserId: string, otherOwnerUserId: string, person: SharedPerson) {
   const params = new URLSearchParams();
   params.set("ownerUserId", ownerUserId);
+  params.set("otherOwnerUserId", otherOwnerUserId);
   params.set("name", person.displayName);
   if (person.city) params.set("city", person.city);
   if (person.school) params.set("school", person.school);
@@ -84,7 +85,17 @@ function buildExploreHref(ownerUserId: string, person: SharedPerson) {
   return `/my-network/overlap/explore?${params.toString()}`;
 }
 
-export default function MyNetworkOverlapPage() {
+function LoadingScreen() {
+  return (
+    <main className="min-h-screen bg-[#0f172a] px-4 py-6 text-white">
+      <div className="mx-auto flex min-h-[360px] max-w-6xl items-center justify-center rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+        연결 정보를 불러오는 중...
+      </div>
+    </main>
+  );
+}
+
+function MyNetworkOverlapPageContent() {
   const searchParams = useSearchParams();
 
   const ownerUserId = useMemo(() => {
@@ -129,252 +140,136 @@ export default function MyNetworkOverlapPage() {
     };
   }, [ownerUserId]);
 
+  const ownerGroups = data?.ok ? data.ownerGroups : [];
+  const summary = data?.ok ? data.summary : null;
+
   return (
-    <main className="min-h-screen bg-neutral-950 text-white">
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-6">
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl">
-          <div className="mb-3 flex items-center justify-between gap-3">
+    <main className="min-h-screen bg-[#0f172a] px-4 py-6 text-white">
+      <div className="mx-auto max-w-6xl space-y-5">
+        <header className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-white/50">
-                Mutual Network Discovery
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">
+                Dunbar Link Overlap
               </p>
-              <h1 className="mt-1 text-2xl font-semibold leading-tight">
-                너도 이 사람 알아?
-              </h1>
+              <h1 className="mt-2 text-2xl font-bold">겹치는 인맥 찾기</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">
+                내 네트워크와 다른 사용자 네트워크 사이에 반복해서 등장하는 사람을 찾아 연결 후보로 정리합니다.
+              </p>
             </div>
-            <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-white/70">
-              1차 구현
-            </div>
-          </div>
-
-          <p className="text-sm leading-6 text-white/75">
-            내 네트워크와 다른 owner 네트워크 사이에서, 같은 사람일 가능성이 높은
-            공통 지인 후보를 보여줍니다. 현재 버전은 이름만 같은 경우는 제외하고,
-            이름 + 학교 / 회사 / 도시 조합이 겹칠 때만 후보로 올립니다.
-          </p>
-
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-3 text-sm">
-            <div className="text-white/60">현재 ownerUserId</div>
-            <div className="mt-1 break-all font-mono text-xs text-white/90">
-              {ownerUserId}
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href="/my-network"
-              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+              className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-white/15"
             >
-              내 인맥으로 돌아가기
+              내 네트워크로 돌아가기
             </Link>
-            <Link
-              href={`/my-network/overlap?ownerUserId=${encodeURIComponent(ownerUserId)}`}
-              className="rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-400/15"
-            >
-              다시 계산하기
-            </Link>
+          </div>
+        </header>
+
+        <section className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs text-white/45">내 연락처</p>
+            <p className="mt-2 text-2xl font-bold">{summary?.myContactCount ?? "-"}</p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs text-white/45">비교 사용자</p>
+            <p className="mt-2 text-2xl font-bold">{summary?.comparedOwnerCount ?? "-"}</p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs text-white/45">겹침 사용자</p>
+            <p className="mt-2 text-2xl font-bold">{summary?.overlapOwnerCount ?? "-"}</p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <p className="text-xs text-white/45">겹친 사람</p>
+            <p className="mt-2 text-2xl font-bold">{summary?.overlapPersonCount ?? "-"}</p>
           </div>
         </section>
 
-        {loading ? (
-          <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
-            <div className="animate-pulse text-sm text-white/70">
-              overlap 후보를 계산하는 중...
-            </div>
-          </section>
-        ) : null}
-
-        {!loading && data?.ok ? (
-          <>
-            <section className="grid grid-cols-2 gap-3">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/55">내 active contact</div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {data.summary.myContactCount}
-                </div>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/55">비교된 다른 owner</div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {data.summary.comparedOwnerCount}
-                </div>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/55">겹침 있는 owner</div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {data.summary.overlapOwnerCount}
-                </div>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/55">총 overlap 후보</div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {data.summary.overlapPersonCount}
-                </div>
-              </div>
-            </section>
-
-            {data.note ? (
-              <section className="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-                {data.note}
-              </section>
-            ) : null}
-
-            <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
-              <h2 className="text-lg font-semibold">매칭 기준</h2>
-              <div className="mt-3 flex flex-col gap-2">
-                {(data.rules ?? []).map((rule) => (
-                  <div
-                    key={rule.rule}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-3 py-2 text-sm"
-                  >
-                    <span className="text-white/80">{rule.label}</span>
-                    <span className="rounded-full border border-white/10 bg-white/10 px-2 py-1 text-xs text-white/70">
-                      score {rule.score}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {data.ownerGroups.length === 0 ? (
-              <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                <h2 className="text-lg font-semibold">결과</h2>
-                <p className="mt-3 text-sm leading-6 text-white/75">
-                  아직 공통 지인 후보가 없습니다. 이 상태면 다음 액션은 두 가지입니다.
-                  먼저 <span className="font-semibold text-white">/my-network</span>에서
-                  인맥 수를 더 늘리고, 학교 / 회사 / 도시 정보를 더 정확히 입력하세요.
-                </p>
-              </section>
-            ) : (
-              <section className="flex flex-col gap-4">
-                {data.ownerGroups.map((group, index) => (
-                  <article
-                    key={`${group.otherOwnerUserId}-${index}`}
-                    className="rounded-3xl border border-white/10 bg-white/5 p-5"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.22em] text-white/45">
-                          overlap owner #{index + 1}
-                        </div>
-                        <h2 className="mt-1 text-lg font-semibold">
-                          다른 네트워크 {shortUserId(group.otherOwnerUserId)}
-                        </h2>
-                      </div>
-                      <div className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">
-                        {group.sharedCount}명 겹침
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                        <div className="text-xs text-white/50">평균 매칭 점수</div>
-                        <div className="mt-1 text-lg font-semibold">
-                          {group.avgMatchScore}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                        <div className="text-xs text-white/50">최고 매칭 점수</div>
-                        <div className="mt-1 text-lg font-semibold">
-                          {group.strongestMatchScore}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-col gap-3">
-                      {group.sharedPeople.map((person) => (
-                        <div
-                          key={person.dedupeKey}
-                          className="rounded-2xl border border-white/10 bg-black/25 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-base font-semibold">
-                                {person.displayName}
-                              </div>
-                              <div className="mt-1 text-sm text-white/60">
-                                {metaLine(person)}
-                              </div>
-                            </div>
-                            <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/75">
-                              {scoreLabel(person.matchScore)}
-                            </div>
-                          </div>
-
-                          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80">
-                            {person.matchLabel}
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                              <div className="text-xs text-white/50">내 네트워크</div>
-                              <div className="mt-1 text-white/85">
-                                Tier {person.myTier ?? "-"} · Trust {person.myTrust ?? "-"}
-                              </div>
-                            </div>
-                            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                              <div className="text-xs text-white/50">상대 네트워크</div>
-                              <div className="mt-1 text-white/85">
-                                Tier {person.otherTier ?? "-"} · Trust {person.otherTrust ?? "-"}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-col gap-2">
-                            <Link
-                              href={buildExploreHref(ownerUserId, person)}
-                              className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/15"
-                            >
-                              이 겹침으로 타겟 찾기
-                            </Link>
-
-                            <Link
-                              href="/path"
-                              className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
-                            >
-                              그냥 경로 탐색 화면으로 이동
-                            </Link>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </section>
-            )}
-
-            <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
-              <h2 className="text-lg font-semibold">이 다음 단계</h2>
-              <div className="mt-3 space-y-2 text-sm leading-6 text-white/75">
-                <p>1차 구현은 overlap 후보 계산과 리스트 출력까지입니다.</p>
-                <p>
-                  이번 단계에서는 overlap 후보를 눌러서
-                  <span className="font-semibold text-white">
-                    관련 타겟 후보를 다시 추천받는 연결 화면
-                  </span>
-                  으로 넘어갑니다.
-                </p>
-                <p>
-                  다음 단계에서는 여기서 바로
-                  <span className="font-semibold text-white">
-                    /path 자동 진입 + 자동 discover
-                  </span>
-                  까지 연결하면 됩니다.
-                </p>
-              </div>
-            </section>
-          </>
-        ) : null}
+        {loading ? <LoadingScreen /> : null}
 
         {!loading && data && !data.ok ? (
           <section className="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-5">
             <h2 className="text-lg font-semibold text-rose-100">API 오류</h2>
-            <p className="mt-3 break-all text-sm leading-6 text-rose-100/90">
-              {data.error}
-            </p>
+            <p className="mt-3 break-all text-sm leading-6 text-rose-100/90">{data.error}</p>
+          </section>
+        ) : null}
+
+        {!loading && data?.ok && ownerGroups.length === 0 ? (
+          <section className="rounded-3xl border border-white/10 bg-white/5 p-5 text-sm text-white/70">
+            아직 겹치는 인맥 후보가 없습니다.
+          </section>
+        ) : null}
+
+        {!loading && data?.ok && ownerGroups.length > 0 ? (
+          <section className="space-y-4">
+            {ownerGroups.map((group) => (
+              <article
+                key={group.otherOwnerUserId}
+                className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs text-white/45">상대 사용자</p>
+                    <h2 className="mt-1 text-lg font-semibold">
+                      {shortUserId(group.otherOwnerUserId)}
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs text-white/70">
+                    <div className="rounded-2xl bg-white/10 px-3 py-2">
+                      <p className="text-white/45">공유</p>
+                      <p className="mt-1 font-semibold text-white">{group.sharedCount}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/10 px-3 py-2">
+                      <p className="text-white/45">평균</p>
+                      <p className="mt-1 font-semibold text-white">{Math.round(group.avgMatchScore)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/10 px-3 py-2">
+                      <p className="text-white/45">최고</p>
+                      <p className="mt-1 font-semibold text-white">{Math.round(group.strongestMatchScore)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {group.sharedPeople.map((person) => (
+                    <Link
+                      key={`${group.otherOwnerUserId}-${person.dedupeKey}-${person.otherContactId}`}
+                      href={buildExploreHref(ownerUserId, group.otherOwnerUserId, person)}
+                      className="rounded-3xl border border-white/10 bg-white/10 p-4 transition hover:bg-white/15"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-semibold">{person.displayName}</h3>
+                          <p className="mt-1 text-xs text-white/55">{metaLine(person)}</p>
+                        </div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-900">
+                          {Math.round(person.matchScore)}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full bg-white/10 px-3 py-1 text-white/75">
+                          {person.matchLabel || scoreLabel(person.matchScore)}
+                        </span>
+                        <span className="rounded-full bg-white/10 px-3 py-1 text-white/75">
+                          {person.matchRule}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </article>
+            ))}
           </section>
         ) : null}
       </div>
     </main>
+  );
+}
+
+export default function MyNetworkOverlapPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <MyNetworkOverlapPageContent />
+    </Suspense>
   );
 }

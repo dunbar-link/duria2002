@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PathHeader from "./_components/PathHeader";
 import OverlapSourceSection from "./_components/OverlapSourceSection";
@@ -73,7 +73,7 @@ function readPendingExploreFromSession(): PendingExplorePayload | null {
   }
 }
 
-export default function PathPage() {
+function PathPageContent() {
   const searchParams = useSearchParams();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const autoTriggeredRef = useRef(false);
@@ -453,5 +453,21 @@ export default function PathPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function PathPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-50">
+          <div className="mx-auto flex min-h-[320px] max-w-6xl items-center justify-center px-4 py-8 text-sm text-slate-500">
+            경로 정보를 불러오는 중...
+          </div>
+        </main>
+      }
+    >
+      <PathPageContent />
+    </Suspense>
   );
 }

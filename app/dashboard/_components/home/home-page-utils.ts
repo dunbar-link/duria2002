@@ -233,19 +233,27 @@ export function getHiddenEntityRealCount(
 
 export function getHomeLayerDerivedStateMap(
   layoutState: Record<string, LayerLayoutState>,
-  folders: FolderMap
+  folders: FolderMap,
+  blueprints: LayerBlueprint[] = layerBlueprints
 ): Record<string, HomeLayerDerivedState> {
   return Object.fromEntries(
-    layerBlueprints.map((layer) => [
-      layer.id,
-      {
-        hiddenCount: getHiddenEntityRealCount(
-          layoutState[layer.id].hiddenSlotIds,
-          folders
-        ),
-        dynamicCountLabel: getDynamicCountLabel(layer, layoutState, folders),
-      },
-    ])
+    blueprints.map((layer) => {
+      const layerState = layoutState[layer.id] ?? {
+        visibleSlotIds: [],
+        hiddenSlotIds: [],
+      };
+
+      return [
+        layer.id,
+        {
+          hiddenCount: getHiddenEntityRealCount(
+            layerState.hiddenSlotIds,
+            folders
+          ),
+          dynamicCountLabel: getDynamicCountLabel(layer, layoutState, folders),
+        },
+      ];
+    })
   );
 }
 
@@ -717,13 +725,32 @@ export function hasEntityInLayout(
   return Boolean(findEntityLocation(current, entityId));
 }
 
+type InsertExternalEntityToTargetInput = {
+  entityId: string;
+  targetLayerId: string;
+  targetArea: DragSourceArea;
+  targetIndex?: number;
+};
+
 export function insertExternalEntityToTarget(
   current: Record<string, LayerLayoutState>,
-  entityId: string,
-  targetLayerId: string,
-  targetArea: DragSourceArea,
-  targetIndex?: number
+  entityIdOrInput: string | InsertExternalEntityToTargetInput,
+  targetLayerIdInput?: string,
+  targetAreaInput?: DragSourceArea,
+  targetIndexInput?: number
 ) {
+  const input: InsertExternalEntityToTargetInput =
+    typeof entityIdOrInput === "string"
+      ? {
+          entityId: entityIdOrInput,
+          targetLayerId: targetLayerIdInput ?? "maintain",
+          targetArea: targetAreaInput ?? "hidden",
+          targetIndex: targetIndexInput,
+        }
+      : entityIdOrInput;
+
+  const { entityId, targetLayerId, targetArea, targetIndex } = input;
+
   if (hasEntityInLayout(current, entityId)) {
     return current;
   }
@@ -1428,8 +1455,11 @@ export function markConnectableCandidateRecommended(
 
 type MarkAddedInput = {
   entityId: string;
+  targetPid?: string;
+  name?: string;
   targetLayerId: string;
   targetArea: DragSourceArea;
+  targetIndex?: number;
   source?: string;
 };
 
@@ -1439,6 +1469,8 @@ export function markConnectableCandidateAddedToLayer(
 ) {
   return upsertConnectableCandidateState(current, {
     entityId: input.entityId,
+    targetPid: input.targetPid,
+    name: input.name,
     status: "added_to_layer",
     addedToLayerId: input.targetLayerId,
     addedToArea: input.targetArea,

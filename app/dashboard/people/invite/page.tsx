@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 import type { AddDashboardPersonInput } from "../data";
 import { usePeopleStore } from "../store";
 import { createClient } from "@/lib/supabase/client";
@@ -36,7 +36,7 @@ type RemoteInviteStatus = {
   acceptedAt: string | null;
 };
 
-export default function CreateInvitePage() {
+function CreateInvitePageContent() {
   const searchParams = useSearchParams();
   const createInviteDraft = usePeopleStore((state) => state.createInviteDraft);
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
@@ -345,78 +345,24 @@ ${latestInviteUrl}`;
               {isSubmitting ? "생성 중..." : "설치형 초대 링크 생성"}
             </button>
           </form>
-
-          {latestInvite ? (
-            <div className="mt-5 border-t border-slate-100 pt-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">
-                    RESULT
-                  </p>
-                  <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-                    설치형 초대 준비 완료
-                  </h2>
-                </div>
-
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    remoteStatus?.status === "accepted"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  {remoteStatus?.status === "accepted" ? "입력 완료" : "대기 중"}
-                </span>
-              </div>
-
-              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Install Invite URL
-                </p>
-                <p className="mt-2 break-all text-sm leading-6 text-slate-700">
-                  {latestInviteUrl || latestInvite.invitePath}
-                </p>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3">
-                <button
-                  type="button"
-                  onClick={() => copyText(latestInviteUrl, "링크를 복사했어요.")}
-                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white"
-                >
-                  링크 복사
-                </button>
-
-                <a
-                  href={buildSmsHref()}
-                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200"
-                >
-                  문자 보내기
-                </a>
-
-                <Link
-                  href={latestInvite.invitePath}
-                  className="inline-flex h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200"
-                >
-                  받은 사람 화면 보기
-                </Link>
-              </div>
-
-              {remoteStatus?.status === "accepted" ? (
-                <div className="mt-4 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
-                  <p className="text-sm font-semibold text-emerald-700">
-                    {remoteStatus.acceptedPersonName ?? "상대"}님이 입력을 완료했어요.
-                  </p>
-
-                  <p className="mt-1 text-sm text-emerald-700/90">
-                    다른 기기 입력도 이제 서버에 저장된다.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </section>
       </div>
     </main>
+  );
+}
+
+export default function CreateInvitePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-50 pb-6">
+          <div className="mx-auto flex min-h-[320px] max-w-md items-center justify-center px-4 py-6 text-sm text-slate-500">
+            초대 정보를 불러오는 중...
+          </div>
+        </main>
+      }
+    >
+      <CreateInvitePageContent />
+    </Suspense>
   );
 }

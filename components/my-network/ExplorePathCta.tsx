@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 
 type Evidence = {
   orgPid: string;
@@ -24,7 +25,8 @@ type RecommendedTarget = {
 
 type Props = {
   ownerUserId: string;
-  items: RecommendedTarget[];
+  items?: RecommendedTarget[];
+  syncSignal?: number;
 };
 
 function getTargetBadge(category: string) {
@@ -37,23 +39,41 @@ function getTargetBadge(category: string) {
   return "Target";
 }
 
-export default function ExplorePathCta({ ownerUserId, items }: Props) {
-  if (!items || items.length === 0) {
+function buildPathUrl(ownerUserId: string, item: RecommendedTarget) {
+  const params = new URLSearchParams({
+    ownerUserId,
+    targetPid: item.pid,
+    recScore: String(item.score),
+    recReason: item.reason,
+    recSourceHint: item.sourceHint,
+  });
+
+  return `/path?${params.toString()}`;
+}
+
+export default function ExplorePathCta({
+  ownerUserId,
+  items = [],
+  syncSignal: _syncSignal,
+}: Props) {
+  const safeOwnerUserId = ownerUserId.trim();
+
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => Boolean(item.pid && item.displayName));
+  }, [items]);
+
+  if (visibleItems.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <p className="text-sm text-slate-600">
-          아직 추천 가능한 타겟이 없습니다.
-        </p>
+        <p className="text-sm text-slate-600">아직 추천 가능한 타겟이 없습니다.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {items.map((item) => {
-        const url = `/path?ownerUserId=${ownerUserId}&targetPid=${item.pid}&recScore=${item.score}&recReason=${encodeURIComponent(
-          item.reason
-        )}&recSourceHint=${encodeURIComponent(item.sourceHint)}`;
+      {visibleItems.map((item) => {
+        const url = buildPathUrl(safeOwnerUserId, item);
 
         return (
           <Link
@@ -95,7 +115,7 @@ export default function ExplorePathCta({ ownerUserId, items }: Props) {
                   예상 경로
                 </p>
 
-                <p className="mt-1 text-sm text-slate-700 break-words">
+                <p className="mt-1 break-words text-sm text-slate-700">
                   {item.previewPathHint}
                 </p>
               </div>

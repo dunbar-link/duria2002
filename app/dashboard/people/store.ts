@@ -9,6 +9,7 @@ import {
   AddDashboardPersonInput,
   buildAddedPerson,
   DashboardPerson,
+  DashboardTier,
   getChannelAvailability,
   ContactChannel,
   RelationshipType,
@@ -51,7 +52,7 @@ export type InviteDraft = {
 export type CreateInviteDraftInput = {
   inviteeName?: string;
   sourcePersonId?: string | null;
-  tier: AddDashboardPersonInput["tier"];
+  tier: DashboardTier;
   relationshipType: RelationshipType;
   relationshipLabel?: string;
   inviterNote?: string;
@@ -66,8 +67,8 @@ export type RemoteInviteDraftLike = {
   sourcePersonId?: string | null;
   source_person_id?: string | null;
   tier?: AddDashboardPersonInput["tier"] | number | null;
-  relationshipType?: RelationshipType | null;
-  relationship_type?: RelationshipType | null;
+  relationshipType?: RelationshipType | string | null;
+  relationship_type?: RelationshipType | string | null;
   relationshipLabel?: string | null;
   relationship_label?: string | null;
   inviterNote?: string | null;
@@ -287,9 +288,13 @@ function normalizeRelationshipType(value: unknown): RelationshipType {
     value === "work" ||
     value === "senior_junior" ||
     value === "business" ||
-    value === "etc"
+    value === "other"
   ) {
     return value;
+  }
+
+  if (value === "etc") {
+    return "other";
   }
 
   return "friend";
@@ -637,7 +642,7 @@ export const usePeopleStore = create<PeopleState>()(
           invitePath: `/invite/${token}`,
           inviteeName: cleanText(input.inviteeName),
           sourcePersonId: input.sourcePersonId?.trim() || null,
-          tier: input.tier,
+          tier: normalizeTier(input.tier),
           relationshipType,
           relationshipLabel,
           inviterNote: cleanText(input.inviterNote),
@@ -796,9 +801,9 @@ export const usePeopleStore = create<PeopleState>()(
               status: "accepted",
               acceptedAt: item.acceptedAt ?? existing?.acceptedAt ?? now,
               acceptedPersonId:
-                item.acceptedPersonId ?? existing?.acceptedPersonId,
+                item.acceptedPersonId ?? existing?.acceptedPersonId ?? null,
               acceptedPersonName:
-                item.acceptedPersonName ?? existing?.acceptedPersonName,
+                item.acceptedPersonName ?? existing?.acceptedPersonName ?? null,
             });
           }
 

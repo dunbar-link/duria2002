@@ -28,6 +28,15 @@ import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
 import SignalBottomSheet from "./signal-bottom-sheet";
 
+type PersonRuntimeFlags = {
+  isMe?: boolean;
+  isJoined?: boolean;
+  joined?: boolean;
+  status?: string;
+  connectionStatus?: string;
+};
+
+
 function isPersonActionNeeded(
   entityId: string,
   people: DashboardPerson[],
@@ -39,7 +48,7 @@ function isPersonActionNeeded(
     return false;
   }
 
-  if (!person.isJoined) {
+  if (!((person as DashboardPerson & PersonRuntimeFlags).isJoined === true || (person as DashboardPerson & PersonRuntimeFlags).joined === true || (person as DashboardPerson & PersonRuntimeFlags).status === "joined" || (person as DashboardPerson & PersonRuntimeFlags).connectionStatus === "joined")) {
     return true;
   }
 

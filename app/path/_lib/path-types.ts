@@ -7,11 +7,36 @@ export type DiscoverPathNode = {
   isCelebrity?: boolean;
 };
 
+export type BridgeEvidence = {
+  type: "school" | "company" | "city" | "unknown";
+  label: string;
+};
+
+export type BridgeEvidenceLike = BridgeEvidence | string | null | undefined;
+
+export type RecommendationType =
+  | "PRIMARY"
+  | "FASTEST"
+  | "STRONGEST"
+  | "BALANCED"
+  | "BACKUP";
+
 export type PresentedPath = {
   nodes: DiscoverPathNode[];
   hops: number;
   score: number;
   firstConnector?: DiscoverPathNode | null;
+};
+
+export type DiscoverPathCandidate = PresentedPath & {
+  people?: DiscoverPathNode[];
+  stepCount?: number | null;
+  firstConnectorPid?: string | null;
+  firstConnectorName?: string | null;
+  firstConnectorEvidence?: BridgeEvidenceLike;
+  tierAverage?: number | null;
+  presentedPath?: string;
+  recommendationType?: RecommendationType;
 };
 
 export type DiscoverPayload = {
@@ -36,10 +61,12 @@ export type DiscoverPayload = {
   // 기존 path
   path?: DiscoverPathNode[];
 
-  // ✅ 신규 핵심
-  bestPath?: PresentedPath;
-  allPaths?: PresentedPath[];
-  firstConnectorEvidence?: string;
+  // 연결 경로 결과
+  firstConnectorName?: string;
+  firstConnectorEvidence?: BridgeEvidenceLike;
+  presentedPathText?: string;
+  bestPath?: DiscoverPathCandidate | PresentedPath | null;
+  allPaths?: Array<DiscoverPathCandidate | PresentedPath>;
 };
 
 export type DiscoverResponse =

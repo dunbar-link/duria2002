@@ -146,7 +146,7 @@ export type ExecuteAutoExecutePlanResult = {
   decisions: AutoExecuteDecision[];
 };
 
-function getSupabaseAdmin {
+function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -676,7 +676,7 @@ export async function executeAutoExecutePlan(params: {
     throw new Error(error.message);
   }
 
-  const candidates = (data ?? []) as CandidateRow[];
+  const candidates = (data ?? []) as unknown as CandidateRow[];
   const decisions: AutoExecuteDecision[] = [];
 
   for (const candidate of candidates) {
@@ -719,8 +719,6 @@ export async function executeAutoExecutePlan(params: {
 
     if (candidate.status !== "approved") {
       decision.reason = "not_approved";
-    } else if (candidate.status === "seeded") {
-      decision.reason = "already_seeded";
     } else if (metrics.dangerous) {
       decision.reason = "dangerous";
     } else if (intelligence.riskLevel === "review") {

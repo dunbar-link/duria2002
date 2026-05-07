@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type BridgeCandidateItem = {
@@ -249,7 +249,7 @@ function StatusControl({ item, onStatusUpdated }: StatusControlProps) {
   );
 }
 
-export default function BridgeCandidatesPage() {
+function BridgeCandidatesPageContent() {
   const searchParams = useSearchParams();
 
   const ownerUserId = searchParams.get("ownerUserId") || "";
@@ -558,5 +558,21 @@ export default function BridgeCandidatesPage() {
           : null}
       </div>
     </main>
+  );
+}
+
+export default function BridgeCandidatesPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-neutral-50 px-4 py-6 text-neutral-900">
+          <div className="mx-auto flex min-h-[320px] w-full max-w-md items-center justify-center text-sm text-neutral-500">
+            bridge candidates 불러오는 중...
+          </div>
+        </main>
+      }
+    >
+      <BridgeCandidatesPageContent />
+    </Suspense>
   );
 }

@@ -80,7 +80,6 @@ import {
   markConnectableCandidateDismissed,
   markConnectableCandidateExplored,
   readConnectableCandidateStateMap,
-  syncConnectableStateWithLayout,
   writeConnectableCandidateStateMap,
 } from "../../dashboard/_components/home/home-page-utils";
 import { useHomeDragDrop } from "../../dashboard/_components/home/use-home-drag-drop";
@@ -88,7 +87,6 @@ import { useHomeFolderInteractions } from "../../dashboard/_components/home/use-
 import { useHomeLayerSheet } from "../../dashboard/_components/home/use-home-layer-sheet";
 import { useHomeLayoutStorage } from "../../dashboard/_components/home/use-home-layout-storage";
 import HomeMoveMenu from "../../dashboard/_components/home-move-menu";
-import type { ConnectableCandidate } from "../../dashboard/_components/home/connectable-candidate-types";
 import { usePeopleStore, type InviteDraft } from "../../dashboard/people/store";
 
 import { setRelationshipActionStarted } from "../../dashboard/people/relationship-status";
@@ -100,12 +98,22 @@ const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000;
 const DEFER_DURATION_MS = 60 * 60 * 1000;
 const HOME_ONBOARDING_STORAGE_KEY = "dunbar-link-home-onboarding-dismissed-v1";
 
-function getTierByLayerId(layerId: string): number {
+type HomeInviteTier = 1 | 5 | 15 | 50 | 150;
+
+function getTierByLayerId(layerId: string): HomeInviteTier {
   if (layerId === "family") return 1;
   if (layerId === "core") return 5;
   if (layerId === "intimate") return 15;
   if (layerId === "trust") return 50;
   return 150;
+}
+
+function getLayerIdByTier(tier: number): string {
+  if (tier === 1) return "family";
+  if (tier === 5) return "core";
+  if (tier === 15) return "intimate";
+  if (tier === 50) return "trust";
+  return "friendly";
 }
 
 function getLayerLabelById(layerId: string): string {
@@ -706,16 +714,27 @@ async function handleEnableNotification() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const derivedStateMap = useMemo(() => {
-    return getHomeLayerDerivedStateMap(layoutState, folders, layerBlueprints);
+    return getHomeLayerDerivedStateMap(layoutState, folders);
   }, [layoutState, folders]);
 
-  const occupiedEntityIds = useMemo(() => {
-    return new Set(
-      Object.values(layoutState).flatMap((layer) => [
-        ...layer.visibleSlotIds.filter(Boolean),
-        ...layer.hiddenSlotIds,
-      ]),
-    );
+  const occupiedEntityIds = useMemo<Set<string>>(() => {
+    const next = new Set<string>();
+
+    for (const layer of Object.values(layoutState)) {
+      for (const entityId of layer.visibleSlotIds) {
+        if (typeof entityId === "string" && entityId.length > 0) {
+          next.add(entityId);
+        }
+      }
+
+      for (const entityId of layer.hiddenSlotIds) {
+        if (typeof entityId === "string" && entityId.length > 0) {
+          next.add(entityId);
+        }
+      }
+    }
+
+    return next;
   }, [layoutState]);
 
   const suppressedConnectableEntityIds = useMemo(() => {
@@ -836,31 +855,18 @@ showSignalNotification();
         return current;
       }
 
-      const updated = syncConnectableStateWithLayout(
-        current,
-        unplacedPeopleIds,
-      );
+      let updated = current;
 
-      // 🔥 folder 다시 붙이기
-      for (const layerKey of Object.keys(current)) {
-        const original = current[layerKey];
-        const nextLayer = updated[layerKey];
+      for (const personId of unplacedPeopleIds) {
+        const matchedPerson = people.find((person) => person.id === personId);
+        const targetLayerId = getLayerIdByTier(matchedPerson?.tier ?? 150);
 
-        if (!original || !nextLayer) continue;
-
-        const folderIds = [
-          ...original.visibleSlotIds,
-          ...original.hiddenSlotIds,
-        ].filter((id) => id && id.startsWith("folder-"));
-
-        for (const folderId of folderIds) {
-          if (
-            !nextLayer.visibleSlotIds.includes(folderId) &&
-            !nextLayer.hiddenSlotIds.includes(folderId)
-          ) {
-            nextLayer.hiddenSlotIds.push(folderId);
-          }
-        }
+        updated = insertExternalEntityToTarget(
+          updated,
+          personId,
+          targetLayerId,
+          "hidden",
+        );
       }
 
       return updated;
@@ -891,7 +897,6 @@ showSignalNotification();
     dragState,
     dragOverState,
     specialDropTargetKey,
-    isConnectableDragActive,
     handleDragStart,
     handleDragEnd,
     handleDragOver,
@@ -908,6 +913,9 @@ showSignalNotification();
     folders,
     setFolders,
   });
+
+  const isConnectableDragActive =
+    dragState?.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID;
 
   const {
     openLayer,
@@ -944,7 +952,6 @@ showSignalNotification();
     setLayoutState,
     folders,
     setFolders,
-    layerBlueprints,
   });
 
   const handleClosePersonActionSheet = useCallback(() => {
@@ -1031,33 +1038,59 @@ showSignalNotification();
     handleCloseAddSheet();
   }
 
-  function handleAddFromSearch(
-    entityId: string,
-    targetPid: string,
-    entityName: string,
-    layerId: string,
-    index: number,
-  ) {
+  function handleAddFromSearch(entityId: string, targetLayerId: string) {
+    const targetPid = entityId.startsWith("connectable:")
+      ? entityId.slice("connectable:".length).trim()
+      : entityId;
+
+    const entityName =
+      connectableStateMap[entityId]?.name ??
+      personCatalog[entityId]?.canonicalName ??
+      personCatalog[entityId]?.myAlias ??
+      targetPid;
+
     setConnectableStateMap((current) =>
       markConnectableCandidateAddedToLayer(current, {
         entityId,
         targetPid,
         name: entityName,
-        targetLayerId: layerId,
-        targetIndex: index,
+        targetLayerId,
         targetArea: "visible",
         source: "home-connectable-search",
       }),
     );
 
-    setLayoutState((current) =>
-      insertExternalEntityToTarget(current, {
-        entityId,
-        targetLayerId: layerId,
-        targetIndex: index,
-        targetArea: "visible",
-      }),
-    );
+    setLayoutState((current) => {
+      const target = current[targetLayerId];
+
+      if (!target) {
+        return current;
+      }
+
+      const emptyIndex = target.visibleSlotIds.findIndex((slotId) => !slotId);
+
+      if (emptyIndex >= 0) {
+        return insertExternalEntityToTarget(
+          current,
+          entityId,
+          targetLayerId,
+          "visible",
+          emptyIndex,
+        );
+      }
+
+      if (target.hiddenSlotIds.includes(entityId)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [targetLayerId]: {
+          ...target,
+          hiddenSlotIds: [...target.hiddenSlotIds, entityId],
+        },
+      };
+    });
 
     setSearchSheetOpen(false);
   }
@@ -1104,7 +1137,7 @@ showSignalNotification();
     router.push(`/path?${params.toString()}`);
   }
 
-  function handleExploreRecommendation(candidate: ConnectableCandidate) {
+  function handleExploreRecommendation(candidate: { pid: string; name: string }) {
     const entityId = buildDynamicConnectableEntityId(candidate.pid);
 
     setConnectableStateMap((current) =>

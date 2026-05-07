@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Evidence = {
@@ -202,7 +202,7 @@ function SaveBridgeButton(props: SaveBridgeButtonProps) {
   );
 }
 
-export default function OverlapExplorePage() {
+function OverlapExploreContent() {
   const searchParams = useSearchParams();
 
   const ownerUserId = searchParams.get("ownerUserId") || "";
@@ -507,5 +507,21 @@ export default function OverlapExplorePage() {
           : null}
       </div>
     </main>
+  );
+}
+
+export default function OverlapExplorePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-neutral-50 px-4 py-6 text-neutral-900">
+          <div className="mx-auto w-full max-w-md rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <p className="text-sm text-neutral-600">페이지를 불러오는 중...</p>
+          </div>
+        </main>
+      }
+    >
+      <OverlapExploreContent />
+    </Suspense>
   );
 }

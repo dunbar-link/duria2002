@@ -266,11 +266,20 @@ function getInviteeNameFromRow(row: Record<string, unknown>) {
   return acceptedName || inviteeName || "초대받은 사람";
 }
 
-function getTierByLayerId(layerId: string): number {
+function getTierByLayerId(layerId: string): 1 | 5 | 15 | 50 | 150 {
   if (layerId === "family") return 1;
   if (layerId === "core") return 5;
-  if (layerId === "intimate") return 15;
-  if (layerId === "trust") return 50;
+  if (layerId === "trust") return 15;
+  if (layerId === "intimate") return 50;
+  return 150;
+}
+
+
+function normalizeInviteTier(tier: number): 1 | 5 | 15 | 50 | 150 {
+  if (tier === 1) return 1;
+  if (tier === 5) return 5;
+  if (tier === 15) return 15;
+  if (tier === 50) return 50;
   return 150;
 }
 
@@ -942,17 +951,28 @@ useEffect(() => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const derivedStateMap = useMemo(() => {
-    return getHomeLayerDerivedStateMap(layoutState, folders, layerBlueprints);
+    return getHomeLayerDerivedStateMap(layoutState, folders);
   }, [layoutState, folders]);
 
-  const occupiedEntityIds = useMemo(() => {
-    return new Set(
-      Object.values(layoutState).flatMap((layer) => [
-        ...layer.visibleSlotIds.filter(Boolean),
-        ...layer.hiddenSlotIds,
-      ]),
-    );
-  }, [layoutState]);
+  const occupiedEntityIds = useMemo<Set<string>>(() => {
+  const set = new Set<string>();
+
+  Object.values(layoutState).forEach((layer) => {
+    layer.visibleSlotIds.forEach((entityId) => {
+      if (typeof entityId === "string") {
+        set.add(entityId);
+      }
+    });
+
+    layer.hiddenSlotIds.forEach((entityId) => {
+      if (typeof entityId === "string") {
+        set.add(entityId);
+      }
+    });
+  });
+
+  return set;
+}, [layoutState]);
 
   const suppressedConnectableEntityIds = useMemo(() => {
     return getSuppressedConnectableEntityIds(connectableStateMap);
@@ -1176,7 +1196,6 @@ useEffect(() => {
     dragState,
     dragOverState,
     specialDropTargetKey,
-    isConnectableDragActive,
     handleDragStart,
     handleDragEnd,
     handleDragOver,
@@ -1193,6 +1212,8 @@ useEffect(() => {
     folders,
     setFolders,
   });
+
+  const isConnectableDragActive = false;
 
   const {
     openLayer,
@@ -1229,7 +1250,6 @@ useEffect(() => {
     setLayoutState,
     folders,
     setFolders,
-    layerBlueprints,
   });
 
   const handleClosePersonActionSheet = useCallback(() => {
@@ -1316,33 +1336,49 @@ useEffect(() => {
     handleCloseAddSheet();
   }
 
-  function handleAddFromSearch(
-    entityId: string,
-    targetPid: string,
-    entityName: string,
-    layerId: string,
-    index: number,
-  ) {
+  function handleAddFromSearch(entityId: string, targetLayerId: string) {
     setConnectableStateMap((current) =>
       markConnectableCandidateAddedToLayer(current, {
         entityId,
-        targetPid,
-        name: entityName,
-        targetLayerId: layerId,
-        targetIndex: index,
+        targetLayerId,
         targetArea: "visible",
-        source: "home-connectable-search",
       }),
     );
 
-    setLayoutState((current) =>
-      insertExternalEntityToTarget(current, {
-        entityId,
-        targetLayerId: layerId,
-        targetIndex: index,
-        targetArea: "visible",
-      }),
-    );
+    setLayoutState((current) => {
+      const target = current[targetLayerId];
+
+      if (!target) {
+        return current;
+      }
+
+      const nextVisibleSlotIds = [...target.visibleSlotIds];
+      const emptyIndex = nextVisibleSlotIds.findIndex((slotId) => !slotId);
+
+      if (emptyIndex >= 0) {
+        nextVisibleSlotIds[emptyIndex] = entityId;
+
+        return {
+          ...current,
+          [targetLayerId]: {
+            ...target,
+            visibleSlotIds: nextVisibleSlotIds,
+          },
+        };
+      }
+
+      if (target.hiddenSlotIds.includes(entityId)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [targetLayerId]: {
+          ...target,
+          hiddenSlotIds: [...target.hiddenSlotIds, entityId],
+        },
+      };
+    });
 
     setSearchSheetOpen(false);
   }
@@ -1389,7 +1425,7 @@ useEffect(() => {
     router.push(`/path?${params.toString()}`);
   }
 
-  function handleExploreRecommendation(candidate: ConnectableCandidate) {
+  function handleExploreRecommendation(candidate: any) {
     const entityId = buildDynamicConnectableEntityId(candidate.pid);
 
     setConnectableStateMap((current) =>
@@ -1584,6 +1620,7 @@ useEffect(() => {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
 
     const personRecord = person as Record<string, unknown>;
+
     const receiverUserId =
       typeof personRecord.userId === "string"
         ? personRecord.userId
@@ -1594,18 +1631,21 @@ useEffect(() => {
             : latestInviteDraft?.acceptedPersonId ?? null;
 
     const isJoined =
-      person.isJoined === true ||
+      personRecord.isJoined === true ||
+      personRecord.joined === true ||
+      personRecord.status === "joined" ||
+      personRecord.connectionStatus === "joined" ||
       Boolean(receiverUserId) ||
       latestInviteDraft?.status === "accepted";
 
-    const createdTime = parseTime(person.createdAt);
+    const createdTime = parseTime(personRecord.createdAt);
     const inviteCreatedTime = parseTime(latestInviteDraft?.createdAt);
     const acceptedTime = parseTime(latestInviteDraft?.acceptedAt);
     const lastContactTime = Math.max(
-      parseTime(person.lastContactAt),
-      parseTime(person.lastContactedAt),
-      parseTime(person.last_contact_at),
-      parseTime(person.last_contacted_at),
+      parseTime(personRecord.lastContactAt),
+      parseTime(personRecord.lastContactedAt),
+      parseTime(personRecord.last_contact_at),
+      parseTime(personRecord.last_contacted_at),
     );
 
     if (!isJoined && latestInviteDraft) {
@@ -1633,7 +1673,7 @@ useEffect(() => {
   }
 
   for (const person of people) {
-  personCatalog[person.id] = {
+    personCatalog[person.id] = {
     id: person.id,
     initials: getInitialsFromName(person.name),
     canonicalName: person.name,
@@ -1643,8 +1683,8 @@ useEffect(() => {
     urgent:
       isRedActionRequiredForPerson(person) ||
       blueSignalSenderIds.includes(person.id),
-  };
-}
+    };
+  }
 
 
   function handleHomePersonClick(entityId: string) {
@@ -1675,6 +1715,15 @@ useEffect(() => {
             ? targetRecord.acceptedPersonId
             : latestInviteDraft?.acceptedPersonId ?? null;
 
+const isJoined =
+  targetRecord.isJoined === true ||
+  targetRecord.joined === true ||
+  targetRecord.status === "joined" ||
+  targetRecord.connectionStatus === "joined" ||
+  Boolean(receiverUserId) ||
+  latestInviteDraft?.status === "accepted";
+
+
     // 🔵 파란점: 받은 신호가 있으면 클릭 즉시 읽음 처리 후 바로 답장 신호를 연다.
     if (blueSignalSenderIds.includes(targetPerson.id) && receiverUserId) {
       const currentUserId = getCurrentUserId();
@@ -1704,11 +1753,7 @@ useEffect(() => {
       return;
     }
 
-    const isJoined =
-      targetPerson.isJoined === true ||
-      Boolean(receiverUserId) ||
-      latestInviteDraft?.status === "accepted";
-
+    
     if (!isJoined) {
       dismissRedActionForPerson(targetPerson.id);
 
@@ -1783,7 +1828,7 @@ useEffect(() => {
     const draft = createInviteDraft({
       sourcePersonId: targetPerson.id,
       inviteeName: targetPerson.name,
-      tier: targetPerson.tier,
+      tier: normalizeInviteTier(targetPerson.tier),
       relationshipType: targetPerson.relationshipType,
     });
 

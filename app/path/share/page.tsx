@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 const FIXED_OWNER_USER_ID = "fa0d8146-46c1-4fab-b6ba-e1b002c62011";
@@ -144,7 +144,7 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(objectUrl);
 }
 
-export default function PathSharePage() {
+function PathSharePageContent() {
   const searchParams = useSearchParams();
   const cardRef = useRef<HTMLElement | null>(null);
 
@@ -690,5 +690,21 @@ set balance = 1000;`}
         </div>
       </div>
     </main>
+  );
+}
+
+export default function PathSharePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-100">
+          <div className="mx-auto flex min-h-[320px] max-w-4xl items-center justify-center px-4 py-8 text-sm text-slate-500">
+            공유 경로를 불러오는 중...
+          </div>
+        </main>
+      }
+    >
+      <PathSharePageContent />
+    </Suspense>
   );
 }
