@@ -1043,7 +1043,7 @@ useEffect(() => {
               );
             });
 
-            const blueId = matchedPerson?.id ?? senderId;
+            const blueId = senderId;
 
             setBlueSignalSenderIds((current) => {
               const next = Array.from(new Set([...current, blueId]));
