@@ -1055,6 +1055,20 @@ useEffect(() => {
           showSignalNotification();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "signals",
+          filter: `receiver_id=eq.${userId}`,
+        },
+        () => {
+          readUnreadSignalCount(userId).then((count) => {
+            setSignalCount(count);
+          });
+        },
+      )
       .subscribe();
 
     return () => {
