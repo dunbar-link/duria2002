@@ -799,6 +799,32 @@ showSignalNotification();
   };
 }, [currentUserId]);
 
+useEffect(() => {
+  if (!hasHydrated) {
+    return;
+  }
+
+  const inviteChannel = supabase
+    .channel("realtime-invites-accepted")
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "dl_invites",
+        filter: "status=eq.accepted",
+      },
+      () => {
+        void syncAcceptedInvitesToPeople();
+      },
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(inviteChannel);
+  };
+}, [hasHydrated, syncAcceptedInvitesToPeople]);
+
   useEffect(() => {
     writeConnectableCandidateStateMap(connectableStateMap);
   }, [connectableStateMap]);
