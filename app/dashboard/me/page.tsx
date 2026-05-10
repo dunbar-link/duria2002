@@ -388,7 +388,7 @@ export default function DashboardMePage() {
           window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
           window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
         }}
-        className="mt-3 h-[52px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
+        className="mt-3 h-[58px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
       >
         저장하기
       </button>
