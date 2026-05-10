@@ -21,7 +21,7 @@ const SELF_PURPLE_TEXT = "#4B2E83";
 
 const HOME_BLUE_SIGNAL_SENDERS_STORAGE_KEY = "dunbar-link-home-blue-signal-senders-v1";
 const HOME_BLUE_SIGNAL_CHANGE_EVENT = "dunbar-link-blue-signals-changed";
-const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v1";
+const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const PROFILE_UPDATED_EVENT = "dunbar-link-me-profile-updated";
 
 function readMeProfileImageUrl() {
@@ -40,6 +40,21 @@ function readMeProfileImageUrl() {
     }
 
     return typeof imageDataUrl === "string" ? imageDataUrl : "";
+  } catch {
+    return "";
+  }
+}
+
+function readMeProfileName() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+    const name = parsed?.name;
+    return typeof name === "string" ? name.trim() : "";
   } catch {
     return "";
   }
@@ -261,6 +276,7 @@ export function PersonFace({
 }) {
   const [hasMounted, setHasMounted] = useState(false);
   const [meProfileImageDataUrl, setMeProfileImageDataUrl] = useState("");
+  const [meName, setMeName] = useState("");
 
   useEffect(() => {
     setHasMounted(true);
@@ -269,17 +285,18 @@ export function PersonFace({
       return;
     }
 
-    function syncProfileImage() {
+    function syncProfile() {
       setMeProfileImageDataUrl(readMeProfileImageUrl());
+      setMeName(readMeProfileName());
     }
 
-    syncProfileImage();
-    window.addEventListener(PROFILE_UPDATED_EVENT, syncProfileImage);
-    window.addEventListener("storage", syncProfileImage);
+    syncProfile();
+    window.addEventListener(PROFILE_UPDATED_EVENT, syncProfile);
+    window.addEventListener("storage", syncProfile);
 
     return () => {
-      window.removeEventListener(PROFILE_UPDATED_EVENT, syncProfileImage);
-      window.removeEventListener("storage", syncProfileImage);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, syncProfile);
+      window.removeEventListener("storage", syncProfile);
     };
   }, [isMe]);
 
@@ -345,7 +362,7 @@ export function PersonFace({
       }}
     >
       <span className="text-[18px] leading-none tracking-[-0.02em]">
-        {initials}
+        {isMe && meName ? meName.slice(0, 2) : initials}
       </span>
     </div>
   );
@@ -560,6 +577,7 @@ export function PersonTile({
   const [blueSignalSenderIds, setBlueSignalSenderIds] = useState<Set<string>>(
     () => readBlueSignalSenderIds(),
   );
+  const [meTileLabel, setMeTileLabel] = useState("");
 
   useEffect(() => {
     function syncBlueSignalSenderIds() {
@@ -578,6 +596,23 @@ export function PersonTile({
       window.removeEventListener("storage", syncBlueSignalSenderIds);
     };
   }, []);
+
+  useEffect(() => {
+    if (entityId !== "family-me") return;
+
+    function syncMeLabel() {
+      setMeTileLabel(readMeProfileName());
+    }
+
+    syncMeLabel();
+    window.addEventListener(PROFILE_UPDATED_EVENT, syncMeLabel);
+    window.addEventListener("storage", syncMeLabel);
+
+    return () => {
+      window.removeEventListener(PROFILE_UPDATED_EVENT, syncMeLabel);
+      window.removeEventListener("storage", syncMeLabel);
+    };
+  }, [entityId]);
 
   const showUrgentBadge = folder
     ? hasUrgentInFolder(folder, folders, people, getRecommendedAction)
@@ -648,7 +683,9 @@ export function PersonTile({
         )}
         style={{ maxWidth: labelMaxWidth }}
       >
-        {getEntityLabel(entityId, folders)}
+        {entityId === "family-me" && meTileLabel
+          ? meTileLabel
+          : getEntityLabel(entityId, folders)}
       </span>
     </div>
   );
