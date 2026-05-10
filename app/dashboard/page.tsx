@@ -351,26 +351,26 @@ function HomeOnboardingOverlay({
             </p>
 
             <h2 className="mt-3 text-[24px] font-semibold leading-[1.3] tracking-tight text-slate-900">
-              사람을 넣고,
-              <br />한 명씩 챙기면 돼요.
+              가까운 사람부터
+              <br />하나씩 넣어볼까요?
             </h2>
 
             <div className="mt-5 grid gap-2.5">
               <div className="rounded-[18px] bg-slate-50 px-4 py-3">
                 <p className="text-[13px] font-semibold text-slate-900">
-                  1. People에서 추가
+                  1. 내 이름과 사진을 먼저 정해요
                 </p>
               </div>
 
               <div className="rounded-[18px] bg-slate-50 px-4 py-3">
                 <p className="text-[13px] font-semibold text-slate-900">
-                  2. Home에서 구조 보기
+                  2. 챙기고 싶은 사람을 추가해요
                 </p>
               </div>
 
               <div className="rounded-[18px] bg-slate-50 px-4 py-3">
                 <p className="text-[13px] font-semibold text-slate-900">
-                  3. Me에서 설정 확인
+                  3. 가볍게 신호를 보내봐요
                 </p>
               </div>
             </div>
