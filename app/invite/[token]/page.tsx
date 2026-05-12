@@ -185,7 +185,7 @@ export default function InviteEntryPage() {
       } : prev);
 
       setFeedbackTone("success");
-      setFeedback("입력이 완료되었습니다.");
+      setFeedback("연결됐어요.");
     } finally {
       setIsSubmitting(false);
     }
@@ -224,9 +224,9 @@ export default function InviteEntryPage() {
         <div className="mx-auto max-w-md px-4 pt-10">
           <section className="rounded-[28px] bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-semibold text-slate-500">초대 링크</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">입력이 완료되었습니다</h1>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">연결됐어요</h1>
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              {invite.accepted_person_name ?? "상대"}님이 등록을 마쳤어요.
+              {invite.accepted_person_name ?? "상대"}님과 연결됐어요.
             </p>
             <div className="mt-5 grid grid-cols-1 gap-3">
               <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white">
@@ -246,28 +246,26 @@ export default function InviteEntryPage() {
     <main className="min-h-screen bg-slate-50 pb-10">
       <div className="mx-auto max-w-md px-4 pt-8">
         <section className="rounded-[28px] bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">INSTALL INVITE</p>
+          <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">DUNBAR LINK</p>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">던바링크 초대가 도착했어요</h1>
 
           <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Invite</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">초대 대상: {invite.invitee_name || "이름 없음"}</p>
-            <p className="mt-1 text-sm text-slate-600">관계 레이어: {getTierLabel(invite.tier)}</p>
-            <p className="mt-1 text-sm text-slate-600">관계명: {invite.relationship_label || "친구"}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">초대</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{invite.invitee_name || "이름 없음"}님에게 온 초대예요</p>
+            <p className="mt-1 text-sm text-slate-600">{getTierLabel(invite.tier)} 관계로 연결돼요</p>
+            <p className="mt-1 text-sm text-slate-600">{invite.relationship_label || "친구"}으로 연결돼요</p>
           </div>
 
           <div className="mt-4 rounded-2xl bg-slate-900 p-4 text-white">
-            <p className="text-sm font-semibold">지금 이 화면에서 하는 일</p>
+            <p className="text-sm font-semibold">가볍게 연결하고 신호를 주고받는 앱이에요.</p>
             <div className="mt-2 space-y-1 text-sm leading-6 text-slate-200">
-              <p>• 초대 토큰을 이 기기에 저장</p>
-              <p>• 이후 앱 설치/열기 후 추천인 연결 기반으로 사용</p>
-              <p>• 현재 MVP에서는 테스트용 웹 입력도 같이 제공</p>
+              <p>이름만 입력하면 바로 시작할 수 있어요.</p>
             </div>
           </div>
 
           <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
             <p className="text-sm font-semibold text-emerald-700">
-              {savedInviteToken ? "추천인 연결용 토큰을 이 기기에 저장했어요." : "토큰 저장은 시도했지만 브라우저 제한이 있을 수 있어요."}
+              {savedInviteToken ? "연결 정보를 이 기기에 저장했어요." : "연결 정보 저장을 시도했지만 브라우저 제한이 있을 수 있어요."}
             </p>
           </div>
 
@@ -277,8 +275,8 @@ export default function InviteEntryPage() {
           </div>
 
           <div className="mt-6 border-t border-slate-100 pt-5">
-            <h2 className="text-lg font-bold text-slate-900">테스트용 웹 입력 계속하기</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">최종 목표는 설치 후 온보딩 연결이지만, 지금은 MVP 테스트를 위해 바로 입력도 열어둔다.</p>
+            <h2 className="text-lg font-bold text-slate-900">내 이름 입력하기</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">이름만 입력하면 연결돼요.</p>
 
             {feedback ? <div className={`mt-4 rounded-2xl px-4 py-3 text-sm font-semibold ${feedbackClass(feedbackTone)}`}>{feedback}</div> : null}
 
@@ -292,7 +290,7 @@ export default function InviteEntryPage() {
                 <input value={form.phone} onChange={(event) => updateField("phone", event.target.value)} placeholder="예: 010-1234-5678" inputMode="tel" className="mt-2 h-12 w-full rounded-2xl border-0 bg-slate-100 px-4 text-sm text-slate-900 outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300" />
               </div>
               <button type="submit" disabled={isSubmitting} className="h-12 w-full rounded-2xl bg-slate-900 text-sm font-semibold text-white disabled:opacity-60">
-                {isSubmitting ? "저장 중..." : "테스트용 입력 완료"}
+                {isSubmitting ? "저장 중..." : "연결 시작하기"}
               </button>
             </form>
           </div>
