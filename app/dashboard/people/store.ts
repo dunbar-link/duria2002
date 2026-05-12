@@ -820,8 +820,15 @@ export const usePeopleStore = create<PeopleState>()(
             }),
           );
 
+          const currentUserId = getCurrentUserId();
+
           const missingAcceptedPeople = normalizedRows
             .filter((item) => item.status === "accepted")
+            .filter(
+              (item) =>
+                !item.acceptedPersonId ||
+                item.acceptedPersonId !== currentUserId,
+            )
             .map((item) => {
               const acceptedName =
                 cleanText(item.acceptedPersonName) ||
