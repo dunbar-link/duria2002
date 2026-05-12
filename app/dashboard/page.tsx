@@ -1807,6 +1807,8 @@ const isJoined =
           relationshipType: draft.relationshipType,
           relationshipLabel: draft.relationshipLabel,
           inviterNote: draft.inviterNote,
+          inviterUserId: draft.inviterUserId,
+          inviterName: draft.inviterName,
           status: draft.status,
           createdAt: draft.createdAt,
         }),
