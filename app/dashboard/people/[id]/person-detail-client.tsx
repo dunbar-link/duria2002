@@ -406,6 +406,8 @@ export default function PersonDetailClient({ person }: Props) {
       relationship_type: inviteDraft.relationshipType,
       relationship_label: inviteDraft.relationshipLabel,
       inviter_note: inviteDraft.inviterNote,
+      inviter_user_id: inviteDraft.inviterUserId,
+      inviter_name: inviteDraft.inviterName,
       status: "pending",
       accepted_person_id: null,
       accepted_person_name: null,

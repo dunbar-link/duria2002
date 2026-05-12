@@ -11,6 +11,8 @@ type InviteUpsertBody = {
   relationshipType?: string;
   relationshipLabel?: string;
   inviterNote?: string;
+  inviterUserId?: string | null;
+  inviterName?: string | null;
   status?: string;
   createdAt?: string;
 };
@@ -123,6 +125,9 @@ export async function POST(request: Request) {
     const token = cleanText(body.token) || createInviteToken();
     const invitePath = cleanText(body.invitePath) || `/invite/${token}`;
 
+    const inviterUserId = cleanText(body.inviterUserId) || null;
+    const inviterName = cleanText(body.inviterName) || null;
+
     const { error } = await supabase.from("dl_invites").upsert(
       {
         token,
@@ -133,6 +138,8 @@ export async function POST(request: Request) {
         relationship_type: relationshipType,
         relationship_label: relationshipLabel,
         inviter_note: cleanText(body.inviterNote),
+        inviter_user_id: inviterUserId,
+        inviter_name: inviterName,
         status: requestedStatus,
         created_at: createdAt,
       },

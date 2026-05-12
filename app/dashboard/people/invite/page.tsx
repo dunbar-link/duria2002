@@ -225,7 +225,8 @@ ${latestInviteUrl}`;
 
       const { error } = await supabase.from("dl_invites").insert({
         token: created.token,
-        inviter_user_id: null,
+        inviter_user_id: created.inviterUserId,
+        inviter_name: created.inviterName,
         invitee_name: trimmedName,
         invitee_phone: trimmedPhone || null,
         tier: form.tier,

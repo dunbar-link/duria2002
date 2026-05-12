@@ -537,6 +537,8 @@ function buildAcceptedInviteDraftFromPerson(
     relationshipType: "friend",
     relationshipLabel: "친구",
     inviterNote: "",
+    inviterUserId: null,
+    inviterName: null,
     acceptedAt: new Date().toISOString(),
     acceptedPersonId,
     acceptedPersonName: name,
@@ -847,7 +849,7 @@ useEffect(() => {
     try {
       const { data: inviteRow, error: loadError } = await supabase
         .from("dl_invites")
-        .select("token, invitee_name, accepted_person_name, status")
+        .select("token, invitee_name, accepted_person_name, inviter_user_id, inviter_name, status")
         .eq("token", pendingToken)
         .maybeSingle();
 

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
+import { readMeProfileName } from "@/lib/me/profile-name";
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -43,6 +44,8 @@ export type InviteDraft = {
   relationshipType: RelationshipType;
   relationshipLabel: string;
   inviterNote: string;
+  inviterUserId: string | null;
+  inviterName: string | null;
   acceptedAt: string | null;
   acceptedPersonId: string | null;
   acceptedPersonName: string | null;
@@ -73,6 +76,10 @@ export type RemoteInviteDraftLike = {
   relationship_label?: string | null;
   inviterNote?: string | null;
   inviter_note?: string | null;
+  inviterUserId?: string | null;
+  inviter_user_id?: string | null;
+  inviterName?: string | null;
+  inviter_name?: string | null;
   acceptedAt?: string | null;
   accepted_at?: string | null;
   acceptedPersonId?: string | null;
@@ -336,6 +343,10 @@ function normalizeRemoteInviteDraft(
     relationshipType,
     relationshipLabel,
     inviterNote: cleanText(row.inviterNote) || cleanText(row.inviter_note),
+    inviterUserId:
+      cleanText(row.inviterUserId) || cleanText(row.inviter_user_id) || null,
+    inviterName:
+      cleanText(row.inviterName) || cleanText(row.inviter_name) || null,
     acceptedAt: acceptedAt || null,
     acceptedPersonId:
       cleanText(row.acceptedPersonId) ||
@@ -635,6 +646,9 @@ export const usePeopleStore = create<PeopleState>()(
           cleanText(input.relationshipLabel) ||
           getDefaultRelationshipLabel(relationshipType);
 
+        const inviterUserId = getCurrentUserId() || null;
+        const inviterName = readMeProfileName() || "초대한 사람";
+
         const draft: InviteDraft = {
           token,
           provisionalPersonId: buildProvisionalPersonId(token),
@@ -646,6 +660,8 @@ export const usePeopleStore = create<PeopleState>()(
           relationshipType,
           relationshipLabel,
           inviterNote: cleanText(input.inviterNote),
+          inviterUserId,
+          inviterName,
           acceptedAt: null,
           acceptedPersonId: null,
           acceptedPersonName: null,
@@ -697,6 +713,8 @@ export const usePeopleStore = create<PeopleState>()(
                 item.status === "accepted" || existing.status === "accepted"
                   ? "accepted"
                   : "pending",
+              inviterUserId: item.inviterUserId ?? existing.inviterUserId,
+              inviterName: item.inviterName ?? existing.inviterName,
               acceptedAt: item.acceptedAt ?? existing.acceptedAt,
               acceptedPersonId:
                 item.acceptedPersonId ?? existing.acceptedPersonId,
@@ -719,7 +737,7 @@ export const usePeopleStore = create<PeopleState>()(
         const { data, error } = await supabase
           .from("dl_invites")
           .select(
-            "token, invite_path, invitee_name, source_person_id, tier, relationship_type, relationship_label, inviter_note, accepted_at, accepted_person_id, accepted_person_name, status, created_at",
+            "token, invite_path, invitee_name, source_person_id, tier, relationship_type, relationship_label, inviter_note, inviter_user_id, inviter_name, accepted_at, accepted_person_id, accepted_person_name, status, created_at",
           )
           .eq("status", "accepted");
 
@@ -799,6 +817,8 @@ export const usePeopleStore = create<PeopleState>()(
                 item.sourcePersonId ||
                 item.provisionalPersonId,
               status: "accepted",
+              inviterUserId: item.inviterUserId ?? existing?.inviterUserId ?? null,
+              inviterName: item.inviterName ?? existing?.inviterName ?? null,
               acceptedAt: item.acceptedAt ?? existing?.acceptedAt ?? now,
               acceptedPersonId:
                 item.acceptedPersonId ?? existing?.acceptedPersonId ?? null,
@@ -867,9 +887,60 @@ export const usePeopleStore = create<PeopleState>()(
             })
             .filter((item): item is DashboardPerson => Boolean(item));
 
+          const inviterPeople = normalizedRows
+            .filter((item) => item.status === "accepted")
+            .filter(
+              (item) =>
+                item.acceptedPersonId &&
+                item.acceptedPersonId === currentUserId,
+            )
+            .filter(
+              (item) =>
+                !item.inviterUserId || item.inviterUserId !== currentUserId,
+            )
+            .filter(
+              (item) =>
+                cleanText(item.inviterUserId) || cleanText(item.inviterName),
+            )
+            .map((item) => {
+              const inviterUserId = cleanText(item.inviterUserId);
+              const inviterName =
+                cleanText(item.inviterName) || "초대한 사람";
+              const key = inviterUserId
+                ? `user:${inviterUserId}`
+                : `name:${normalizePersonName(inviterName)}`;
+
+              if (existingKeys.has(key)) {
+                return null;
+              }
+
+              existingKeys.add(key);
+
+              const nextPerson = buildAddedPerson({
+                name: inviterName,
+                tier: item.tier,
+                relationshipType: item.relationshipType,
+                roleLabel:
+                  item.relationshipLabel ||
+                  getDefaultRelationshipLabel(item.relationshipType),
+              });
+
+              return {
+                ...nextPerson,
+                isJoined: true,
+                userId: inviterUserId || undefined,
+                dlUserId: inviterUserId || undefined,
+                acceptedPersonId: inviterUserId || undefined,
+                lastContactAt: item.acceptedAt ?? now,
+                lastContactedAt: item.acceptedAt ?? now,
+              } as DashboardPerson;
+            })
+            .filter((item): item is DashboardPerson => Boolean(item));
+
           const dedupedPeople = dedupePeopleByIdentity([
             ...updatedPeople,
             ...missingAcceptedPeople,
+            ...inviterPeople,
           ]);
           const nextChannels = buildChannelState(dedupedPeople);
 

@@ -16,6 +16,8 @@ type InviteRow = {
   relationship_type: string | null;
   relationship_label: string | null;
   inviter_note: string | null;
+  inviter_user_id: string | null;
+  inviter_name: string | null;
   status: string;
   accepted_person_id: string | null;
   accepted_person_name: string | null;
@@ -81,7 +83,7 @@ export default function InviteEntryPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("dl_invites")
-        .select("token, invite_path, invitee_name, invitee_phone, tier, relationship_type, relationship_label, inviter_note, status, accepted_person_id, accepted_person_name, accepted_at")
+        .select("token, invite_path, invitee_name, invitee_phone, tier, relationship_type, relationship_label, inviter_note, inviter_user_id, inviter_name, status, accepted_person_id, accepted_person_name, accepted_at")
         .eq("token", token)
         .maybeSingle();
 
