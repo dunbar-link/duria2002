@@ -37,6 +37,16 @@ function getTierLabel(tier: number) {
   return "친근";
 }
 
+/** 받침 유무에 따라 "로" 또는 "으로"를 붙여 반환하는 순수 표시용 함수 */
+function appendRo(word: string): string {
+  if (!word) return "으로";
+  const code = word.charCodeAt(word.length - 1);
+  if (code < 0xac00 || code > 0xd7a3) return `${word}로`;
+  const batchim = (code - 0xac00) % 28;
+  if (batchim === 0 || batchim === 8) return `${word}로`; // 받침 없음 or ㄹ받침
+  return `${word}으로`;
+}
+
 function feedbackClass(tone: "success" | "error" | "neutral") {
   if (tone === "success") return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
   if (tone === "error") return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";
@@ -253,7 +263,7 @@ export default function InviteEntryPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">초대</p>
             <p className="mt-2 text-sm font-semibold text-slate-900">{invite.invitee_name || "이름 없음"}님에게 온 초대예요</p>
             <p className="mt-1 text-sm text-slate-600">{getTierLabel(invite.tier)} 관계로 연결돼요</p>
-            <p className="mt-1 text-sm text-slate-600">{invite.relationship_label || "친구"}으로 연결돼요</p>
+            <p className="mt-1 text-sm text-slate-600">{appendRo(invite.relationship_label || "친구")} 연결돼요</p>
           </div>
 
           <div className="mt-4 rounded-2xl bg-slate-900 p-4 text-white">
@@ -261,17 +271,6 @@ export default function InviteEntryPage() {
             <div className="mt-2 space-y-1 text-sm leading-6 text-slate-200">
               <p>이름만 입력하면 바로 시작할 수 있어요.</p>
             </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
-            <p className="text-sm font-semibold text-emerald-700">
-              {savedInviteToken ? "연결 정보를 이 기기에 저장했어요." : "연결 정보 저장을 시도했지만 브라우저 제한이 있을 수 있어요."}
-            </p>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3">
-            <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white">앱 열기</Link>
-            <button type="button" onClick={copyCurrentUrl} className="inline-flex h-12 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">링크 복사</button>
           </div>
 
           <div className="mt-6 border-t border-slate-100 pt-5">
@@ -293,6 +292,17 @@ export default function InviteEntryPage() {
                 {isSubmitting ? "저장 중..." : "연결 시작하기"}
               </button>
             </form>
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+            <p className="text-sm font-semibold text-emerald-700">
+              {savedInviteToken ? "이 기기에서 이어서 시작할 수 있어요." : "브라우저 제한으로 이어서 시작이 어려울 수 있어요."}
+            </p>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3">
+            <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white">던바링크 열기</Link>
+            <button type="button" onClick={copyCurrentUrl} className="inline-flex h-12 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">초대 링크 복사</button>
           </div>
         </section>
       </div>
