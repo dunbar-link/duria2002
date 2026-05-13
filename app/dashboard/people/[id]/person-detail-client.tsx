@@ -379,21 +379,16 @@ export default function PersonDetailClient({ person }: Props) {
   async function syncInviteDraftToRemote(inviteDraft: InviteDraft) {
     const supabase = createClient();
 
-    const { data: existing, error: readError } = await supabase
-      .from("dl_invites")
-      .select(
-        "token, invitee_name, invitee_phone, tier, relationship_type, relationship_label, inviter_note, status, accepted_person_id, accepted_person_name, accepted_at",
-      )
-      .eq("token", inviteDraft.token)
-      .maybeSingle();
+    const existingRes = await fetch(`/api/invites/${encodeURIComponent(inviteDraft.token)}`);
 
-    if (readError) {
-      throw readError;
+    if (!existingRes.ok && existingRes.status !== 404) {
+      throw new Error(`invite fetch error: ${existingRes.status}`);
     }
 
-    if (existing) {
+    if (existingRes.ok) {
+      const existing = (await existingRes.json()) as RemoteInviteRow;
       syncInviteDraftsFromRemote([
-        mapRemoteInviteRow(existing as RemoteInviteRow, inviteDraft.sourcePersonId),
+        mapRemoteInviteRow(existing, inviteDraft.sourcePersonId),
       ]);
       return;
     }
@@ -561,24 +556,17 @@ export default function PersonDetailClient({ person }: Props) {
     }
 
     try {
-      const supabase = createClient();
+      const res = await fetch(`/api/invites/${encodeURIComponent(latestInviteDraft.token)}`);
 
-      const { data, error } = await supabase
-        .from("dl_invites")
-        .select(
-          "token, invitee_name, invitee_phone, tier, relationship_type, relationship_label, inviter_note, status, accepted_person_id, accepted_person_name, accepted_at",
-        )
-        .eq("token", latestInviteDraft.token)
-        .maybeSingle();
-
-      if (error || !data) {
+      if (!res.ok) {
         setSavedMessageTone("neutral");
         setSavedMessage("아직 가입 전이에요.");
         return;
       }
 
+      const data = (await res.json()) as RemoteInviteRow;
       const remoteDraft = mapRemoteInviteRow(
-        data as RemoteInviteRow,
+        data,
         latestInviteDraft.sourcePersonId,
       );
 
