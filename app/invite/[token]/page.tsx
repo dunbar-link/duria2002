@@ -80,17 +80,19 @@ export default function InviteEntryPage() {
         return;
       }
 
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("dl_invites")
-        .select("token, invite_path, invitee_name, invitee_phone, tier, relationship_type, relationship_label, inviter_note, inviter_user_id, inviter_name, status, accepted_person_id, accepted_person_name, accepted_at")
-        .eq("token", token)
-        .maybeSingle();
+      const res = await fetch(`/api/invites/${encodeURIComponent(token)}`);
 
       if (!isMounted) return;
 
-      setInvite((data as InviteRow | null) ?? null);
-      if (data) setForm({ name: "", phone: data.invitee_phone ?? "" });
+      if (!res.ok) {
+        setInvite(null);
+        setIsLoading(false);
+        return;
+      }
+
+      const data = (await res.json()) as InviteRow;
+      setInvite(data);
+      setForm({ name: "", phone: data.invitee_phone ?? "" });
       setIsLoading(false);
     }
 
