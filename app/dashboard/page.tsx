@@ -847,18 +847,16 @@ useEffect(() => {
     const acceptedAt = new Date().toISOString();
 
     try {
-      const { data: inviteRow, error: loadError } = await supabase
-        .from("dl_invites")
-        .select("token, invitee_name, accepted_person_name, inviter_user_id, inviter_name, status")
-        .eq("token", pendingToken)
-        .maybeSingle();
+      const inviteRes = await fetch(`/api/invites/${encodeURIComponent(pendingToken)}`);
 
       if (cancelled) return;
 
-      if (loadError || !inviteRow) {
-        console.warn("보류 초대 토큰 확인 실패:", loadError?.message);
+      if (!inviteRes.ok) {
+        console.warn("보류 초대 토큰 확인 실패:", inviteRes.status);
         return;
       }
+
+      const inviteRow = (await inviteRes.json()) as Record<string, unknown>;
 
       const acceptedPersonName = getInviteeNameFromRow(
         inviteRow as Record<string, unknown>,
