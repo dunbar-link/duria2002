@@ -162,7 +162,8 @@ export default function InviteEntryPage() {
           accepted_person_name: trimmedName,
           accepted_at: now,
         })
-        .eq("token", token);
+        .eq("token", token)
+        .eq("status", "pending");
 
       if (error) {
         setFeedbackTone("error");
