@@ -733,13 +733,21 @@ export const usePeopleStore = create<PeopleState>()(
 
       syncAcceptedInvitesToPeople: async () => {
         const supabase = createClient();
+        const currentUserId = getCurrentUserId();
+
+        if (!currentUserId) {
+          return;
+        }
 
         const { data, error } = await supabase
           .from("dl_invites")
           .select(
             "token, invite_path, invitee_name, source_person_id, tier, relationship_type, relationship_label, inviter_note, inviter_user_id, inviter_name, accepted_at, accepted_person_id, accepted_person_name, status, created_at",
           )
-          .eq("status", "accepted");
+          .eq("status", "accepted")
+          .or(
+            `inviter_user_id.eq.${currentUserId},accepted_person_id.eq.${currentUserId}`,
+          );
 
         if (error) {
           console.warn("초대 수락 상태 동기화 실패:", error.message);
@@ -839,8 +847,6 @@ export const usePeopleStore = create<PeopleState>()(
                   : `id:${person.id}`;
             }),
           );
-
-          const currentUserId = getCurrentUserId();
 
           const missingAcceptedPeople = normalizedRows
             .filter((item) => item.status === "accepted")
