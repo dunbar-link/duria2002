@@ -804,24 +804,35 @@ useEffect(() => {
     return;
   }
 
-  const inviteChannel = supabase
-    .channel("realtime-invites-accepted")
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "dl_invites",
-        filter: "status=eq.accepted",
-      },
-      () => {
-        void syncAcceptedInvitesToPeople();
-      },
-    )
-    .subscribe();
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return;
+  }
+
+  function triggerWhenVisible() {
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+    void syncAcceptedInvitesToPeople();
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === "visible") {
+      void syncAcceptedInvitesToPeople();
+    }
+  }
+
+  function handleFocus() {
+    void syncAcceptedInvitesToPeople();
+  }
+
+  const intervalId = window.setInterval(triggerWhenVisible, 60000);
+  window.addEventListener("focus", handleFocus);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 
   return () => {
-    supabase.removeChannel(inviteChannel);
+    window.clearInterval(intervalId);
+    window.removeEventListener("focus", handleFocus);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
   };
 }, [hasHydrated, syncAcceptedInvitesToPeople]);
 
