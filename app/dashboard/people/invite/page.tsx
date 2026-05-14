@@ -90,13 +90,34 @@ function CreateInvitePageContent() {
     let isMounted = true;
 
     async function loadInviteStatus() {
-      const supabase = createClient();
+      if (!latestToken) {
+        return;
+      }
 
-      const { data } = await supabase
-        .from("dl_invites")
-        .select("status, accepted_person_name, accepted_at")
-        .eq("token", latestToken)
-        .maybeSingle();
+      let data:
+        | {
+            status: string | null;
+            accepted_person_name: string | null;
+            accepted_at: string | null;
+          }
+        | null = null;
+
+      try {
+        const res = await fetch(
+          `/api/invites/${encodeURIComponent(latestToken)}`,
+          {
+            cache: "no-store",
+          },
+        );
+
+        if (!res.ok) {
+          return;
+        }
+
+        data = await res.json();
+      } catch {
+        return;
+      }
 
       if (!isMounted || !data) {
         return;
