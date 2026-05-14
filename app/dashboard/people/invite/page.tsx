@@ -5,7 +5,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AddDashboardPersonInput } from "../data";
 import { usePeopleStore } from "../store";
-import { createClient } from "@/lib/supabase/client";
 
 const tierOptions: Array<{
   value: AddDashboardPersonInput["tier"];
@@ -242,26 +241,39 @@ ${latestInviteUrl}`;
         inviterNote: "",
       });
 
-      const supabase = createClient();
+      let isOk = false;
+      try {
+        const res = await fetch("/api/invites/upsert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token: created.token,
+            inviteeName: trimmedName,
+            inviteePhone: trimmedPhone || null,
+            tier: form.tier,
+            relationshipType,
+            relationshipLabel: created.relationshipLabel || "친구",
+            inviterNote: null,
+            inviterUserId: created.inviterUserId,
+            inviterName: created.inviterName,
+            status: "pending",
+          }),
+        });
 
-      const { error } = await supabase.from("dl_invites").insert({
-        token: created.token,
-        inviter_user_id: created.inviterUserId,
-        inviter_name: created.inviterName,
-        invitee_name: trimmedName,
-        invitee_phone: trimmedPhone || null,
-        tier: form.tier,
-        relationship_type: relationshipType,
-        relationship_label: created.relationshipLabel || "친구",
-        inviter_note: null,
-        status: "pending",
-      });
+        const data = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+        } | null;
+
+        isOk = res.ok && data?.ok === true;
+      } catch {
+        isOk = false;
+      }
 
       setLatestToken(created.token);
       setLatestInviteeName(trimmedName);
       setLatestInviteePhone(trimmedPhone);
 
-      if (error) {
+      if (!isOk) {
         showFeedback("링크는 만들었지만 서버 저장은 실패했어요.");
         return;
       }

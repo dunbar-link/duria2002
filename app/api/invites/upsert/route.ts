@@ -6,6 +6,7 @@ type InviteUpsertBody = {
   invitePath?: string;
   inviteeName?: string;
   name?: string;
+  inviteePhone?: string | null;
   sourcePersonId?: string | null;
   tier?: number;
   relationshipType?: string;
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     const sourcePersonId = cleanText(body.sourcePersonId) || null;
     const requestedStatus = cleanText(body.status) || "pending";
     const inviteeName = cleanText(body.inviteeName) || cleanText(body.name);
+    const safeInviteePhone = cleanText(body.inviteePhone);
     const relationshipType = cleanText(body.relationshipType) || "friend";
     const relationshipLabel = cleanText(body.relationshipLabel) || "친구";
     const createdAt = cleanText(body.createdAt) || new Date().toISOString();
@@ -133,6 +135,7 @@ export async function POST(request: Request) {
         token,
         invite_path: invitePath,
         invitee_name: inviteeName,
+        invitee_phone: safeInviteePhone,
         source_person_id: sourcePersonId,
         tier: typeof body.tier === "number" ? body.tier : 50,
         relationship_type: relationshipType,
