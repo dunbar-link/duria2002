@@ -863,18 +863,39 @@ useEffect(() => {
       );
 
       if ((inviteRow as Record<string, unknown>).status !== "accepted") {
-        const { error: updateError } = await supabase
-          .from("dl_invites")
-          .update({
-            status: "accepted",
-            accepted_person_id: acceptedPersonId,
-            accepted_person_name: acceptedPersonName,
-            accepted_at: acceptedAt,
-          })
-          .eq("token", pendingToken);
+        try {
+          const acceptRes = await fetch("/api/invites/accept", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: pendingToken,
+              acceptedPersonId,
+              acceptedPersonName,
+              acceptedAt,
+            }),
+          });
 
-        if (updateError) {
-          console.warn("보류 초대 자동 수락 실패:", updateError.message);
+          if (cancelled) {
+            return;
+          }
+
+          if (!acceptRes.ok) {
+            console.warn("보류 초대 자동 수락 실패:", acceptRes.status);
+            return;
+          }
+
+          const acceptData = (await acceptRes.json()) as {
+            ok?: boolean;
+          };
+
+          if (!acceptData.ok) {
+            console.warn("보류 초대 자동 수락 실패: ok=false");
+            return;
+          }
+        } catch (acceptError) {
+          console.warn("보류 초대 자동 수락 실패:", acceptError);
           return;
         }
       }
