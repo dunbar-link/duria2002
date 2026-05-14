@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
-import { createClient } from "@/lib/supabase/client";
 import { usePeopleStore } from "../../dashboard/people/store";
 
 type InviteRow = {
@@ -152,22 +151,31 @@ export default function InviteEntryPage() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
       const acceptedPersonId = getCurrentUserId();
       const now = new Date().toISOString();
 
-      const { error } = await supabase
-        .from("dl_invites")
-        .update({
-          status: "accepted",
-          accepted_person_id: acceptedPersonId,
-          accepted_person_name: trimmedName,
-          accepted_at: now,
-        })
-        .eq("token", token)
-        .eq("status", "pending");
+      let acceptOk = false;
+      try {
+        const res = await fetch("/api/invites/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            acceptedPersonId,
+            acceptedPersonName: trimmedName,
+            acceptedAt: now,
+          }),
+        });
 
-      if (error) {
+        if (res.ok) {
+          const data = (await res.json()) as { ok?: boolean };
+          acceptOk = Boolean(data.ok);
+        }
+      } catch {
+        acceptOk = false;
+      }
+
+      if (!acceptOk) {
         setFeedbackTone("error");
         setFeedback("입력 저장에 실패했어요.");
         return;

@@ -3,42 +3,49 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: Request) {
   try {
-    const { token } = await req.json();
+    const body = (await req.json()) as {
+      token?: string;
+      acceptedPersonId?: string;
+      acceptedPersonName?: string;
+      acceptedAt?: string;
+    };
 
-    if (!token) {
-      return NextResponse.json({ ok: false });
+    const { token, acceptedPersonId, acceptedPersonName, acceptedAt } = body;
+
+    if (!token || !acceptedPersonId || !acceptedPersonName || !acceptedAt) {
+      return NextResponse.json({ ok: false }, { status: 400 });
     }
 
     const supabase = createAdminClient();
 
-    // 🔥 invite 찾기
     const { data: invite } = await supabase
       .from("dl_invites")
-      .select("*")
+      .select("token, status")
       .eq("token", token)
-      .single();
+      .maybeSingle();
 
     if (!invite) {
-      return NextResponse.json({ ok: false });
+      return NextResponse.json({ ok: false }, { status: 404 });
     }
 
-    const userId = crypto.randomUUID();
-
-    // 🔥 수락 처리
-    await supabase
+    const { error: updateError } = await supabase
       .from("dl_invites")
       .update({
         status: "accepted",
-        accepted_user_id: userId,
+        accepted_person_id: acceptedPersonId,
+        accepted_person_name: acceptedPersonName,
+        accepted_at: acceptedAt,
       })
-      .eq("token", token);
+      .eq("token", token)
+      .eq("status", "pending");
 
-    return NextResponse.json({
-      ok: true,
-      userId,
-    });
+    if (updateError) {
+      return NextResponse.json({ ok: false }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ ok: false });
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
