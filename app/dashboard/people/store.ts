@@ -1,6 +1,5 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { readMeProfileName } from "@/lib/me/profile-name";
 
@@ -732,29 +731,31 @@ export const usePeopleStore = create<PeopleState>()(
       },
 
       syncAcceptedInvitesToPeople: async () => {
-        const supabase = createClient();
         const currentUserId = getCurrentUserId();
 
         if (!currentUserId) {
           return;
         }
 
-        const { data, error } = await supabase
-          .from("dl_invites")
-          .select(
-            "token, invite_path, invitee_name, source_person_id, tier, relationship_type, relationship_label, inviter_note, inviter_user_id, inviter_name, accepted_at, accepted_person_id, accepted_person_name, status, created_at",
-          )
-          .eq("status", "accepted")
-          .or(
-            `inviter_user_id.eq.${currentUserId},accepted_person_id.eq.${currentUserId}`,
-          );
+        const res = await fetch(
+          `/api/invites/mine?userId=${encodeURIComponent(currentUserId)}&status=accepted`,
+        );
 
-        if (error) {
-          console.warn("초대 수락 상태 동기화 실패:", error.message);
+        const payload = (await res.json().catch(() => null)) as
+          | {
+              ok?: boolean;
+              invites?: RemoteInviteDraftLike[];
+            }
+          | null;
+
+        if (!res.ok || !payload?.ok) {
+          console.warn("accepted invite sync failed");
           return;
         }
 
-        const normalizedRows = ((data ?? []) as RemoteInviteDraftLike[])
+        const data = payload.invites ?? [];
+
+        const normalizedRows = (data as RemoteInviteDraftLike[])
           .map((row) => normalizeRemoteInviteDraft(row))
           .filter((item): item is InviteDraft => Boolean(item));
 
