@@ -6,7 +6,6 @@ import { KeyboardEvent, MouseEvent, useEffect, useMemo, useState } from "react";
 import type { ContactChannel, DashboardPerson } from "./data";
 import { getDashboardTierLabel } from "./data";
 import { usePeopleStore } from "./store";
-import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
   buildActionDraft,
@@ -490,24 +489,27 @@ export default function DashboardPeoplePage() {
         return;
       }
 
-      const supabase = createClient();
+      const res = await fetch(
+        `/api/invites/mine?userId=${encodeURIComponent(currentUserId)}&limit=50`,
+        {
+          cache: "no-store",
+        },
+      );
 
-      const { data } = await supabase
-        .from("dl_invites")
-        .select(
-          "token, invitee_name, invitee_phone, tier, relationship_label, status, accepted_person_id, accepted_person_name, accepted_at, created_at",
-        )
-        .or(
-          `inviter_user_id.eq.${currentUserId},accepted_person_id.eq.${currentUserId}`,
-        )
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const payload = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            invites?: RemoteInviteRow[];
+          }
+        | null;
 
       if (!isMounted) {
         return;
       }
 
-      const rows = (data as RemoteInviteRow[] | null) ?? [];
+      const rows =
+        res.ok && payload?.ok === true ? payload.invites ?? [] : [];
+
       setRemoteInvites(rows);
       syncInviteDraftsFromRemote(rows);
       await syncAcceptedInvitesToPeople();
