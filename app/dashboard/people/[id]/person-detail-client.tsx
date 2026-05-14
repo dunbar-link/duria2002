@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { sendSignal } from "@/lib/signal/send-signal";
 import SignalBottomSheet from "../../_components/home/signal-bottom-sheet";
@@ -377,8 +376,6 @@ export default function PersonDetailClient({ person }: Props) {
   }, [person, receiverUserId, latestInviteDraft]);
 
   async function syncInviteDraftToRemote(inviteDraft: InviteDraft) {
-    const supabase = createClient();
-
     const existingRes = await fetch(`/api/invites/${encodeURIComponent(inviteDraft.token)}`);
 
     if (!existingRes.ok && existingRes.status !== 404) {
@@ -393,24 +390,39 @@ export default function PersonDetailClient({ person }: Props) {
       return;
     }
 
-    const { error: insertError } = await supabase.from("dl_invites").insert({
-      token: inviteDraft.token,
-      invitee_name: inviteDraft.inviteeName,
-      invitee_phone: person.phone ?? "",
-      tier: inviteDraft.tier,
-      relationship_type: inviteDraft.relationshipType,
-      relationship_label: inviteDraft.relationshipLabel,
-      inviter_note: inviteDraft.inviterNote,
-      inviter_user_id: inviteDraft.inviterUserId,
-      inviter_name: inviteDraft.inviterName,
-      status: "pending",
-      accepted_person_id: null,
-      accepted_person_name: null,
-      accepted_at: null,
+    const upsertRes = await fetch("/api/invites/upsert", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        token: inviteDraft.token,
+        invitePath: inviteDraft.invitePath,
+        inviteeName: inviteDraft.inviteeName,
+        inviteePhone: person.phone || null,
+        sourcePersonId: inviteDraft.sourcePersonId,
+        tier: inviteDraft.tier,
+        relationshipType: inviteDraft.relationshipType,
+        relationshipLabel: inviteDraft.relationshipLabel,
+        inviterNote: inviteDraft.inviterNote,
+        inviterUserId: inviteDraft.inviterUserId,
+        inviterName: inviteDraft.inviterName,
+        status: "pending",
+        createdAt: inviteDraft.createdAt,
+      }),
     });
 
-    if (insertError) {
-      throw insertError;
+    const upsertData = (await upsertRes
+      .json()
+      .catch(() => null)) as
+      | {
+          ok?: boolean;
+          message?: string;
+        }
+      | null;
+
+    if (!upsertRes.ok || upsertData?.ok !== true) {
+      throw new Error(upsertData?.message ?? "invite upsert error");
     }
   }
 
