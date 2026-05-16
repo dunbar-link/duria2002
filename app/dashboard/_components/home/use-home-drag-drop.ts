@@ -167,6 +167,28 @@ export function useHomeDragDrop({
       const action = occupied ? getHoverActionFromPointer(event) : "swap";
 
       if (occupied && action === "combine") {
+        const targetSlotArray =
+          targetArea === "visible"
+            ? layoutState[targetLayerId]?.visibleSlotIds
+            : layoutState[targetLayerId]?.hiddenSlotIds;
+        const targetEntityId = targetSlotArray?.[targetIndex] ?? null;
+        const involvesMe =
+          dragState.entityId === "family-me" || targetEntityId === "family-me";
+
+        if (involvesMe) {
+          setLayoutState((current) =>
+            moveEntityToTarget(
+              current,
+              dragState,
+              targetLayerId,
+              targetArea,
+              targetIndex
+            )
+          );
+          clearDragUiState();
+          return;
+        }
+
         const result = combineEntityIntoTarget(
           layoutState,
           folders,

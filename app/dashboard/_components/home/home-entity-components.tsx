@@ -15,9 +15,9 @@ import type { DashboardPerson } from "../../people/data";
 import { getLayerColor } from "./layer-color";
 
 const DRAG_HITBOX_EXPAND_PX = 10;
-const SELF_PURPLE_BG = "#EFE7FA";
-const SELF_PURPLE_BORDER = "#7A57B8";
-const SELF_PURPLE_TEXT = "#4B2E83";
+const SELF_PURPLE_BG = "#E5E7EB";
+const SELF_PURPLE_BORDER = "#475569";
+const SELF_PURPLE_TEXT = "#334155";
 
 const HOME_BLUE_SIGNAL_SENDERS_STORAGE_KEY = "dunbar-link-home-blue-signal-senders-v1";
 const HOME_BLUE_SIGNAL_CHANGE_EVENT = "dunbar-link-blue-signals-changed";
