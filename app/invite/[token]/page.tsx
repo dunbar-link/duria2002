@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
+import { writeMeProfileNameIfEmpty } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../../dashboard/people/store";
 
 type InviteRow = {
@@ -180,6 +181,8 @@ export default function InviteEntryPage() {
         setFeedback("입력 저장에 실패했어요.");
         return;
       }
+
+      writeMeProfileNameIfEmpty(trimmedName);
 
       if (localInviteExists) {
         acceptInvite({

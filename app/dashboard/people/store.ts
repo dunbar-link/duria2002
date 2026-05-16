@@ -763,6 +763,7 @@ export const usePeopleStore = create<PeopleState>()(
 
         set((state) => {
           const now = new Date().toISOString();
+          const deviceUserId = currentUserId;
 
           const updatedPeople = state.people.map((person) => {
             const extended = person as DashboardPerson &
@@ -771,6 +772,11 @@ export const usePeopleStore = create<PeopleState>()(
             const personName = normalizePersonName(person.name);
 
             const matchedInvite = normalizedRows.find((item) => {
+              if (
+                item.acceptedPersonId &&
+                item.acceptedPersonId === deviceUserId
+              )
+                return false;
               if (item.sourcePersonId && item.sourcePersonId === person.id)
                 return true;
               if (

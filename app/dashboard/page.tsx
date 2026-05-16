@@ -2,6 +2,7 @@
 
 import { subscribePushForUser } from "@/lib/push/push-client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
+import { writeMeProfileNameIfEmpty } from "@/lib/me/profile-name";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -901,6 +902,8 @@ useEffect(() => {
       }
 
       // 🔥 여기부터 중요
+      writeMeProfileNameIfEmpty(acceptedPersonName);
+
       clearPendingInviteToken();
 
       await syncAcceptedInvitesToPeople();
