@@ -801,8 +801,22 @@ export const usePeopleStore = create<PeopleState>()(
               return person;
             }
 
+            const acceptedName = cleanText(matchedInvite.acceptedPersonName);
+            const inviteeNameText = cleanText(matchedInvite.inviteeName);
+            const matchesInviteeName =
+              inviteeNameText.length > 0 &&
+              normalizePersonName(person.name) ===
+                normalizePersonName(inviteeNameText);
+            const personNameIsEmpty = person.name.trim() === "";
+            const shouldOverwriteName =
+              acceptedName.length > 0 &&
+              matchedInvite.acceptedPersonId !== deviceUserId &&
+              (matchesInviteeName ||
+                (inviteeNameText.length === 0 && personNameIsEmpty));
+
             return {
               ...person,
+              name: shouldOverwriteName ? acceptedName : person.name,
               isJoined: true,
               userId:
                 (matchedInvite.acceptedPersonId ?? currentUserId) || undefined,
