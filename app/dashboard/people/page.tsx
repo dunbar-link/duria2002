@@ -577,6 +577,7 @@ export default function DashboardPeoplePage() {
 
   const mergedPeopleSource = useMemo(() => {
   const map = new Map<string, DashboardPerson>();
+  const deviceUserId = getCurrentUserId();
 
   function getKey(p: any) {
     return (
@@ -587,8 +588,24 @@ export default function DashboardPeoplePage() {
     );
   }
 
+  function isSelfPerson(p: any) {
+    if (!deviceUserId) return false;
+    const candidates = [p.userId, p.dlUserId, p.acceptedPersonId, p.id];
+    return candidates.some(
+      (value) =>
+        typeof value === "string" && value.trim() === deviceUserId,
+    );
+  }
+
   // remote 먼저
   remoteAcceptedInvites.forEach((item) => {
+    if (
+      deviceUserId &&
+      (item.accepted_person_id ?? "").trim() === deviceUserId
+    ) {
+      return;
+    }
+
     const p = buildRemoteInvitePerson(item);
     const key = getKey(p);
 
@@ -599,6 +616,9 @@ export default function DashboardPeoplePage() {
 
   // local 덮어쓰기
   people.forEach((p) => {
+    if (isSelfPerson(p)) {
+      return;
+    }
     const key = getKey(p);
     map.set(key, p);
   });

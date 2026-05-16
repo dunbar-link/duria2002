@@ -969,10 +969,20 @@ export const usePeopleStore = create<PeopleState>()(
             ...missingAcceptedPeople,
             ...inviterPeople,
           ]);
-          const nextChannels = buildChannelState(dedupedPeople);
+
+          const cleanedPeople = deviceUserId
+            ? dedupedPeople.filter(
+                (person) =>
+                  getStoredUserId(
+                    person as DashboardPerson & Record<string, unknown>,
+                  ) !== deviceUserId,
+              )
+            : dedupedPeople;
+
+          const nextChannels = buildChannelState(cleanedPeople);
 
           return {
-            people: dedupedPeople,
+            people: cleanedPeople,
             availableChannels: nextChannels.availableChannels,
             preferredChannels: nextChannels.preferredChannels,
             inviteDrafts: Array.from(mergedInviteDrafts.values()).sort((a, b) =>
