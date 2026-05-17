@@ -76,14 +76,17 @@ import {
 } from "./_components/home/home-page-types";
 import {
   createInitialLayoutState,
+  findEntityLocation,
   getEntityLabel,
   getHomeLayerDerivedStateMap,
   getSuppressedConnectableEntityIds,
   insertExternalEntityToTarget,
+  isPersonEntityId,
   markConnectableCandidateAddedToLayer,
   markConnectableCandidateDeferred,
   markConnectableCandidateDismissed,
   markConnectableCandidateExplored,
+  moveEntityToTarget,
   readConnectableCandidateStateMap,
   writeConnectableCandidateStateMap,
 } from "./_components/home/home-page-utils";
@@ -1328,6 +1331,77 @@ useEffect(() => {
     ],
   );
 
+  const {
+    dragState: layerSheetLongPressDragState,
+    beginDrag: beginLayerSheetLongPressDrag,
+  } = useFolderLongPressDrag({
+    onDrop: ({ entityId, layerId, area, index }) => {
+      if (!isPersonEntityId(entityId)) {
+        return;
+      }
+
+      setLayoutState((current) => {
+        const location = findEntityLocation(current, entityId);
+
+        if (!location) {
+          return current;
+        }
+
+        if (
+          location.layerId === layerId &&
+          location.area === area &&
+          (typeof index !== "number" || location.index === index)
+        ) {
+          return current;
+        }
+
+        return moveEntityToTarget(
+          current,
+          {
+            sourceLayerId: location.layerId,
+            sourceIndex: location.index,
+            entityId,
+            sourceArea: location.area,
+          },
+          layerId,
+          area,
+          index,
+        );
+      });
+
+      usePeopleStore.getState().updatePersonTier(entityId, getTierByLayerId(layerId));
+    },
+  });
+
+  const handleLayerSheetLongPressDragStart = useCallback(
+    (entityId: string, point: { x: number; y: number }) => {
+      if (!openLayerId) {
+        return;
+      }
+
+      if (!isPersonEntityId(entityId)) {
+        return;
+      }
+
+      const label = getEntityLabel(entityId, folders);
+
+      handleCloseMore();
+      beginLayerSheetLongPressDrag({
+        entityId,
+        sourceFolderId: openLayerId,
+        label,
+        x: point.x,
+        y: point.y,
+      });
+    },
+    [
+      beginLayerSheetLongPressDrag,
+      folders,
+      handleCloseMore,
+      openLayerId,
+    ],
+  );
+
   const handleClosePersonActionSheet = useCallback(() => {
     setSelectedHomePersonId(null);
     setPersonActionFeedback("");
@@ -2124,6 +2198,7 @@ const isJoined =
           onDropToHiddenContainer={handleDropToHiddenContainer}
           onClose={handleCloseMore}
           onOpenFolder={handleOpenFolder}
+          onLongPressDragStart={handleLayerSheetLongPressDragStart}
         />
       ) : null}
 
@@ -2188,6 +2263,39 @@ const isJoined =
             }}
           >
             {folderLongPressDragState.label.slice(0, 2) || "?"}
+          </div>
+        </div>
+      ) : null}
+
+      {layerSheetLongPressDragState ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: layerSheetLongPressDragState.x,
+            top: layerSheetLongPressDragState.y,
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            zIndex: 200,
+          }}
+        >
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 16,
+              background: "#FFFFFF",
+              border: "2px solid #475569",
+              boxShadow: "0 14px 30px rgba(15,23,42,0.25)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#334155",
+            }}
+          >
+            {layerSheetLongPressDragState.label.slice(0, 2) || "?"}
           </div>
         </div>
       ) : null}

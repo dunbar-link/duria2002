@@ -13,6 +13,7 @@ import { personCatalog } from "./home-page-types";
 import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
 import { getLayerColor } from "./layer-color";
+import { useLongPress } from "../use-long-press";
 
 const DRAG_HITBOX_EXPAND_PX = 10;
 const SELF_PURPLE_BG = "#E5E7EB";
@@ -545,6 +546,7 @@ export function PersonTile({
   onDrop,
   onOpenFolder,
   onPersonClick,
+  onLongPressDragStart,
 }: {
   entityId: string;
   folders: FolderMap;
@@ -581,6 +583,10 @@ export function PersonTile({
   ) => void;
   onOpenFolder: (folderId: string) => void;
   onPersonClick?: (entityId: string) => void;
+  onLongPressDragStart?: (
+    entityId: string,
+    point: { x: number; y: number },
+  ) => void;
 }) {
   const folder = folders[entityId];
   const person = folder ? null : personCatalog[entityId];
@@ -639,6 +645,17 @@ export function PersonTile({
   const isConnected = !folder && isJoinedEntity(entityId);
   const isHighPriority = !folder && showUrgentBadge;
 
+  const longPressEnabled = Boolean(onLongPressDragStart && !folder);
+  const { bind: longPressBind, wasLongPressedRef, cancelLongPress } = useLongPress({
+    onLongPress: (point) => {
+      if (!onLongPressDragStart) return;
+      onLongPressDragStart(entityId, point);
+    },
+    delay: 420,
+    moveTolerance: 8,
+    disabled: !longPressEnabled,
+  });
+
   const tileCore = (
   <div
     data-slot
@@ -659,7 +676,13 @@ export function PersonTile({
       WebkitTouchCallout: "none",
     }}
     draggable
-    onDragStart={() => onDragStart(layerId, index, entityId, sourceArea)}
+    {...(longPressEnabled ? longPressBind : {})}
+    onDragStart={() => {
+      if (longPressEnabled) {
+        cancelLongPress();
+      }
+      onDragStart(layerId, index, entityId, sourceArea);
+    }}
     onDragEnd={onDragEnd}
     onDragOver={(event) => {
       event.stopPropagation();
@@ -743,11 +766,22 @@ export function PersonTile({
     </div>
   );
 
+  const consumeLongPressClickIfNeeded = () => {
+    if (longPressEnabled && wasLongPressedRef.current) {
+      wasLongPressedRef.current = false;
+      return true;
+    }
+    return false;
+  };
+
   if (folder) {
     return (
       <button
         type="button"
-        onClick={() => onOpenFolder(entityId)}
+        onClick={() => {
+          if (consumeLongPressClickIfNeeded()) return;
+          onOpenFolder(entityId);
+        }}
         className="shrink-0 overflow-visible text-left transition-transform duration-150 hover:-translate-y-[1px] active:scale-[0.985]"
       >
         {wrappedTile}
@@ -759,7 +793,10 @@ export function PersonTile({
     return (
       <button
         type="button"
-        onClick={() => onPersonClick(entityId)}
+        onClick={() => {
+          if (consumeLongPressClickIfNeeded()) return;
+          onPersonClick(entityId);
+        }}
         className="shrink-0 overflow-visible text-left transition-transform duration-150 hover:-translate-y-[1px] active:scale-[0.985]"
       >
         {wrappedTile}
@@ -775,6 +812,12 @@ export function PersonTile({
           aria-label={`${getEntityLabel(entityId, folders)} 열기`}
           className="block overflow-visible transition-transform duration-150 hover:-translate-y-[1px] active:scale-[0.985]"
           draggable={false}
+          onClick={(event) => {
+            if (consumeLongPressClickIfNeeded()) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
         >
           {wrappedTile}
         </Link>

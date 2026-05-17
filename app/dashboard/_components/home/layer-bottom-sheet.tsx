@@ -120,6 +120,7 @@ function BottomSheetGrid({
   onDragOver,
   onDrop,
   onOpenFolder,
+  onLongPressDragStart,
 }: {
   layer: LayerBlueprint;
   ids: Array<string | null>;
@@ -149,6 +150,10 @@ function BottomSheetGrid({
     occupied: boolean
   ) => void;
   onOpenFolder: (folderId: string) => void;
+  onLongPressDragStart?: (
+    entityId: string,
+    point: { x: number; y: number },
+  ) => void;
 }) {
   const isDragActive = dragState !== null;
 
@@ -211,6 +216,7 @@ function BottomSheetGrid({
             onDragOver={onDragOver}
             onDrop={onDrop}
             onOpenFolder={onOpenFolder}
+            onLongPressDragStart={onLongPressDragStart}
           />
         );
       })}
@@ -254,6 +260,10 @@ type LayerBottomSheetProps = {
   onDropToHiddenContainer: (layerId: string, event: DragEvent) => void;
   onClose: () => void;
   onOpenFolder: (folderId: string) => void;
+  onLongPressDragStart?: (
+    entityId: string,
+    point: { x: number; y: number },
+  ) => void;
 };
 
 export default function LayerBottomSheet({
@@ -275,6 +285,7 @@ export default function LayerBottomSheet({
   onDropToHiddenContainer,
   onClose,
   onOpenFolder,
+  onLongPressDragStart,
 }: LayerBottomSheetProps) {
   return (
     <>
@@ -353,6 +364,7 @@ export default function LayerBottomSheet({
                 onDragOver={onDragOver}
                 onDrop={onDrop}
                 onOpenFolder={onOpenFolder}
+                onLongPressDragStart={onLongPressDragStart}
               />
             </SheetSectionShell>
           </section>
@@ -387,6 +399,7 @@ export default function LayerBottomSheet({
                 onDragOver={onDragOver}
                 onDrop={onDrop}
                 onOpenFolder={onOpenFolder}
+                onLongPressDragStart={onLongPressDragStart}
               />
             </SheetSectionShell>
           </section>
