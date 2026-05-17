@@ -2090,7 +2090,13 @@ const isJoined =
           </div>
         </div>
 
-        <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[10px] pb-[120px] pt-[6px] [overscroll-behavior-y:contain]">
+        <div
+          className={`hide-scrollbar min-h-0 flex-1 overflow-x-hidden px-[10px] pb-[120px] pt-[6px] [overscroll-behavior-y:contain] ${
+            folderLongPressDragState || layerSheetLongPressDragState
+              ? "overflow-y-hidden touch-none"
+              : "overflow-y-auto"
+          }`}
+        >
           <DashboardHomeShell>
             <div className="flex flex-col gap-[12px]">
               <HomeLayerSection
