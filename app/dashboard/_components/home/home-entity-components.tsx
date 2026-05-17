@@ -985,6 +985,8 @@ export function RightMetaColumn({
 
       <div
         className="absolute bottom-0 right-0"
+        data-drop-zone="more"
+        data-layer-id={layerId}
         onDragOver={onDragOverMore}
         onDrop={onDropToMore}
       >

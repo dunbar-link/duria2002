@@ -164,7 +164,7 @@ function FolderMemberTile({
   onDragOver,
   onDrop,
   onOpenFolder,
-  onRequestMoveMenu,
+  onLongPressDragStart,
   onPersonClick,
   people,
   getRecommendedAction,
@@ -182,7 +182,10 @@ function FolderMemberTile({
   onDragOver: (index: number, event: DragEvent, occupied: boolean) => void;
   onDrop: (index: number, event: DragEvent, occupied: boolean) => void;
   onOpenFolder: (folderId: string) => void;
-  onRequestMoveMenu: (entityId: string) => void;
+  onLongPressDragStart: (
+    entityId: string,
+    point: { x: number; y: number },
+  ) => void;
   onPersonClick?: (entityId: string) => void;
   people: DashboardPerson[];
   getRecommendedAction: (person: DashboardPerson) => string;
@@ -195,8 +198,8 @@ function FolderMemberTile({
     : isPersonActionNeeded(entityId, people, getRecommendedAction);
 
   const { bind, wasLongPressedRef, cancelLongPress } = useLongPress({
-    onLongPress: () => {
-      onRequestMoveMenu(entityId);
+    onLongPress: (point) => {
+      onLongPressDragStart(entityId, point);
     },
     delay: 420,
     moveTolerance: 8,
@@ -294,7 +297,10 @@ type FolderBottomSheetProps = {
   onDragOver: (index: number, event: DragEvent, occupied: boolean) => void;
   onDrop: (index: number, event: DragEvent, occupied: boolean) => void;
   onOpenFolder: (folderId: string) => void;
-  onRequestMoveMenu: (entityId: string) => void;
+  onLongPressDragStart: (
+    entityId: string,
+    point: { x: number; y: number },
+  ) => void;
   onPersonClick?: (entityId: string) => void;
 };
 
@@ -312,7 +318,7 @@ export default function FolderBottomSheet({
   onDragOver,
   onDrop,
   onOpenFolder,
-  onRequestMoveMenu,
+  onLongPressDragStart,
   onPersonClick,
 }: FolderBottomSheetProps) {
   const people = usePeopleStore((state) => state.people);
@@ -615,7 +621,7 @@ export default function FolderBottomSheet({
                   onDragOver={onDragOver}
                   onDrop={onDrop}
                   onOpenFolder={onOpenFolder}
-                  onRequestMoveMenu={onRequestMoveMenu}
+                  onLongPressDragStart={onLongPressDragStart}
                   onPersonClick={onPersonClick}
                   people={people}
                   getRecommendedAction={getRecommendedAction}

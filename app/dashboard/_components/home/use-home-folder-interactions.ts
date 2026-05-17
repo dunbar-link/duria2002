@@ -296,5 +296,6 @@ export function useHomeFolderInteractions({
     handleSendMoveMenuToCurrentMore,
     handleMoveMenuToLayerHome,
     handleMoveMenuToLayerMore,
+    moveFolderEntityToLayer,
   };
 }

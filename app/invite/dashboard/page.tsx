@@ -72,6 +72,7 @@ import {
 } from "../../dashboard/_components/home/home-page-types";
 import {
   createInitialLayoutState,
+  getEntityLabel,
   getHomeLayerDerivedStateMap,
   getSuppressedConnectableEntityIds,
   insertExternalEntityToTarget,
@@ -82,6 +83,7 @@ import {
   readConnectableCandidateStateMap,
   writeConnectableCandidateStateMap,
 } from "../../dashboard/_components/home/home-page-utils";
+import { useFolderLongPressDrag } from "../../dashboard/_components/home/use-folder-long-press-drag";
 import { useHomeDragDrop } from "../../dashboard/_components/home/use-home-drag-drop";
 import { useHomeFolderInteractions } from "../../dashboard/_components/home/use-home-folder-interactions";
 import { useHomeLayerSheet } from "../../dashboard/_components/home/use-home-layer-sheet";
@@ -984,12 +986,41 @@ useEffect(() => {
     handleMoveMenuToLayerHome,
     handleMoveMenuToLayerMore,
     closeFolderMoveMenu,
+    moveFolderEntityToLayer,
   } = useHomeFolderInteractions({
     layoutState,
     setLayoutState,
     folders,
     setFolders,
   });
+
+  const { dragState: folderLongPressDragState, beginDrag: beginFolderLongPressDrag } =
+    useFolderLongPressDrag({
+      onDrop: ({ folderId, entityId, layerId, area }) => {
+        moveFolderEntityToLayer(folderId, entityId, layerId, area);
+      },
+    });
+
+  const handleFolderLongPressDragStart = useCallback(
+    (entityId: string, point: { x: number; y: number }) => {
+      if (!openFolder) {
+        return;
+      }
+
+      const sourceFolderId = openFolder.id;
+      const label = getEntityLabel(entityId, folders);
+
+      handleCloseFolder();
+      beginFolderLongPressDrag({
+        entityId,
+        sourceFolderId,
+        label,
+        x: point.x,
+        y: point.y,
+      });
+    },
+    [beginFolderLongPressDrag, folders, handleCloseFolder, openFolder],
+  );
 
   const handleClosePersonActionSheet = useCallback(() => {
     setSelectedHomePersonId(null);
@@ -1495,13 +1526,13 @@ useEffect(() => {
           onDragOver={handleFolderMemberDragOver}
           onDrop={handleFolderMemberDrop}
           onOpenFolder={handleOpenFolder}
-          onRequestMoveMenu={handleRequestFolderMoveMenu}
+          onLongPressDragStart={handleFolderLongPressDragStart}
           onPersonClick={handleHomePersonClick}
         />
       ) : null}
 
       <HomeMoveMenu
-        open={Boolean(folderMoveMenuState && openFolder)}
+        open={false}
         personName={folderMoveEntityLabel}
         currentLayerLabel={openFolderTopLayer?.label ?? "현재"}
         targets={folderMoveTargets}
@@ -1511,6 +1542,39 @@ useEffect(() => {
         onMoveToLayerMore={handleMoveMenuToLayerMore}
         onClose={closeFolderMoveMenu}
       />
+
+      {folderLongPressDragState ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: folderLongPressDragState.x,
+            top: folderLongPressDragState.y,
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            zIndex: 200,
+          }}
+        >
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 16,
+              background: "#FFFFFF",
+              border: "2px solid #475569",
+              boxShadow: "0 14px 30px rgba(15,23,42,0.25)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#334155",
+            }}
+          >
+            {folderLongPressDragState.label.slice(0, 2) || "?"}
+          </div>
+        </div>
+      ) : null}
 
       <HomeOnboardingOverlay
         open={showOnboarding}
