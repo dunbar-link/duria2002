@@ -654,6 +654,7 @@ export function PersonTile({
     delay: 420,
     moveTolerance: 8,
     disabled: !longPressEnabled,
+    capturePointer: longPressEnabled,
   });
 
   const tileCore = (
