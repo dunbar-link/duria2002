@@ -293,7 +293,7 @@ export default function LayerBottomSheet({
           "fixed inset-x-[10px] bottom-0 z-50 mx-auto rounded-t-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-[16px] pb-4 pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.16)] transition-all duration-200 ease-out",
           isVisible
             ? "translate-y-0 opacity-100"
-            : "translate-y-[24px] opacity-0"
+            : "pointer-events-none translate-y-[24px] opacity-0"
         )}
         style={{
           width: "min(100%, 412px)",

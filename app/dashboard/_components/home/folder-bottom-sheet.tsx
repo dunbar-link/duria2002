@@ -235,6 +235,7 @@ function FolderMemberTile({
         touchAction: "manipulation",
         userSelect: "none",
         WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
       }}
       draggable
       onDragStart={() => {
@@ -453,7 +454,9 @@ export default function FolderBottomSheet({
       <section
         className={cn(
           "fixed inset-x-[18px] bottom-[18px] z-[70] mx-auto rounded-[28px] border border-slate-200/85 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-[16px] pb-4 pt-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)] transition-all duration-200 ease-out",
-          isVisible ? "translate-y-0 opacity-100" : "translate-y-[18px] opacity-0",
+          isVisible
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-[18px] opacity-0",
         )}
         style={{ width: "min(100%, 380px)" }}
       >

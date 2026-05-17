@@ -17,6 +17,7 @@ type DropPayload = {
   entityId: string;
   layerId: string;
   area: FolderDropArea;
+  index?: number;
 };
 
 type BeginDragInput = {
@@ -55,7 +56,7 @@ export function useFolderLongPressDrag({
     function findDropTarget(
       x: number,
       y: number,
-    ): { layerId: string; area: FolderDropArea } | null {
+    ): { layerId: string; area: FolderDropArea; index?: number } | null {
       const elements = document.elementsFromPoint(x, y);
 
       for (const element of elements) {
@@ -81,7 +82,10 @@ export function useFolderLongPressDrag({
           return { layerId, area: "hidden" };
         }
         if (dropZone === "slot" || candidate.hasAttribute("data-slot")) {
-          return { layerId, area: "visible" };
+          const indexAttr = candidate.getAttribute("data-index");
+          const parsedIndex = indexAttr !== null ? Number(indexAttr) : NaN;
+          const index = Number.isFinite(parsedIndex) ? parsedIndex : undefined;
+          return { layerId, area: "visible", index };
         }
       }
 
@@ -105,6 +109,7 @@ export function useFolderLongPressDrag({
             entityId: current.entityId,
             layerId: target.layerId,
             area: target.area,
+            index: target.index,
           });
         }
       }

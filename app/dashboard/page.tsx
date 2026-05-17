@@ -1295,8 +1295,8 @@ useEffect(() => {
 
   const { dragState: folderLongPressDragState, beginDrag: beginFolderLongPressDrag } =
     useFolderLongPressDrag({
-      onDrop: ({ folderId, entityId, layerId, area }) => {
-        moveFolderEntityToLayer(folderId, entityId, layerId, area);
+      onDrop: ({ folderId, entityId, layerId, area, index }) => {
+        moveFolderEntityToLayer(folderId, entityId, layerId, area, index);
       },
     });
 

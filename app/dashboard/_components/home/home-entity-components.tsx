@@ -637,7 +637,13 @@ export function PersonTile({
       isDragging && "z-20 scale-[0.92] opacity-35",
       !isDragging && isDropTarget && "scale-[1.05]",
     )}
-    style={{ width: tileWidth }}
+    style={{
+      width: tileWidth,
+      touchAction: "manipulation",
+      userSelect: "none",
+      WebkitUserSelect: "none",
+      WebkitTouchCallout: "none",
+    }}
     draggable
     onDragStart={() => onDragStart(layerId, index, entityId, sourceArea)}
     onDragEnd={onDragEnd}
@@ -649,6 +655,7 @@ export function PersonTile({
       event.stopPropagation();
       onDrop(layerId, index, sourceArea, event, true);
     }}
+    onContextMenu={(event) => event.preventDefault()}
   >
       <div
      className={cn(

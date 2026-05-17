@@ -157,7 +157,8 @@ export function useHomeFolderInteractions({
     folderId: string,
     entityId: string,
     targetLayerId: string,
-    targetArea: DragSourceArea
+    targetArea: DragSourceArea,
+    targetIndex?: number
   ) {
     const targetLayer = layoutState[targetLayerId];
 
@@ -165,8 +166,15 @@ export function useHomeFolderInteractions({
       return;
     }
 
+    const hasExplicitIndex =
+      typeof targetIndex === "number" &&
+      Number.isFinite(targetIndex) &&
+      targetIndex >= 0 &&
+      targetIndex < targetLayer.visibleSlotIds.length;
+
     if (
       targetArea === "visible" &&
+      !hasExplicitIndex &&
       getFirstEmptyIndex(targetLayer.visibleSlotIds) < 0
     ) {
       return;
@@ -192,9 +200,10 @@ export function useHomeFolderInteractions({
     }
 
     if (targetArea === "visible") {
-      const visibleIndex = getFirstEmptyIndex(
-        nextLayout[targetLayerId].visibleSlotIds
-      );
+      const visibleSlots = nextLayout[targetLayerId].visibleSlotIds;
+      const visibleIndex = hasExplicitIndex
+        ? (targetIndex as number)
+        : getFirstEmptyIndex(visibleSlots);
 
       if (visibleIndex >= 0) {
         nextLayout = moveEntityToTarget(
