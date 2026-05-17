@@ -210,7 +210,21 @@ function isJoinedEntity(entityId: string) {
     const people = Array.isArray(state?.people) ? state.people : [];
 
     return people.some((person: Record<string, unknown>) => {
-      return person.id === entityId && person.isJoined === true;
+      if (person.id !== entityId) {
+        return false;
+      }
+      if (person.isJoined !== true) {
+        return false;
+      }
+      const serverIdCandidates = [
+        person.userId,
+        person.dlUserId,
+        person.acceptedPersonId,
+      ];
+      return serverIdCandidates.some(
+        (value) =>
+          typeof value === "string" && value.trim().length > 0,
+      );
     });
   } catch {
     return false;
