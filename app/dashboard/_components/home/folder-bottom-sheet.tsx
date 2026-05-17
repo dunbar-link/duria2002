@@ -230,7 +230,12 @@ function FolderMemberTile({
         isDragging && "z-20 scale-[0.92] opacity-35",
         !isDragging && isDropTarget && "scale-[1.05]",
       )}
-      style={{ width: tileWidth }}
+      style={{
+        width: tileWidth,
+        touchAction: "manipulation",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+      }}
       draggable
       onDragStart={() => {
         cancelLongPress();

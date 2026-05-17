@@ -1011,6 +1011,7 @@ useEffect(() => {
       const label = getEntityLabel(entityId, folders);
 
       handleCloseFolder();
+      handleCloseMore();
       beginFolderLongPressDrag({
         entityId,
         sourceFolderId,
@@ -1019,7 +1020,13 @@ useEffect(() => {
         y: point.y,
       });
     },
-    [beginFolderLongPressDrag, folders, handleCloseFolder, openFolder],
+    [
+      beginFolderLongPressDrag,
+      folders,
+      handleCloseFolder,
+      handleCloseMore,
+      openFolder,
+    ],
   );
 
   const handleClosePersonActionSheet = useCallback(() => {

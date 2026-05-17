@@ -38,6 +38,7 @@ export function useLongPress(options: UseLongPressOptions): {
   const startPointRef = useRef<Point | null>(null);
   const latestPointRef = useRef<Point | null>(null);
   const pressedPointerIdRef = useRef<number | null>(null);
+  const pressedPointerTypeRef = useRef<string>("mouse");
   const wasLongPressedRef = useRef(false);
 
   const clearTimer = useCallback(() => {
@@ -70,6 +71,7 @@ export function useLongPress(options: UseLongPressOptions): {
 
       wasLongPressedRef.current = false;
       pressedPointerIdRef.current = event.pointerId;
+      pressedPointerTypeRef.current = event.pointerType || "mouse";
 
       const point = {
         x: event.clientX,
@@ -117,7 +119,12 @@ export function useLongPress(options: UseLongPressOptions): {
       const dy = nextPoint.y - startPoint.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance > moveTolerance) {
+      const effectiveTolerance =
+        pressedPointerTypeRef.current === "touch"
+          ? Math.max(moveTolerance, 16)
+          : moveTolerance;
+
+      if (distance > effectiveTolerance) {
         cancelLongPress();
       }
     },
