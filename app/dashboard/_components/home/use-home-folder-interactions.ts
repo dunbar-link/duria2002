@@ -13,12 +13,23 @@ import {
   extractEntityFromFolderHierarchy,
   findEntityLocation,
   getFirstEmptyIndex,
+  getTierByLayerId,
+  isPersonEntityId,
   moveEntityToTarget,
   moveFolderEntityWithinFolder,
   renameFolderEntity,
 } from "./home-page-utils";
 import { useHomeFolderMoveMenu } from "./use-home-folder-move-menu";
 import { useHomeFolderSheet } from "./use-home-folder-sheet";
+import { usePeopleStore } from "../../people/store";
+
+function syncPersonTierForLayer(entityId: string, targetLayerId: string) {
+  if (!isPersonEntityId(entityId)) {
+    return;
+  }
+  const nextTier = getTierByLayerId(targetLayerId);
+  usePeopleStore.getState().updatePersonTier(entityId, nextTier);
+}
 
 export function useHomeFolderInteractions({
   layoutState,
@@ -235,6 +246,7 @@ export function useHomeFolderInteractions({
 
     setLayoutState(nextLayout);
     setFolders(nextFolders);
+    syncPersonTierForLayer(entityId, targetLayerId);
     closeFolderMoveMenu();
   }
 

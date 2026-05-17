@@ -16,10 +16,21 @@ import { CONNECTABLE_SOURCE_LAYER_ID } from "./home-page-types";
 import {
   combineEntityIntoTarget,
   getHoverActionFromPointer,
+  getTierByLayerId,
   insertExternalEntityToTarget,
+  isPersonEntityId,
   moveEntityToTarget,
   resolveRailTarget,
 } from "./home-page-utils";
+import { usePeopleStore } from "../../people/store";
+
+function syncPersonTierForLayer(entityId: string, targetLayerId: string) {
+  if (!isPersonEntityId(entityId)) {
+    return;
+  }
+  const nextTier = getTierByLayerId(targetLayerId);
+  usePeopleStore.getState().updatePersonTier(entityId, nextTier);
+}
 
 type UseHomeDragDropParams = {
   layoutState: Record<string, LayerLayoutState>;
@@ -185,6 +196,7 @@ export function useHomeDragDrop({
               targetIndex
             )
           );
+          syncPersonTierForLayer(dragState.entityId, targetLayerId);
           clearDragUiState();
           return;
         }
@@ -200,6 +212,7 @@ export function useHomeDragDrop({
 
         setLayoutState(result.layout);
         setFolders(result.folders);
+        syncPersonTierForLayer(dragState.entityId, targetLayerId);
         clearDragUiState();
         return;
       }
@@ -214,6 +227,7 @@ export function useHomeDragDrop({
         )
       );
 
+      syncPersonTierForLayer(dragState.entityId, targetLayerId);
       clearDragUiState();
     },
     [
@@ -273,6 +287,7 @@ export function useHomeDragDrop({
         moveEntityToTarget(current, dragState, layerId, "hidden")
       );
 
+      syncPersonTierForLayer(dragState.entityId, layerId);
       clearDragUiState();
     },
     [clearDragUiState, dragState, onExternalEntityAdded, setLayoutState]
@@ -365,6 +380,7 @@ export function useHomeDragDrop({
         );
       });
 
+      syncPersonTierForLayer(dragState.entityId, layerId);
       clearDragUiState();
     },
     [clearDragUiState, dragState, layoutState, onExternalEntityAdded, setLayoutState]
@@ -413,6 +429,7 @@ export function useHomeDragDrop({
         moveEntityToTarget(current, dragState, layerId, "hidden")
       );
 
+      syncPersonTierForLayer(dragState.entityId, layerId);
       clearDragUiState();
     },
     [clearDragUiState, dragState, onExternalEntityAdded, setLayoutState]

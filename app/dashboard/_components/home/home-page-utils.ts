@@ -29,6 +29,24 @@ export function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
+export function getTierByLayerId(layerId: string): 1 | 5 | 15 | 50 | 150 {
+  if (layerId === "family") return 1;
+  if (layerId === "core") return 5;
+  if (layerId === "trust") return 15;
+  if (layerId === "intimate") return 50;
+  return 150;
+}
+
+export function isPersonEntityId(entityId: string | null | undefined): boolean {
+  if (typeof entityId !== "string") return false;
+  if (entityId.length === 0) return false;
+  if (entityId === "family-me") return false;
+  if (entityId.startsWith("folder-")) return false;
+  if (entityId.startsWith("connectable:")) return false;
+  if (entityId.startsWith("invite-pending-")) return false;
+  return true;
+}
+
 export function fillSlots(
   ids: Array<string | null>,
   minSlots: number

@@ -128,6 +128,7 @@ type PeopleState = {
   inviteDrafts: InviteDraft[];
 
   addPerson: (input: AddDashboardPersonInput) => DashboardPerson;
+  updatePersonTier: (id: string, tier: DashboardTier) => void;
   markContacted: (id: string, at?: string) => void;
   snooze: (id: string, days?: number) => void;
   snoozePerson: (id: string) => void;
@@ -445,6 +446,30 @@ export const usePeopleStore = create<PeopleState>()(
         });
 
         return nextPerson;
+      },
+
+      updatePersonTier: (id, tier) => {
+        const trimmedId = id.trim();
+        if (!trimmedId) {
+          return;
+        }
+        set((state) => {
+          let changed = false;
+          const nextPeople = state.people.map((person) => {
+            if (person.id !== trimmedId) {
+              return person;
+            }
+            if (person.tier === tier) {
+              return person;
+            }
+            changed = true;
+            return { ...person, tier };
+          });
+          if (!changed) {
+            return {} as Partial<PeopleState>;
+          }
+          return { people: nextPeople };
+        });
       },
 
       markContacted: (id, at) =>
