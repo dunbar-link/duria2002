@@ -275,8 +275,8 @@ function getInviteeNameFromRow(row: Record<string, unknown>) {
 function getTierByLayerId(layerId: string): 1 | 5 | 15 | 50 | 150 {
   if (layerId === "family") return 1;
   if (layerId === "core") return 5;
-  if (layerId === "trust") return 15;
-  if (layerId === "intimate") return 50;
+  if (layerId === "intimate") return 15;
+  if (layerId === "trust") return 50;
   return 150;
 }
 
