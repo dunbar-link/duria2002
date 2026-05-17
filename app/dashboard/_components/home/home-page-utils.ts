@@ -1123,6 +1123,17 @@ export function extractEntityFromFolderHierarchy(
   );
 
   if (topLocation) {
+    const alreadyInLayout = findEntityLocation(committed.layout, entityId);
+
+    if (alreadyInLayout) {
+      return {
+        layout: committed.layout,
+        folders: committed.folders,
+        extractedInserted: true,
+        insertLayerId: alreadyInLayout.layerId,
+      };
+    }
+
     const layerState = committed.layout[topLocation.layerId];
     insertEntityToVisibleFirst(layerState, entityId);
     layerState.hiddenSlotIds = normalizeHiddenSlots(layerState.hiddenSlotIds);

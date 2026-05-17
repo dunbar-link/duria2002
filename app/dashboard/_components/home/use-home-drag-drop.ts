@@ -185,8 +185,12 @@ export function useHomeDragDrop({
         const targetEntityId = targetSlotArray?.[targetIndex] ?? null;
         const involvesMe =
           dragState.entityId === "family-me" || targetEntityId === "family-me";
+        const sourceIsFolder = Boolean(folders[dragState.entityId]);
+        const targetIsFolder = Boolean(
+          targetEntityId && folders[targetEntityId]
+        );
 
-        if (involvesMe) {
+        if (involvesMe || sourceIsFolder || targetIsFolder) {
           setLayoutState((current) =>
             moveEntityToTarget(
               current,

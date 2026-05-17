@@ -183,6 +183,18 @@ export function useHomeFolderInteractions({
       targetIndex >= 0 &&
       targetIndex < targetLayer.visibleSlotIds.length;
 
+    if (hasExplicitIndex) {
+      const targetSlots =
+        targetArea === "visible"
+          ? targetLayer.visibleSlotIds
+          : targetLayer.hiddenSlotIds;
+      const targetEntityIdAtSlot = targetSlots[targetIndex as number] ?? null;
+      if (targetEntityIdAtSlot === "family-me") {
+        closeFolderMoveMenu();
+        return;
+      }
+    }
+
     if (
       targetArea === "visible" &&
       !hasExplicitIndex &&

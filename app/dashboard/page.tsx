@@ -1340,7 +1340,25 @@ useEffect(() => {
         return;
       }
 
+      let didMove = false;
+
       setLayoutState((current) => {
+        const targetLayer = current[layerId];
+
+        if (!targetLayer) {
+          return current;
+        }
+
+        if (typeof index === "number") {
+          const targetSlots =
+            area === "visible"
+              ? targetLayer.visibleSlotIds
+              : targetLayer.hiddenSlotIds;
+          if (targetSlots[index] === "family-me") {
+            return current;
+          }
+        }
+
         const location = findEntityLocation(current, entityId);
 
         if (!location) {
@@ -1354,6 +1372,8 @@ useEffect(() => {
         ) {
           return current;
         }
+
+        didMove = true;
 
         return moveEntityToTarget(
           current,
@@ -1369,7 +1389,9 @@ useEffect(() => {
         );
       });
 
-      usePeopleStore.getState().updatePersonTier(entityId, getTierByLayerId(layerId));
+      if (didMove) {
+        usePeopleStore.getState().updatePersonTier(entityId, getTierByLayerId(layerId));
+      }
     },
   });
 
