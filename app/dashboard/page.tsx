@@ -1424,6 +1424,89 @@ useEffect(() => {
     ],
   );
 
+  const {
+    dragState: homeMainLongPressDragState,
+    beginDrag: beginHomeMainLongPressDrag,
+  } = useFolderLongPressDrag({
+    onDrop: ({ entityId, layerId, area, index }) => {
+      if (!isPersonEntityId(entityId)) {
+        return;
+      }
+
+      let didMove = false;
+
+      setLayoutState((current) => {
+        const targetLayer = current[layerId];
+
+        if (!targetLayer) {
+          return current;
+        }
+
+        if (typeof index === "number") {
+          const targetSlots =
+            area === "visible"
+              ? targetLayer.visibleSlotIds
+              : targetLayer.hiddenSlotIds;
+          if (targetSlots[index] === "family-me") {
+            return current;
+          }
+        }
+
+        const location = findEntityLocation(current, entityId);
+
+        if (!location) {
+          return current;
+        }
+
+        if (
+          location.layerId === layerId &&
+          location.area === area &&
+          (typeof index !== "number" || location.index === index)
+        ) {
+          return current;
+        }
+
+        didMove = true;
+
+        return moveEntityToTarget(
+          current,
+          {
+            sourceLayerId: location.layerId,
+            sourceIndex: location.index,
+            entityId,
+            sourceArea: location.area,
+          },
+          layerId,
+          area,
+          index,
+        );
+      });
+
+      if (didMove) {
+        usePeopleStore
+          .getState()
+          .updatePersonTier(entityId, getTierByLayerId(layerId));
+      }
+    },
+  });
+
+  const handleHomeMainLongPressDragStart = useCallback(
+    (entityId: string, point: { x: number; y: number }) => {
+      if (!isPersonEntityId(entityId)) {
+        return;
+      }
+
+      beginHomeMainLongPressDrag({
+        entityId,
+        sourceFolderId: "home-main",
+        label: getEntityLabel(entityId, folders),
+        x: point.x,
+        y: point.y,
+      });
+    },
+    [beginHomeMainLongPressDrag, folders],
+  );
+
   const handleClosePersonActionSheet = useCallback(() => {
     setSelectedHomePersonId(null);
     setPersonActionFeedback("");
@@ -2114,7 +2197,9 @@ const isJoined =
 
         <div
           className={`hide-scrollbar min-h-0 flex-1 overflow-x-hidden px-[10px] pb-[120px] pt-[6px] [overscroll-behavior-y:contain] ${
-            folderLongPressDragState || layerSheetLongPressDragState
+            folderLongPressDragState ||
+            layerSheetLongPressDragState ||
+            homeMainLongPressDragState
               ? "overflow-y-hidden touch-none"
               : "overflow-y-auto"
           }`}
@@ -2154,6 +2239,7 @@ const isJoined =
                       onDropToRailLayer={handleDropToRailLayer}
                       onEmptySlotClick={handleOpenAddSheet}
                       onPersonClick={handleHomePersonClick}
+                      onLongPressDragStart={handleHomeMainLongPressDragStart}
                     />
                   );
                 }}
@@ -2324,6 +2410,39 @@ const isJoined =
             }}
           >
             {layerSheetLongPressDragState.label.slice(0, 2) || "?"}
+          </div>
+        </div>
+      ) : null}
+
+      {homeMainLongPressDragState ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: homeMainLongPressDragState.x,
+            top: homeMainLongPressDragState.y,
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            zIndex: 200,
+          }}
+        >
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 16,
+              background: "#FFFFFF",
+              border: "2px solid #475569",
+              boxShadow: "0 14px 30px rgba(15,23,42,0.25)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#334155",
+            }}
+          >
+            {homeMainLongPressDragState.label.slice(0, 2) || "?"}
           </div>
         </div>
       ) : null}

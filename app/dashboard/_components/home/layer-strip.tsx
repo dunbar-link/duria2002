@@ -54,6 +54,10 @@ type LayerStripProps = {
   onDropToRailLayer: (layerId: string) => void;
   onEmptySlotClick: (layerId: string, index: number) => void;
   onPersonClick?: (entityId: string) => void;
+  onLongPressDragStart?: (
+    entityId: string,
+    point: { x: number; y: number },
+  ) => void;
 };
 
 export default function LayerStrip({
@@ -78,6 +82,7 @@ export default function LayerStrip({
   onDropToRailLayer,
   onEmptySlotClick,
   onPersonClick,
+  onLongPressDragStart,
 }: LayerStripProps) {
   const isDragActive = dragState !== null;
   const isConnectableDrag = dragState?.sourceLayerId === "connectable-source";
@@ -168,6 +173,7 @@ export default function LayerStrip({
                   onDrop={onDrop}
                   onOpenFolder={onOpenFolder}
                   onPersonClick={onPersonClick}
+                  onLongPressDragStart={onLongPressDragStart}
                 />
               );
             })}
