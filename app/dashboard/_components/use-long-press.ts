@@ -71,13 +71,22 @@ export function useLongPress(options: UseLongPressOptions): {
     capturedTargetRef.current = null;
   }, []);
 
-  const resetState = useCallback(() => {
+  // Lighter reset used right after the long-press timer fires. Clears the
+  // timer and movement refs but **keeps the pointer capture and pressed
+  // pointer id intact** so the in-flight ghost drag retains active-touch
+  // ownership until pointerup/real cancel happens. Capture release is moved
+  // to handlePointerUp/handlePointerCancel.
+  const resetTimerState = useCallback(() => {
     clearTimer();
-    releaseCapturedPointer();
     startPointRef.current = null;
     latestPointRef.current = null;
+  }, [clearTimer]);
+
+  const resetState = useCallback(() => {
+    resetTimerState();
+    releaseCapturedPointer();
     pressedPointerIdRef.current = null;
-  }, [clearTimer, releaseCapturedPointer]);
+  }, [resetTimerState, releaseCapturedPointer]);
 
   const cancelLongPress = useCallback(() => {
     resetState();
@@ -122,10 +131,13 @@ export function useLongPress(options: UseLongPressOptions): {
         const finalPoint = latestPointRef.current ?? point;
         wasLongPressedRef.current = true;
         onLongPress(finalPoint);
-        resetState();
+        // Keep pointer capture and pressedPointerIdRef so the ghost drag
+        // retains active-touch ownership through pointermove. Capture is
+        // released by handlePointerUp/handlePointerCancel.
+        resetTimerState();
       }, delay);
     },
-    [capturePointer, clearTimer, delay, disabled, onLongPress, resetState]
+    [capturePointer, clearTimer, delay, disabled, onLongPress, resetTimerState]
   );
 
   const handlePointerMove = useCallback(
@@ -144,6 +156,13 @@ export function useLongPress(options: UseLongPressOptions): {
       };
 
       latestPointRef.current = nextPoint;
+
+      // After the long-press has fired, the ghost drag owns the active touch.
+      // Skip the tolerance-based cancel so a small finger drift cannot release
+      // pointer capture and break the in-flight drag tracking.
+      if (wasLongPressedRef.current) {
+        return;
+      }
 
       const startPoint = startPointRef.current;
       if (!startPoint) {
