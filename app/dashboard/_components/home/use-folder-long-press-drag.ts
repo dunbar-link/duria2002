@@ -48,10 +48,25 @@ export function useFolderLongPressDrag({
       return;
     }
 
-    const previousTouchAction = document.body.style.touchAction;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.touchAction = "none";
-    document.body.style.overflow = "hidden";
+    const bodyStyle = document.body.style as CSSStyleDeclaration & {
+      webkitUserSelect?: string;
+      webkitTouchCallout?: string;
+      webkitTapHighlightColor?: string;
+    };
+
+    const previousTouchAction = bodyStyle.touchAction;
+    const previousOverflow = bodyStyle.overflow;
+    const previousUserSelect = bodyStyle.userSelect;
+    const previousWebkitUserSelect = bodyStyle.webkitUserSelect ?? "";
+    const previousWebkitTouchCallout = bodyStyle.webkitTouchCallout ?? "";
+    const previousWebkitTapHighlightColor = bodyStyle.webkitTapHighlightColor ?? "";
+
+    bodyStyle.touchAction = "none";
+    bodyStyle.overflow = "hidden";
+    bodyStyle.userSelect = "none";
+    bodyStyle.webkitUserSelect = "none";
+    bodyStyle.webkitTouchCallout = "none";
+    bodyStyle.webkitTapHighlightColor = "transparent";
 
     const activatedAt = Date.now();
     const cancelGraceMs = 300;
@@ -147,8 +162,12 @@ export function useFolderLongPressDrag({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleCancel);
       window.removeEventListener("keydown", handleKey);
-      document.body.style.touchAction = previousTouchAction;
-      document.body.style.overflow = previousOverflow;
+      bodyStyle.touchAction = previousTouchAction;
+      bodyStyle.overflow = previousOverflow;
+      bodyStyle.userSelect = previousUserSelect;
+      bodyStyle.webkitUserSelect = previousWebkitUserSelect;
+      bodyStyle.webkitTouchCallout = previousWebkitTouchCallout;
+      bodyStyle.webkitTapHighlightColor = previousWebkitTapHighlightColor;
     };
   }, [isActive]);
 
