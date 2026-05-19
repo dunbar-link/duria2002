@@ -792,16 +792,24 @@ export function PersonTile({
 
   if (onPersonClick) {
     return (
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => {
           if (consumeLongPressClickIfNeeded()) return;
           onPersonClick(entityId);
         }}
-        className="shrink-0 overflow-visible text-left transition-transform duration-150 hover:-translate-y-[1px] active:scale-[0.985]"
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (consumeLongPressClickIfNeeded()) return;
+            onPersonClick(entityId);
+          }
+        }}
+        className="shrink-0 cursor-pointer overflow-visible text-left transition-transform duration-150 hover:-translate-y-[1px] active:scale-[0.985]"
       >
         {wrappedTile}
-      </button>
+      </div>
     );
   }
 
