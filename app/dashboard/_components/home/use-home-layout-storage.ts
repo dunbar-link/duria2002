@@ -14,7 +14,7 @@ import {
   personCatalog,
   upsertDynamicConnectableCandidate,
 } from "./home-page-types";
-import { normalizeStoredState } from "./home-page-utils";
+import { normalizeHiddenSlots, normalizeStoredState } from "./home-page-utils";
 
 type PersistedConnectableStateRecord = {
   entityId?: string;
@@ -545,6 +545,238 @@ function reattachFolderIdsToLayout(
   return nextLayout;
 }
 
+type SlotLocation = {
+  layerId: string;
+  area: "visible" | "hidden";
+  index: number;
+};
+
+// Defensive consistency scrubber for layoutState/folders.
+// Run once after hydration to repair pre-existing corrupt persisted state
+// (duplicate person ids across root + folder, orphan folder references,
+// empty / single-member folders, unknown person ids, etc.).
+// Idempotent: returns the input references unchanged when already clean.
+function scrubLayoutAndFolders(
+  layout: Record<string, LayerLayoutState>,
+  folders: FolderMap,
+): { layout: Record<string, LayerLayoutState>; folders: FolderMap; changed: boolean } {
+  const personCatalogIds = new Set(Object.keys(personCatalog));
+
+  // ---- Pass 1: dedupe folder memberships ----
+  // First-folder wins for any person id or nested folder id.
+  const personOwnerFolder = new Map<string, string>();
+  const folderOwnerFolder = new Map<string, string>();
+  const cleanedFolders: FolderMap = {};
+  let foldersChanged = false;
+
+  for (const [folderId, folder] of Object.entries(folders)) {
+    if (!folder) {
+      foldersChanged = true;
+      continue;
+    }
+
+    const cleanedMembers: string[] = [];
+    const seenInThisFolder = new Set<string>();
+    const originalFilledCount = folder.memberIds.filter(
+      (memberId): memberId is string =>
+        typeof memberId === "string" && memberId.trim().length > 0,
+    ).length;
+
+    for (const memberId of folder.memberIds) {
+      if (typeof memberId !== "string" || !memberId.trim()) {
+        continue;
+      }
+
+      if (seenInThisFolder.has(memberId)) {
+        continue; // policy 3: within-folder dedup
+      }
+
+      if (memberId === "family-me") {
+        continue; // family-me must never be inside a folder
+      }
+
+      if (memberId.startsWith("folder-")) {
+        if (folderOwnerFolder.has(memberId)) {
+          continue; // policy 4: cross-folder dedup for nested folder
+        }
+        folderOwnerFolder.set(memberId, folderId);
+      } else {
+        if (!personCatalogIds.has(memberId)) {
+          continue; // policy 8: drop unknown person ids
+        }
+        if (personOwnerFolder.has(memberId)) {
+          continue; // policy 4: cross-folder dedup for person
+        }
+        personOwnerFolder.set(memberId, folderId);
+      }
+
+      seenInThisFolder.add(memberId);
+      cleanedMembers.push(memberId);
+    }
+
+    if (cleanedMembers.length !== originalFilledCount) {
+      foldersChanged = true;
+    }
+
+    cleanedFolders[folderId] = {
+      ...folder,
+      memberIds: cleanedMembers,
+    };
+  }
+
+  // ---- Pass 2: dedupe root slots, drop folder-owned persons, drop orphan folder ids ----
+  const seenInRoot = new Set<string>();
+  const intermediateLayout: Record<string, LayerLayoutState> = {};
+  let layoutChanged = false;
+
+  function processSlot(entityId: string | null): string | null {
+    if (!entityId || !entityId.trim()) return null;
+
+    if (entityId.startsWith("folder-")) {
+      // policy 6: orphan folder id reference cleanup
+      if (!cleanedFolders[entityId]) {
+        layoutChanged = true;
+        return null;
+      }
+      // nested folder must not also appear in root
+      if (folderOwnerFolder.has(entityId)) {
+        layoutChanged = true;
+        return null;
+      }
+      if (seenInRoot.has(entityId)) {
+        layoutChanged = true;
+        return null;
+      }
+      seenInRoot.add(entityId);
+      return entityId;
+    }
+
+    if (entityId === "family-me") {
+      if (seenInRoot.has(entityId)) {
+        layoutChanged = true;
+        return null;
+      }
+      seenInRoot.add(entityId);
+      return entityId;
+    }
+
+    // plain person id
+    if (!personCatalogIds.has(entityId)) {
+      layoutChanged = true;
+      return null; // policy 8
+    }
+    if (personOwnerFolder.has(entityId)) {
+      layoutChanged = true;
+      return null; // policy 1: folder membership wins
+    }
+    if (seenInRoot.has(entityId)) {
+      layoutChanged = true;
+      return null; // policy 2: root dedup, first wins
+    }
+    seenInRoot.add(entityId);
+    return entityId;
+  }
+
+  for (const [layerId, layer] of Object.entries(layout)) {
+    const nextVisible = layer.visibleSlotIds.map(processSlot);
+    const nextHiddenRaw = layer.hiddenSlotIds.map(processSlot);
+    const nextHidden = normalizeHiddenSlots(nextHiddenRaw);
+    intermediateLayout[layerId] = {
+      visibleSlotIds: nextVisible,
+      hiddenSlotIds: nextHidden,
+    };
+  }
+
+  // ---- Pass 3: dissolve 0/1-member folders, iterate to fixed point ----
+  let workLayout: Record<string, LayerLayoutState> = intermediateLayout;
+  let workFolders: FolderMap = cleanedFolders;
+  let dissolveChanged = false;
+
+  const MAX_ITER = 16;
+
+  for (let iter = 0; iter < MAX_ITER; iter += 1) {
+    const folderLocations = new Map<string, SlotLocation>();
+    for (const [layerId, layer] of Object.entries(workLayout)) {
+      layer.visibleSlotIds.forEach((slot, index) => {
+        if (slot && slot.startsWith("folder-") && workFolders[slot]) {
+          folderLocations.set(slot, { layerId, area: "visible", index });
+        }
+      });
+      layer.hiddenSlotIds.forEach((slot, index) => {
+        if (slot && slot.startsWith("folder-") && workFolders[slot]) {
+          folderLocations.set(slot, { layerId, area: "hidden", index });
+        }
+      });
+    }
+
+    let passChanged = false;
+    const nextFolders: FolderMap = { ...workFolders };
+    const nextLayout: Record<string, LayerLayoutState> = {};
+    for (const [layerId, layer] of Object.entries(workLayout)) {
+      nextLayout[layerId] = {
+        visibleSlotIds: [...layer.visibleSlotIds],
+        hiddenSlotIds: [...layer.hiddenSlotIds],
+      };
+    }
+
+    function writeSlot(location: SlotLocation, value: string | null) {
+      const array =
+        location.area === "visible"
+          ? nextLayout[location.layerId].visibleSlotIds
+          : nextLayout[location.layerId].hiddenSlotIds;
+      array[location.index] = value;
+    }
+
+    for (const [folderId, folder] of Object.entries(nextFolders)) {
+      const count = folder.memberIds.length;
+      const location = folderLocations.get(folderId);
+
+      if (count === 0) {
+        delete nextFolders[folderId];
+        if (location) {
+          writeSlot(location, null);
+        }
+        passChanged = true;
+        continue;
+      }
+
+      if (count === 1) {
+        const member = folder.memberIds[0];
+        if (!member) {
+          delete nextFolders[folderId];
+          if (location) writeSlot(location, null);
+          passChanged = true;
+          continue;
+        }
+        delete nextFolders[folderId];
+        if (location) {
+          // policy 5: dissolve. Place member where the folder used to be.
+          writeSlot(location, member);
+        }
+        passChanged = true;
+      }
+    }
+
+    if (!passChanged) break;
+
+    for (const layerId of Object.keys(nextLayout)) {
+      nextLayout[layerId] = {
+        visibleSlotIds: nextLayout[layerId].visibleSlotIds,
+        hiddenSlotIds: normalizeHiddenSlots(nextLayout[layerId].hiddenSlotIds),
+      };
+    }
+
+    workLayout = nextLayout;
+    workFolders = nextFolders;
+    dissolveChanged = true;
+  }
+
+  const changed = foldersChanged || layoutChanged || dissolveChanged;
+  return changed
+    ? { layout: workLayout, folders: workFolders, changed: true }
+    : { layout, folders, changed: false };
+}
+
 export function useHomeLayoutStorage({
   layoutState,
   folders,
@@ -600,11 +832,18 @@ export function useHomeLayoutStorage({
         storedPayload,
       );
 
-      const loadedPayload = buildPayload(restoredLayout, cleanedFolders);
+      // Defensive scrubber: repair pre-existing duplicates / orphan refs /
+      // empty/single-member folders / unknown person ids. Idempotent on
+      // already-clean state.
+      const scrubbed = scrubLayoutAndFolders(restoredLayout, cleanedFolders);
+      const finalLayout = scrubbed.layout;
+      const finalFolders = scrubbed.folders;
+
+      const loadedPayload = buildPayload(finalLayout, finalFolders);
       lastSavedSerializedRef.current = JSON.stringify(loadedPayload);
 
-      setLayoutState(restoredLayout);
-      setFolders(cleanedFolders);
+      setLayoutState(finalLayout);
+      setFolders(finalFolders);
 
       window.setTimeout(() => {
         saveEnabledRef.current = true;
