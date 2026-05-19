@@ -54,6 +54,8 @@ export function useHomeFolderInteractions({
     openFolderTopLayer,
     openFolderSheet,
     closeFolderSheet,
+    hideFolderSheet,
+    finishCloseFolderSheet,
   } = useHomeFolderSheet({
     layoutState,
     folders,
@@ -330,5 +332,7 @@ export function useHomeFolderInteractions({
     handleMoveMenuToLayerHome,
     handleMoveMenuToLayerMore,
     moveFolderEntityToLayer,
+    hideFolderSheet,
+    finishCloseFolderSheet,
   };
 }

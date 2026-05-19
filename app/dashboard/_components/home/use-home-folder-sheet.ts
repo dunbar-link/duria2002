@@ -107,6 +107,29 @@ export function useHomeFolderSheet({
     }, FOLDER_SHEET_CLOSE_MS);
   }
 
+  // Visually animate the sheet hidden without scheduling unmount. Used when a
+  // ghost drag starts from inside the folder so FolderMemberTile stays mounted
+  // and keeps owning the active touch until the drag ends.
+  function hideFolderSheet() {
+    setFolderSheetVisible(false);
+
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+
+  // Complete the deferred close: cancel any pending timer and immediately clear
+  // folderSheetFolderId so the sheet unmounts. Call this after the ghost drag
+  // has settled.
+  function finishCloseFolderSheet() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setFolderSheetFolderId(null);
+  }
+
   return {
     folderSheetFolderId,
     folderSheetVisible,
@@ -115,5 +138,7 @@ export function useHomeFolderSheet({
     openFolderTopLayer,
     openFolderSheet,
     closeFolderSheet,
+    hideFolderSheet,
+    finishCloseFolderSheet,
   };
 }

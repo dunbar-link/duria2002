@@ -53,7 +53,7 @@ import {
 import Link from "next/link";
 import { sendSignal } from "@/lib/signal/send-signal";
 import HomeRecommendationList from "./_components/recommendation/HomeRecommendationList";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardHomeHeader from "./_components/dashboard-home-header";
 import DashboardHomeShell from "./_components/dashboard-home-shell";
@@ -1289,6 +1289,8 @@ useEffect(() => {
     handleMoveMenuToLayerMore,
     closeFolderMoveMenu,
     moveFolderEntityToLayer,
+    hideFolderSheet,
+    finishCloseFolderSheet,
   } = useHomeFolderInteractions({
     layoutState,
     setLayoutState,
@@ -1312,7 +1314,12 @@ useEffect(() => {
       const sourceFolderId = openFolder.id;
       const label = getEntityLabel(entityId, folders);
 
-      handleCloseFolder();
+      // Defer the folder sheet's DOM unmount until the ghost drag settles.
+      // The sheet animates closed visually (visible=false) but FolderMemberTile
+      // stays mounted, keeping the captured/active touch ownership intact.
+      // After folderLongPressDragState transitions back to null, the effect
+      // below calls finishCloseFolderSheet to complete the unmount.
+      hideFolderSheet();
       handleCloseMore();
       beginFolderLongPressDrag({
         entityId,
@@ -1325,11 +1332,22 @@ useEffect(() => {
     [
       beginFolderLongPressDrag,
       folders,
-      handleCloseFolder,
       handleCloseMore,
+      hideFolderSheet,
       openFolder,
     ],
   );
+
+  const folderLongPressDragActiveRef = useRef(false);
+  useEffect(() => {
+    const isActive = Boolean(folderLongPressDragState);
+    const wasActive = folderLongPressDragActiveRef.current;
+    folderLongPressDragActiveRef.current = isActive;
+
+    if (wasActive && !isActive) {
+      finishCloseFolderSheet();
+    }
+  }, [folderLongPressDragState, finishCloseFolderSheet]);
 
   const {
     dragState: layerSheetLongPressDragState,
