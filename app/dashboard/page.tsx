@@ -721,7 +721,7 @@ export default function DashboardPage() {
   >(() => createInitialLayoutState());
   const [folders, setFolders] = useState<FolderMap>({});
 
-  useHomeLayoutStorage({
+  const { storageReady } = useHomeLayoutStorage({
     layoutState,
     folders,
     setLayoutState,
@@ -1111,7 +1111,12 @@ useEffect(() => {
   }, [connectableStateMap]);
 
   useEffect(() => {
-    if (!hasHydrated) {
+    // Wait for both Zustand people store rehydration AND useHomeLayoutStorage
+    // scrubber commit (storageReady) before running the unplaced-people
+    // auto-insert. Otherwise the `folders` closure may still be the initial
+    // empty map, causing folder members to be misclassified as unplaced and
+    // duplicated into root layer slots (Phase 1.12 race fix).
+    if (!hasHydrated || !storageReady) {
       return;
     }
 
@@ -1199,7 +1204,7 @@ useEffect(() => {
 
       return next;
     });
-  }, [people, hasHydrated, folders]);
+  }, [people, hasHydrated, storageReady, folders]);
 
   const selectedHomePerson = useMemo(() => {
     if (!selectedHomePersonId) {

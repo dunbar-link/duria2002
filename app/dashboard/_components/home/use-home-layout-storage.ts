@@ -939,4 +939,6 @@ export function useHomeLayoutStorage({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [folders, layoutState, storageReady]);
+
+  return { storageReady };
 }
