@@ -203,6 +203,7 @@ function FolderMemberTile({
     },
     delay: 420,
     moveTolerance: 8,
+    capturePointer: true,
   });
 
   function handleClick() {
