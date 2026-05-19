@@ -53,6 +53,9 @@ export function useFolderLongPressDrag({
     document.body.style.touchAction = "none";
     document.body.style.overflow = "hidden";
 
+    const activatedAt = Date.now();
+    const cancelGraceMs = 300;
+
     function findDropTarget(
       x: number,
       y: number,
@@ -117,6 +120,14 @@ export function useFolderLongPressDrag({
     }
 
     function handleCancel() {
+      // Spurious pointercancel may fire shortly after the drag starts when the
+      // source overlay (folder sheet / +N sheet) unmounts and removes the
+      // captured target element. Ignore cancels inside the grace window so the
+      // ghost drag survives the overlay teardown. Normal pointerup completes
+      // drops as before.
+      if (Date.now() - activatedAt < cancelGraceMs) {
+        return;
+      }
       setState(null);
     }
 
