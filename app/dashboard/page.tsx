@@ -1306,6 +1306,13 @@ useEffect(() => {
   const { dragState: folderLongPressDragState, beginDrag: beginFolderLongPressDrag } =
     useFolderLongPressDrag({
       onDrop: ({ folderId, entityId, layerId, area, index }) => {
+        console.debug("[DL_FOLDER_DRAG_DEBUG] folder onDrop fire", {
+          folderId,
+          entityId,
+          layerId,
+          area,
+          index,
+        });
         moveFolderEntityToLayer(folderId, entityId, layerId, area, index);
       },
     });
@@ -1318,6 +1325,12 @@ useEffect(() => {
 
       const sourceFolderId = openFolder.id;
       const label = getEntityLabel(entityId, folders);
+
+      console.debug("[DL_FOLDER_DRAG_DEBUG] handleFolderLongPressDragStart", {
+        entityId,
+        sourceFolderId,
+        point,
+      });
 
       // Defer the folder sheet's DOM unmount until the ghost drag settles.
       // The sheet animates closed visually (visible=false) but FolderMemberTile
@@ -1349,7 +1362,16 @@ useEffect(() => {
     const wasActive = folderLongPressDragActiveRef.current;
     folderLongPressDragActiveRef.current = isActive;
 
+    console.debug("[DL_FOLDER_DRAG_DEBUG] folderDragState transition", {
+      wasActive,
+      isActive,
+      dragState: folderLongPressDragState,
+    });
+
     if (wasActive && !isActive) {
+      console.debug(
+        "[DL_FOLDER_DRAG_DEBUG] finishCloseFolderSheet trigger (drag ended)",
+      );
       finishCloseFolderSheet();
     }
   }, [folderLongPressDragState, finishCloseFolderSheet]);

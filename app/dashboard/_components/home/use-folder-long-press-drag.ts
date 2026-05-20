@@ -70,6 +70,14 @@ export function useFolderLongPressDrag({
 
     const activatedAt = Date.now();
     const cancelGraceMs = 300;
+    let firstMoveLogged = false;
+
+    console.debug("[DL_FOLDER_DRAG_DEBUG] ghost drag activated", {
+      state: stateRef.current,
+      bodyTouchAction: bodyStyle.touchAction,
+      bodyOverflow: bodyStyle.overflow,
+      bodyUserSelect: bodyStyle.userSelect,
+    });
 
     function findDropTarget(
       x: number,
@@ -111,6 +119,16 @@ export function useFolderLongPressDrag({
     }
 
     function handleMove(event: PointerEvent) {
+      if (!firstMoveLogged) {
+        firstMoveLogged = true;
+        console.debug("[DL_FOLDER_DRAG_DEBUG] first window pointermove", {
+          pointerId: event.pointerId,
+          pointerType: event.pointerType,
+          x: event.clientX,
+          y: event.clientY,
+          msSinceActivated: Date.now() - activatedAt,
+        });
+      }
       event.preventDefault();
       setState((prev) =>
         prev ? { ...prev, x: event.clientX, y: event.clientY } : prev,
@@ -119,8 +137,18 @@ export function useFolderLongPressDrag({
 
     function handleUp(event: PointerEvent) {
       const current = stateRef.current;
+      const target = current
+        ? findDropTarget(event.clientX, event.clientY)
+        : null;
+      console.debug("[DL_FOLDER_DRAG_DEBUG] window pointerup", {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        hasState: Boolean(current),
+        dropTarget: target,
+        msSinceActivated: Date.now() - activatedAt,
+      });
       if (current) {
-        const target = findDropTarget(event.clientX, event.clientY);
         if (target) {
           onDropRef.current({
             folderId: current.sourceFolderId,
@@ -135,12 +163,18 @@ export function useFolderLongPressDrag({
     }
 
     function handleCancel() {
+      const elapsed = Date.now() - activatedAt;
+      console.debug("[DL_FOLDER_DRAG_DEBUG] window pointercancel", {
+        msSinceActivated: elapsed,
+        willIgnoreByGrace: elapsed < cancelGraceMs,
+        graceMs: cancelGraceMs,
+      });
       // Spurious pointercancel may fire shortly after the drag starts when the
       // source overlay (folder sheet / +N sheet) unmounts and removes the
       // captured target element. Ignore cancels inside the grace window so the
       // ghost drag survives the overlay teardown. Normal pointerup completes
       // drops as before.
-      if (Date.now() - activatedAt < cancelGraceMs) {
+      if (elapsed < cancelGraceMs) {
         return;
       }
       setState(null);
@@ -158,6 +192,9 @@ export function useFolderLongPressDrag({
     window.addEventListener("keydown", handleKey);
 
     return () => {
+      console.debug("[DL_FOLDER_DRAG_DEBUG] ghost drag cleanup", {
+        msSinceActivated: Date.now() - activatedAt,
+      });
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleCancel);
