@@ -936,7 +936,9 @@ export function EmptyDropSlot({
       ) : null}
 
       <div
-        className="relative z-10 flex items-center justify-center text-[15px] font-semibold transition-all duration-200"
+        className={`relative z-10 flex items-center justify-center text-[15px] font-semibold transition-all duration-200 motion-reduce:transition-none motion-reduce:transform-none ${
+          isDropTarget ? "scale-[1.06]" : "scale-100"
+        }`}
         style={{
           width: tileWidth - 4,
           height: tileWidth - 4,
@@ -948,7 +950,6 @@ export function EmptyDropSlot({
           boxShadow: isDropTarget
             ? "0 10px 24px rgba(15,23,42,0.14)"
             : "0 4px 12px rgba(15,23,42,0.03)",
-          transform: isDropTarget ? "scale(1.06)" : "scale(1)",
         }}
       >
         {isDropTarget ? "놓기" : "+"}

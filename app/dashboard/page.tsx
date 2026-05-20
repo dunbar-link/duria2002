@@ -61,6 +61,7 @@ import HomeLayerSection from "./_components/home/home-layer-section";
 import FolderBottomSheet from "./_components/home/folder-bottom-sheet";
 import LayerBottomSheet from "./_components/home/layer-bottom-sheet";
 import LayerStrip from "./_components/home/layer-strip";
+import LongPressGhost from "./_components/home/LongPressGhost";
 import HomeConnectableSearchSheet from "./_components/home/home-connectable-search-sheet";
 import SignalBottomSheet from "./_components/home/signal-bottom-sheet";
 import {
@@ -2547,104 +2548,9 @@ const isJoined =
         onClose={closeFolderMoveMenu}
       />
 
-      {folderLongPressDragState ? (
-        <div
-          aria-hidden="true"
-          style={{
-            position: "fixed",
-            left: folderLongPressDragState.x,
-            top: folderLongPressDragState.y,
-            transform: "translate(-50%, -50%)",
-            pointerEvents: "none",
-            zIndex: 200,
-          }}
-        >
-          <div
-            style={{
-              width: 60,
-              height: 60,
-              borderRadius: 16,
-              background: "#FFFFFF",
-              border: "2px solid #475569",
-              boxShadow: "0 14px 30px rgba(15,23,42,0.25)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
-              fontWeight: 600,
-              color: "#334155",
-            }}
-          >
-            {folderLongPressDragState.label.slice(0, 2) || "?"}
-          </div>
-        </div>
-      ) : null}
-
-      {layerSheetLongPressDragState ? (
-        <div
-          aria-hidden="true"
-          style={{
-            position: "fixed",
-            left: layerSheetLongPressDragState.x,
-            top: layerSheetLongPressDragState.y,
-            transform: "translate(-50%, -50%)",
-            pointerEvents: "none",
-            zIndex: 200,
-          }}
-        >
-          <div
-            style={{
-              width: 60,
-              height: 60,
-              borderRadius: 16,
-              background: "#FFFFFF",
-              border: "2px solid #475569",
-              boxShadow: "0 14px 30px rgba(15,23,42,0.25)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
-              fontWeight: 600,
-              color: "#334155",
-            }}
-          >
-            {layerSheetLongPressDragState.label.slice(0, 2) || "?"}
-          </div>
-        </div>
-      ) : null}
-
-      {homeMainLongPressDragState ? (
-        <div
-          aria-hidden="true"
-          style={{
-            position: "fixed",
-            left: homeMainLongPressDragState.x,
-            top: homeMainLongPressDragState.y,
-            transform: "translate(-50%, -50%)",
-            pointerEvents: "none",
-            zIndex: 200,
-          }}
-        >
-          <div
-            style={{
-              width: 60,
-              height: 60,
-              borderRadius: 16,
-              background: "#FFFFFF",
-              border: "2px solid #475569",
-              boxShadow: "0 14px 30px rgba(15,23,42,0.25)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
-              fontWeight: 600,
-              color: "#334155",
-            }}
-          >
-            {homeMainLongPressDragState.label.slice(0, 2) || "?"}
-          </div>
-        </div>
-      ) : null}
+      <LongPressGhost state={folderLongPressDragState} />
+      <LongPressGhost state={layerSheetLongPressDragState} />
+      <LongPressGhost state={homeMainLongPressDragState} />
 
       <HomeOnboardingOverlay
         open={showOnboarding}
