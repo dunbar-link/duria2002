@@ -68,6 +68,7 @@ import {
   CONNECTABLE_SOURCE_LAYER_ID,
   STORAGE_KEY,
   type ConnectableCandidateStateMap,
+  type DragOverState,
   type FolderMap,
   type LayerLayoutState,
   buildDynamicConnectableEntityId,
@@ -1303,18 +1304,29 @@ useEffect(() => {
     setFolders,
   });
 
+  // Hover preview state for the folder ghost drag. Mirrored from the hook's
+  // onHoverChange callback into a DragOverState-shaped value so the existing
+  // LayerStrip "놓기" highlight can be reused without touching the home
+  // HTML5 dragOverState system. Visible slot hovers only — the +N (more)
+  // area is reachable via specialDropTargetKey, which we deliberately don't
+  // mirror here to keep the change small.
+  const [folderGhostHoverState, setFolderGhostHoverState] =
+    useState<DragOverState>(null);
+
   const { dragState: folderLongPressDragState, beginDrag: beginFolderLongPressDrag } =
     useFolderLongPressDrag({
       onDrop: ({ folderId, entityId, layerId, area, index }) => {
         moveFolderEntityToLayer(folderId, entityId, layerId, area, index);
       },
-      // Exclude "나"(family-me) slot — and on a small viewport its visible
-      // left/right neighbor slots — from drop candidacy during a folder
-      // ghost drag. Otherwise a finger that started over the folder's
-      // leftmost member can land on a slot adjacent to me and the swap
-      // makes it look like the folder member was dropped on me. Hidden
-      // (more) area only excludes me's exact slot; adjacency is not
-      // meaningful there since it's a separate panel.
+      // Exclude only "나"(family-me) own slot from drop candidacy during a
+      // folder ghost drag. The earlier Phase 1.15A-1 also excluded the
+      // visible left/right neighbors, but the source-side lock (1.15B),
+      // canonical pin (1.16), and legacy me-target guard now prevent any
+      // path from displacing 나 — so blocking the adjacent slots merely
+      // hides legitimate landing spots (e.g., right next to me in the
+      // family layer) from the user. The own-slot block stays because we
+      // still want a drop on top of "나" to no-op cleanly and let the
+      // user see the highlight skip past it.
       shouldSkipDropTarget: (candidate) => {
         if (typeof candidate.index !== "number") {
           return false;
@@ -1327,18 +1339,28 @@ useEffect(() => {
           candidate.area === "visible"
             ? layer.visibleSlotIds
             : layer.hiddenSlotIds;
-        if (slots[candidate.index] === "family-me") {
-          return true;
+        return slots[candidate.index] === "family-me";
+      },
+      // Mirror live hit-test into a parallel dragOverState so home tiles can
+      // show the same "놓기" highlight they show during HTML5 drags. Only
+      // visible-area candidates with a concrete index can be represented as
+      // a DragOverState; everything else (more area, null) clears the
+      // mirror so no stale highlight lingers.
+      onHoverChange: (candidate) => {
+        if (
+          candidate &&
+          candidate.area === "visible" &&
+          typeof candidate.index === "number"
+        ) {
+          setFolderGhostHoverState({
+            targetLayerId: candidate.layerId,
+            targetIndex: candidate.index,
+            targetArea: "visible",
+            action: "swap",
+          });
+        } else {
+          setFolderGhostHoverState(null);
         }
-        if (candidate.area === "visible") {
-          if (slots[candidate.index - 1] === "family-me") {
-            return true;
-          }
-          if (slots[candidate.index + 1] === "family-me") {
-            return true;
-          }
-        }
-        return false;
       },
     });
 
@@ -2275,7 +2297,13 @@ const isJoined =
                       dynamicCountLabel={derived.dynamicCountLabel}
                       folders={folders}
                       dragState={dragState}
-                      dragOverState={dragOverState}
+                      // While a folder ghost drag is in flight, surface its
+                      // hovered slot through the same dragOverState that
+                      // home HTML5 drags use so LayerStrip's existing
+                      // "놓기" highlight kicks in without any layer-strip
+                      // code change. Outside of folder drag the original
+                      // home dragOverState shows through unchanged.
+                      dragOverState={folderGhostHoverState ?? dragOverState}
                       isMoreDropTarget={
                         specialDropTargetKey === `more-${layer.id}`
                       }

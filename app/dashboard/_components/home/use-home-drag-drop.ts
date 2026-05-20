@@ -175,6 +175,21 @@ export function useHomeDragDrop({
         return;
       }
 
+      // Mirror the source-side family-me lock (Phase 1.15B) onto the drop
+      // side: never let any drag land on me's slot, so a swap cannot
+      // displace "나". Combined with the canonical pin (Phase 1.16) this
+      // means me is neither a valid source nor a valid target.
+      if (occupied) {
+        const targetSlotArray =
+          targetArea === "visible"
+            ? layoutState[targetLayerId]?.visibleSlotIds
+            : layoutState[targetLayerId]?.hiddenSlotIds;
+        if (targetSlotArray?.[targetIndex] === "family-me") {
+          clearDragUiState();
+          return;
+        }
+      }
+
       const action = occupied ? getHoverActionFromPointer(event) : "swap";
 
       if (occupied && action === "combine") {

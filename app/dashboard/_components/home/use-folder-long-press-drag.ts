@@ -37,15 +37,20 @@ type BeginDragInput = {
 export function useFolderLongPressDrag({
   onDrop,
   shouldSkipDropTarget,
+  onHoverChange,
 }: {
   onDrop: (payload: DropPayload) => void;
   // Optional consumer hook to exclude specific slots from hit-testing. When it
   // returns true for a candidate, findDropTarget continues scanning the next
   // elementsFromPoint result instead of accepting that slot. Used by the
-  // folder ghost drag path to keep family-me's slot (and its visible neighbors
-  // on small viewports) out of drop candidacy; other consumers leave it
-  // undefined to preserve their existing behavior.
+  // folder ghost drag path to keep family-me's slot out of drop candidacy;
+  // other consumers leave it undefined to preserve their existing behavior.
   shouldSkipDropTarget?: (candidate: DropCandidate) => boolean;
+  // Optional consumer hook that receives the current hit-test result on every
+  // pointermove and null when the drag tears down. Lets a consumer mirror the
+  // hovered slot into a separate dragOverState so home tiles can show the
+  // existing "놓기" highlight while the ghost is in flight.
+  onHoverChange?: (candidate: DropCandidate | null) => void;
 }) {
   const [state, setState] = useState<FolderLongPressDragState | null>(null);
 
@@ -54,6 +59,9 @@ export function useFolderLongPressDrag({
 
   const shouldSkipDropTargetRef = useRef(shouldSkipDropTarget);
   shouldSkipDropTargetRef.current = shouldSkipDropTarget;
+
+  const onHoverChangeRef = useRef(onHoverChange);
+  onHoverChangeRef.current = onHoverChange;
 
   const stateRef = useRef<FolderLongPressDragState | null>(null);
   stateRef.current = state;
@@ -192,6 +200,14 @@ export function useFolderLongPressDrag({
         setState((prev) =>
           prev ? { ...prev, x: event.clientX, y: event.clientY } : prev,
         );
+        // Emit the current hit-test result so a consumer can mirror it into
+        // dragOverState and reuse the home "놓기" highlight. Skipped slots
+        // (e.g., family-me own slot) come back as null and the highlight
+        // naturally hides — same shape as the eventual drop target.
+        const hover = onHoverChangeRef.current;
+        if (hover) {
+          hover(findDropTarget(event.clientX, event.clientY));
+        }
       }
 
       function handleUp(event: PointerEvent) {
@@ -251,6 +267,11 @@ export function useFolderLongPressDrag({
         bodyStyle.webkitTouchCallout = previousWebkitTouchCallout;
         bodyStyle.webkitTapHighlightColor = previousWebkitTapHighlightColor;
         cleanupRef.current = null;
+        // Clear any external hover-highlight mirror tied to this drag.
+        const hover = onHoverChangeRef.current;
+        if (hover) {
+          hover(null);
+        }
       }
 
       // Attach window listeners SYNCHRONOUSLY before any new pointer event is
