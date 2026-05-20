@@ -58,6 +58,10 @@ type LayerStripProps = {
     entityId: string,
     point: { x: number; y: number },
   ) => void;
+  // When true, home tiles inside this strip cannot start a new HTML5 drag
+  // or long-press drag. Used to lock out home as a drag source while a
+  // folder ghost drag is already in flight.
+  suppressDragSource?: boolean;
 };
 
 export default function LayerStrip({
@@ -83,6 +87,7 @@ export default function LayerStrip({
   onEmptySlotClick,
   onPersonClick,
   onLongPressDragStart,
+  suppressDragSource = false,
 }: LayerStripProps) {
   const isDragActive = dragState !== null;
   const isConnectableDrag = dragState?.sourceLayerId === "connectable-source";
@@ -167,6 +172,7 @@ export default function LayerStrip({
                   isDragActive={isDragActive}
                   tileWidth={HOME_TILE_WIDTH}
                   labelMaxWidth={58}
+                  suppressDragSource={suppressDragSource}
                   onDragStart={onDragStart}
                   onDragEnd={onDragEnd}
                   onDragOver={onDragOver}

@@ -121,6 +121,7 @@ function BottomSheetGrid({
   onDrop,
   onOpenFolder,
   onLongPressDragStart,
+  suppressDragSource = false,
 }: {
   layer: LayerBlueprint;
   ids: Array<string | null>;
@@ -154,6 +155,7 @@ function BottomSheetGrid({
     entityId: string,
     point: { x: number; y: number },
   ) => void;
+  suppressDragSource?: boolean;
 }) {
   const isDragActive = dragState !== null;
 
@@ -211,6 +213,7 @@ function BottomSheetGrid({
             isDragActive={isDragActive}
             tileWidth={SHEET_TILE_WIDTH}
             labelMaxWidth={58}
+            suppressDragSource={suppressDragSource}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             onDragOver={onDragOver}
@@ -264,6 +267,10 @@ type LayerBottomSheetProps = {
     entityId: string,
     point: { x: number; y: number },
   ) => void;
+  // When true, person tiles inside this sheet cannot start a new HTML5 drag
+  // or long-press drag. Used to lock out the +N sheet as a drag source
+  // while a folder ghost drag is already in flight.
+  suppressDragSource?: boolean;
 };
 
 export default function LayerBottomSheet({
@@ -286,6 +293,7 @@ export default function LayerBottomSheet({
   onClose,
   onOpenFolder,
   onLongPressDragStart,
+  suppressDragSource = false,
 }: LayerBottomSheetProps) {
   return (
     <>
@@ -365,6 +373,7 @@ export default function LayerBottomSheet({
                 onDrop={onDrop}
                 onOpenFolder={onOpenFolder}
                 onLongPressDragStart={onLongPressDragStart}
+                suppressDragSource={suppressDragSource}
               />
             </SheetSectionShell>
           </section>
@@ -400,6 +409,7 @@ export default function LayerBottomSheet({
                 onDrop={onDrop}
                 onOpenFolder={onOpenFolder}
                 onLongPressDragStart={onLongPressDragStart}
+                suppressDragSource={suppressDragSource}
               />
             </SheetSectionShell>
           </section>

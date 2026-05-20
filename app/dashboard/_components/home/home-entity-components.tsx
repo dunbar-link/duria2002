@@ -540,6 +540,7 @@ export function PersonTile({
   isDragActive,
   tileWidth = HOME_TILE_WIDTH,
   labelMaxWidth = 58,
+  suppressDragSource = false,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -560,6 +561,11 @@ export function PersonTile({
   isDragActive: boolean;
   tileWidth?: number;
   labelMaxWidth?: number;
+  // When true (and for family-me always), this tile will not start a new
+  // HTML5 drag or long-press drag. Used by the home view while a folder
+  // ghost drag is already in flight so the finger cannot accidentally
+  // hijack a home tile as a second drag source.
+  suppressDragSource?: boolean;
   onDragStart: (
     layerId: string,
     index: number,
@@ -645,7 +651,16 @@ export function PersonTile({
   const isConnected = !folder && isJoinedEntity(entityId);
   const isHighPriority = !folder && showUrgentBadge;
 
-  const longPressEnabled = Boolean(onLongPressDragStart && !folder);
+  // family-me is never a valid drag source under any path; combine with the
+  // consumer-provided suppressDragSource (e.g., set true while a folder
+  // ghost drag is already in flight) to gate both long-press and HTML5
+  // drag initiation. tap/click remains unaffected.
+  const isMeTile = entityId === "family-me";
+  const dragSourceBlocked = suppressDragSource || isMeTile;
+
+  const longPressEnabled = Boolean(
+    onLongPressDragStart && !folder && !dragSourceBlocked,
+  );
   const { bind: longPressBind, wasLongPressedRef, cancelLongPress } = useLongPress({
     onLongPress: (point) => {
       if (!onLongPressDragStart) return;
@@ -676,9 +691,16 @@ export function PersonTile({
       WebkitUserSelect: "none",
       WebkitTouchCallout: "none",
     }}
-    draggable
+    draggable={!dragSourceBlocked}
     {...(longPressEnabled ? longPressBind : {})}
-    onDragStart={() => {
+    onDragStart={(event) => {
+      if (dragSourceBlocked) {
+        // Belt-and-braces: even though draggable={false}, prevent any
+        // residual native drag initiation from claiming this tile as a
+        // source while a folder ghost drag is active or this is me.
+        event.preventDefault();
+        return;
+      }
       if (longPressEnabled) {
         cancelLongPress();
       }

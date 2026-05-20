@@ -2317,6 +2317,11 @@ const isJoined =
                       onEmptySlotClick={handleOpenAddSheet}
                       onPersonClick={handleHomePersonClick}
                       onLongPressDragStart={handleHomeMainLongPressDragStart}
+                      // Lock out home tiles as a new drag source while a
+                      // folder ghost drag is already in flight, so the
+                      // finger cannot hijack "나"/other home tiles as a
+                      // second long-press / HTML5 drag source.
+                      suppressDragSource={Boolean(folderLongPressDragState)}
                     />
                   );
                 }}
@@ -2390,6 +2395,10 @@ const isJoined =
           onClose={handleCloseMore}
           onOpenFolder={handleOpenFolder}
           onLongPressDragStart={handleLayerSheetLongPressDragStart}
+          // Defensive: if the +N sheet is somehow still open when a
+          // folder ghost drag begins, prevent its tiles from acting as a
+          // second drag source.
+          suppressDragSource={Boolean(folderLongPressDragState)}
         />
       ) : null}
 
