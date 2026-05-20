@@ -114,25 +114,12 @@ export function useLongPress(options: UseLongPressOptions): {
       startPointRef.current = point;
       latestPointRef.current = point;
 
-      console.debug("[DL_FOLDER_DRAG_DEBUG] pointerdown", {
-        pointerId: event.pointerId,
-        pointerType: event.pointerType,
-        capturePointer,
-      });
-
       if (capturePointer) {
         try {
           event.currentTarget.setPointerCapture(event.pointerId);
           capturedTargetRef.current = event.currentTarget;
-          console.debug("[DL_FOLDER_DRAG_DEBUG] setPointerCapture ok", {
-            pointerId: event.pointerId,
-          });
-        } catch (err) {
+        } catch {
           capturedTargetRef.current = null;
-          console.debug("[DL_FOLDER_DRAG_DEBUG] setPointerCapture failed", {
-            pointerId: event.pointerId,
-            err: String(err),
-          });
         }
       } else {
         capturedTargetRef.current = null;
@@ -143,27 +130,6 @@ export function useLongPress(options: UseLongPressOptions): {
       timerRef.current = setTimeout(() => {
         const finalPoint = latestPointRef.current ?? point;
         wasLongPressedRef.current = true;
-        const target = capturedTargetRef.current;
-        const id = pressedPointerIdRef.current;
-        let hasCaptureAtFire: boolean | "unknown" = "unknown";
-        if (target && id !== null) {
-          try {
-            const t = target as Element & {
-              hasPointerCapture?: (id: number) => boolean;
-            };
-            hasCaptureAtFire =
-              typeof t.hasPointerCapture === "function"
-                ? t.hasPointerCapture(id)
-                : "unknown";
-          } catch {
-            hasCaptureAtFire = "unknown";
-          }
-        }
-        console.debug("[DL_FOLDER_DRAG_DEBUG] longPress fire", {
-          pointerId: id,
-          hasCaptureAtFire,
-          pointerType: pressedPointerTypeRef.current,
-        });
         onLongPress(finalPoint);
         // Keep pointer capture and pressedPointerIdRef so the ghost drag
         // retains active-touch ownership through pointermove. Capture is
@@ -242,14 +208,6 @@ export function useLongPress(options: UseLongPressOptions): {
 
       const isTouchPress = pressedPointerTypeRef.current === "touch";
       const longPressFired = wasLongPressedRef.current;
-
-      console.debug("[DL_FOLDER_DRAG_DEBUG] pointercancel (tile-level)", {
-        pointerId: event.pointerId,
-        capturePointer,
-        isTouchPress,
-        longPressFired,
-        willIgnore: capturePointer && isTouchPress && !longPressFired,
-      });
 
       if (capturePointer && isTouchPress && !longPressFired) {
         // Defensive: scroll-capture induced cancel from a parent overflow container.

@@ -117,7 +117,6 @@ export function useFolderLongPressDrag({
       // assume the native gesture classifier silently took over and force a
       // cleanup so the ghost cannot linger as a stale on-screen artifact.
       const inactivityTimeoutMs = 2500;
-      let firstMoveLogged = false;
       let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 
       function resetInactivityTimer() {
@@ -125,13 +124,6 @@ export function useFolderLongPressDrag({
           clearTimeout(inactivityTimer);
         }
         inactivityTimer = setTimeout(() => {
-          console.debug(
-            "[DL_FOLDER_DRAG_DEBUG] inactivity safety cleanup fired",
-            {
-              msSinceActivated: Date.now() - activatedAt,
-              inactivityTimeoutMs,
-            },
-          );
           inactivityTimer = null;
           cleanup();
           setState(null);
@@ -185,9 +177,6 @@ export function useFolderLongPressDrag({
           // viewport). We continue scanning the remaining elementsFromPoint
           // results so a deeper, valid drop zone underneath still wins.
           if (skip && skip(resolved)) {
-            console.debug("[DL_FOLDER_DRAG_DEBUG] dropTarget skipped by consumer", {
-              candidate: resolved,
-            });
             continue;
           }
 
@@ -198,16 +187,6 @@ export function useFolderLongPressDrag({
       }
 
       function handleMove(event: PointerEvent) {
-        if (!firstMoveLogged) {
-          firstMoveLogged = true;
-          console.debug("[DL_FOLDER_DRAG_DEBUG] first window pointermove", {
-            pointerId: event.pointerId,
-            pointerType: event.pointerType,
-            x: event.clientX,
-            y: event.clientY,
-            msSinceActivated: Date.now() - activatedAt,
-          });
-        }
         resetInactivityTimer();
         event.preventDefault();
         setState((prev) =>
@@ -220,14 +199,6 @@ export function useFolderLongPressDrag({
         const target = current
           ? findDropTarget(event.clientX, event.clientY)
           : null;
-        console.debug("[DL_FOLDER_DRAG_DEBUG] window pointerup", {
-          pointerId: event.pointerId,
-          x: event.clientX,
-          y: event.clientY,
-          hasState: Boolean(current),
-          dropTarget: target,
-          msSinceActivated: Date.now() - activatedAt,
-        });
         if (current && target) {
           onDropRef.current({
             folderId: current.sourceFolderId,
@@ -245,11 +216,6 @@ export function useFolderLongPressDrag({
 
       function handleCancel() {
         const elapsed = Date.now() - activatedAt;
-        console.debug("[DL_FOLDER_DRAG_DEBUG] window pointercancel", {
-          msSinceActivated: elapsed,
-          willIgnoreByGrace: elapsed < cancelGraceMs,
-          graceMs: cancelGraceMs,
-        });
         // Spurious pointercancel may fire shortly after the drag starts when
         // the source overlay (folder sheet / +N sheet) unmounts and removes
         // the captured target element. Ignore cancels inside the grace window
@@ -270,9 +236,6 @@ export function useFolderLongPressDrag({
       }
 
       function cleanup() {
-        console.debug("[DL_FOLDER_DRAG_DEBUG] ghost drag cleanup (sync)", {
-          msSinceActivated: Date.now() - activatedAt,
-        });
         if (inactivityTimer !== null) {
           clearTimeout(inactivityTimer);
           inactivityTimer = null;
@@ -307,13 +270,6 @@ export function useFolderLongPressDrag({
       resetInactivityTimer();
 
       cleanupRef.current = cleanup;
-
-      console.debug("[DL_FOLDER_DRAG_DEBUG] ghost drag activated (sync)", {
-        input,
-        bodyTouchAction: bodyStyle.touchAction,
-        bodyOverflow: bodyStyle.overflow,
-        bodyUserSelect: bodyStyle.userSelect,
-      });
 
       setState(input);
     },
