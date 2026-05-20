@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FOLDER_HOVER_CENTER_MAX,
+  FOLDER_HOVER_CENTER_MIN,
+} from "./home-page-types";
 
 export type FolderDropArea = "visible" | "hidden";
 
@@ -12,18 +16,26 @@ export type FolderLongPressDragState = {
   y: number;
 };
 
+// "combine" only appears for occupied-slot hits whose pointer is inside the
+// slot's central rectangle (same FOLDER_HOVER_CENTER_MIN/MAX band desktop
+// HTML5 drag uses). The "+N more" zone and the rail fallback always emit
+// "swap" so accidental folder creation can't happen from coarse hits.
+type DropAction = "swap" | "combine";
+
 type DropPayload = {
   folderId: string;
   entityId: string;
   layerId: string;
   area: FolderDropArea;
   index?: number;
+  action: DropAction;
 };
 
 type DropCandidate = {
   layerId: string;
   area: FolderDropArea;
   index?: number;
+  action: DropAction;
 };
 
 type BeginDragInput = {
@@ -167,12 +179,31 @@ export function useFolderLongPressDrag({
           let resolved: DropCandidate | null = null;
 
           if (dropZone === "more") {
-            resolved = { layerId, area: "hidden" };
+            resolved = { layerId, area: "hidden", action: "swap" };
           } else if (dropZone === "slot" || candidate.hasAttribute("data-slot")) {
             const indexAttr = candidate.getAttribute("data-index");
             const parsedIndex = indexAttr !== null ? Number(indexAttr) : NaN;
             const index = Number.isFinite(parsedIndex) ? parsedIndex : undefined;
-            resolved = { layerId, area: "visible", index };
+            // Mirror desktop's getHoverActionFromPointer: when the pointer sits
+            // inside the slot's central band on both axes the consumer treats
+            // this as a "combine" intent (folder creation). Otherwise it's a
+            // regular swap. Zero-sized rects fall back to "swap" defensively.
+            const rect = candidate.getBoundingClientRect();
+            let action: DropAction = "swap";
+            if (rect.width > 0 && rect.height > 0) {
+              const xRatio = (x - rect.left) / rect.width;
+              const yRatio = (y - rect.top) / rect.height;
+              const isCenteredX =
+                xRatio >= FOLDER_HOVER_CENTER_MIN &&
+                xRatio <= FOLDER_HOVER_CENTER_MAX;
+              const isCenteredY =
+                yRatio >= FOLDER_HOVER_CENTER_MIN &&
+                yRatio <= FOLDER_HOVER_CENTER_MAX;
+              if (isCenteredX && isCenteredY) {
+                action = "combine";
+              }
+            }
+            resolved = { layerId, area: "visible", index, action };
           }
 
           if (!resolved) {
@@ -219,6 +250,10 @@ export function useFolderLongPressDrag({
             layerId,
             area: "visible",
             index: undefined,
+            // Rail fallback is a coarse hit (finger on padding/between slots);
+            // never treat it as a combine intent — consumers should fall back
+            // to the layer's first empty slot via swap semantics.
+            action: "swap",
           };
 
           if (skip && skip(resolved)) {
@@ -259,6 +294,7 @@ export function useFolderLongPressDrag({
             layerId: target.layerId,
             area: target.area,
             index: target.index,
+            action: target.action,
           });
         }
         // Sync teardown so body styles restore and listeners detach

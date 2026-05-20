@@ -76,6 +76,7 @@ import {
   personCatalog,
 } from "./_components/home/home-page-types";
 import {
+  combineEntityIntoTarget,
   createInitialLayoutState,
   findEntityLocation,
   getEntityLabel,
@@ -1412,9 +1413,62 @@ useEffect(() => {
     dragState: layerSheetLongPressDragState,
     beginDrag: beginLayerSheetLongPressDrag,
   } = useFolderLongPressDrag({
-    onDrop: ({ entityId, layerId, area, index }) => {
+    onDrop: ({ entityId, layerId, area, index, action }) => {
       if (!isPersonEntityId(entityId)) {
         return;
+      }
+
+      // Mobile combine: only when the long-press drag landed in the centre
+      // band of an occupied visible slot (action==="combine"). All other
+      // hits fall through to the existing swap path so Phase 2 rail fallback
+      // (index===undefined → first empty slot) keeps working unchanged.
+      if (
+        action === "combine" &&
+        typeof index === "number" &&
+        area === "visible"
+      ) {
+        const targetLayer = layoutState[layerId];
+        const targetEntityId =
+          targetLayer?.visibleSlotIds[index] ?? null;
+        const involvesMe =
+          entityId === "family-me" || targetEntityId === "family-me";
+        const sourceIsFolder = Boolean(folders[entityId]);
+        const targetIsFolder = Boolean(
+          targetEntityId && folders[targetEntityId],
+        );
+
+        if (
+          targetEntityId &&
+          targetEntityId !== entityId &&
+          !involvesMe &&
+          !sourceIsFolder &&
+          !targetIsFolder
+        ) {
+          const location = findEntityLocation(layoutState, entityId);
+          if (location) {
+            const result = combineEntityIntoTarget(
+              layoutState,
+              folders,
+              {
+                sourceLayerId: location.layerId,
+                sourceIndex: location.index,
+                entityId,
+                sourceArea: location.area,
+              },
+              layerId,
+              area,
+              index,
+            );
+            if (result.layout !== layoutState) {
+              setLayoutState(result.layout);
+              setFolders(result.folders);
+              usePeopleStore
+                .getState()
+                .updatePersonTier(entityId, getTierByLayerId(layerId));
+            }
+            return;
+          }
+        }
       }
 
       let didMove = false;
@@ -1505,9 +1559,62 @@ useEffect(() => {
     dragState: homeMainLongPressDragState,
     beginDrag: beginHomeMainLongPressDrag,
   } = useFolderLongPressDrag({
-    onDrop: ({ entityId, layerId, area, index }) => {
+    onDrop: ({ entityId, layerId, area, index, action }) => {
       if (!isPersonEntityId(entityId)) {
         return;
+      }
+
+      // Mobile combine: identical gate to the layer-sheet path above —
+      // action==="combine" + occupied visible slot + neither side is me/folder.
+      // Phase 2 rail fallback (index===undefined) and edge-of-slot hits stay
+      // on the swap path because they emit action==="swap".
+      if (
+        action === "combine" &&
+        typeof index === "number" &&
+        area === "visible"
+      ) {
+        const targetLayer = layoutState[layerId];
+        const targetEntityId =
+          targetLayer?.visibleSlotIds[index] ?? null;
+        const involvesMe =
+          entityId === "family-me" || targetEntityId === "family-me";
+        const sourceIsFolder = Boolean(folders[entityId]);
+        const targetIsFolder = Boolean(
+          targetEntityId && folders[targetEntityId],
+        );
+
+        if (
+          targetEntityId &&
+          targetEntityId !== entityId &&
+          !involvesMe &&
+          !sourceIsFolder &&
+          !targetIsFolder
+        ) {
+          const location = findEntityLocation(layoutState, entityId);
+          if (location) {
+            const result = combineEntityIntoTarget(
+              layoutState,
+              folders,
+              {
+                sourceLayerId: location.layerId,
+                sourceIndex: location.index,
+                entityId,
+                sourceArea: location.area,
+              },
+              layerId,
+              area,
+              index,
+            );
+            if (result.layout !== layoutState) {
+              setLayoutState(result.layout);
+              setFolders(result.folders);
+              usePeopleStore
+                .getState()
+                .updatePersonTier(entityId, getTierByLayerId(layerId));
+            }
+            return;
+          }
+        }
       }
 
       let didMove = false;
