@@ -94,6 +94,8 @@ export default function LayerStrip({
 
   return (
     <section
+      data-layer-rail
+      data-layer-id={layer.id}
       className={`relative rounded-[18px] py-[3px] transition-all duration-200 ${
         isRailDropTarget
           ? "bg-white/80 shadow-[0_10px_26px_rgba(15,23,42,0.10)] ring-1 ring-slate-300/70"

@@ -191,6 +191,43 @@ export function useFolderLongPressDrag({
           return resolved;
         }
 
+        // Rail-level fallback: when no slot/more candidate matched the touch
+        // (finger landed on the rail's padding, between slots, or on the
+        // right meta-column gutter), accept the enclosing rail wrapper with
+        // index=undefined so the consumer can fall back to the layer's first
+        // free slot. Slots and the "+N more" zone still take priority because
+        // they were attempted in the loop above.
+        for (const element of elements) {
+          if (!(element instanceof HTMLElement)) {
+            continue;
+          }
+
+          const rail = element.closest<HTMLElement>(
+            "[data-layer-rail][data-layer-id]",
+          );
+
+          if (!rail) {
+            continue;
+          }
+
+          const layerId = rail.getAttribute("data-layer-id");
+          if (!layerId) {
+            continue;
+          }
+
+          const resolved: DropCandidate = {
+            layerId,
+            area: "visible",
+            index: undefined,
+          };
+
+          if (skip && skip(resolved)) {
+            continue;
+          }
+
+          return resolved;
+        }
+
         return null;
       }
 
