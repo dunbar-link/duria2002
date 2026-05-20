@@ -87,8 +87,39 @@ export function useFolderLongPressDrag({
       bodyStyle.webkitTapHighlightColor = "transparent";
 
       const activatedAt = Date.now();
-      const cancelGraceMs = 300;
+      // Keep a tiny grace window only to absorb the spurious pointercancel
+      // that can fire within the same animation frame as the source overlay
+      // (folder sheet / +N sheet) starting its fade-out. Previously this was
+      // 300ms which swallowed iOS's "I'm taking this gesture as scroll"
+      // cancel and left the ghost stuck on screen forever (no later
+      // pointermove/pointerup ever arrived). 16ms ≈ one frame is enough for
+      // the React commit / DOM teardown to settle without masking a real
+      // native-gesture handoff.
+      const cancelGraceMs = 16;
+      // If nothing happens for this long after activation (no move/up/cancel),
+      // assume the native gesture classifier silently took over and force a
+      // cleanup so the ghost cannot linger as a stale on-screen artifact.
+      const inactivityTimeoutMs = 2500;
       let firstMoveLogged = false;
+      let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+
+      function resetInactivityTimer() {
+        if (inactivityTimer !== null) {
+          clearTimeout(inactivityTimer);
+        }
+        inactivityTimer = setTimeout(() => {
+          console.debug(
+            "[DL_FOLDER_DRAG_DEBUG] inactivity safety cleanup fired",
+            {
+              msSinceActivated: Date.now() - activatedAt,
+              inactivityTimeoutMs,
+            },
+          );
+          inactivityTimer = null;
+          cleanup();
+          setState(null);
+        }, inactivityTimeoutMs);
+      }
 
       function findDropTarget(
         x: number,
@@ -140,6 +171,7 @@ export function useFolderLongPressDrag({
             msSinceActivated: Date.now() - activatedAt,
           });
         }
+        resetInactivityTimer();
         event.preventDefault();
         setState((prev) =>
           prev ? { ...prev, x: event.clientX, y: event.clientY } : prev,
@@ -204,6 +236,10 @@ export function useFolderLongPressDrag({
         console.debug("[DL_FOLDER_DRAG_DEBUG] ghost drag cleanup (sync)", {
           msSinceActivated: Date.now() - activatedAt,
         });
+        if (inactivityTimer !== null) {
+          clearTimeout(inactivityTimer);
+          inactivityTimer = null;
+        }
         window.removeEventListener("pointermove", handleMove);
         window.removeEventListener("pointerup", handleUp);
         window.removeEventListener("pointercancel", handleCancel);
@@ -225,6 +261,13 @@ export function useFolderLongPressDrag({
       window.addEventListener("pointerup", handleUp);
       window.addEventListener("pointercancel", handleCancel);
       window.addEventListener("keydown", handleKey);
+
+      // Arm the inactivity safety timer once at activation. It is reset by
+      // every handleMove and cleared by handleUp/handleCancel/handleKey via
+      // cleanup(). If iOS/Safari silently hands the gesture to native scroll
+      // (no further pointer events reach us), this is the only guarantee
+      // that the ghost won't linger on screen.
+      resetInactivityTimer();
 
       cleanupRef.current = cleanup;
 

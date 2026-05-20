@@ -233,7 +233,13 @@ function FolderMemberTile({
       )}
       style={{
         width: tileWidth,
-        touchAction: "manipulation",
+        // touch-action: none so iOS/Android cannot classify a touch that
+        // begins on a folder member tile as a pan/scroll gesture at
+        // pointerdown. This closes the race where mid-gesture body
+        // touch-action changes are ignored by the native gesture classifier
+        // and pointermove/pointerup ownership gets handed to native scroll.
+        // tap/click still fires normally.
+        touchAction: "none",
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
