@@ -20,6 +20,12 @@ type DropPayload = {
   index?: number;
 };
 
+type DropCandidate = {
+  layerId: string;
+  area: FolderDropArea;
+  index?: number;
+};
+
 type BeginDragInput = {
   entityId: string;
   sourceFolderId: string;
@@ -30,13 +36,24 @@ type BeginDragInput = {
 
 export function useFolderLongPressDrag({
   onDrop,
+  shouldSkipDropTarget,
 }: {
   onDrop: (payload: DropPayload) => void;
+  // Optional consumer hook to exclude specific slots from hit-testing. When it
+  // returns true for a candidate, findDropTarget continues scanning the next
+  // elementsFromPoint result instead of accepting that slot. Used by the
+  // folder ghost drag path to keep family-me's slot (and its visible neighbors
+  // on small viewports) out of drop candidacy; other consumers leave it
+  // undefined to preserve their existing behavior.
+  shouldSkipDropTarget?: (candidate: DropCandidate) => boolean;
 }) {
   const [state, setState] = useState<FolderLongPressDragState | null>(null);
 
   const onDropRef = useRef(onDrop);
   onDropRef.current = onDrop;
+
+  const shouldSkipDropTargetRef = useRef(shouldSkipDropTarget);
+  shouldSkipDropTargetRef.current = shouldSkipDropTarget;
 
   const stateRef = useRef<FolderLongPressDragState | null>(null);
   stateRef.current = state;
@@ -124,8 +141,9 @@ export function useFolderLongPressDrag({
       function findDropTarget(
         x: number,
         y: number,
-      ): { layerId: string; area: FolderDropArea; index?: number } | null {
+      ): DropCandidate | null {
         const elements = document.elementsFromPoint(x, y);
+        const skip = shouldSkipDropTargetRef.current;
 
         for (const element of elements) {
           if (!(element instanceof HTMLElement)) {
@@ -146,15 +164,34 @@ export function useFolderLongPressDrag({
           }
 
           const dropZone = candidate.getAttribute("data-drop-zone");
+          let resolved: DropCandidate | null = null;
+
           if (dropZone === "more") {
-            return { layerId, area: "hidden" };
-          }
-          if (dropZone === "slot" || candidate.hasAttribute("data-slot")) {
+            resolved = { layerId, area: "hidden" };
+          } else if (dropZone === "slot" || candidate.hasAttribute("data-slot")) {
             const indexAttr = candidate.getAttribute("data-index");
             const parsedIndex = indexAttr !== null ? Number(indexAttr) : NaN;
             const index = Number.isFinite(parsedIndex) ? parsedIndex : undefined;
-            return { layerId, area: "visible", index };
+            resolved = { layerId, area: "visible", index };
           }
+
+          if (!resolved) {
+            continue;
+          }
+
+          // Let the consumer veto a candidate (e.g., the folder-drag path
+          // skips family-me's own slot and its visible neighbors so a folder
+          // member cannot accidentally land on / next to "나" on a small
+          // viewport). We continue scanning the remaining elementsFromPoint
+          // results so a deeper, valid drop zone underneath still wins.
+          if (skip && skip(resolved)) {
+            console.debug("[DL_FOLDER_DRAG_DEBUG] dropTarget skipped by consumer", {
+              candidate: resolved,
+            });
+            continue;
+          }
+
+          return resolved;
         }
 
         return null;

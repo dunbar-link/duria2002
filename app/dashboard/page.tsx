@@ -1315,6 +1315,38 @@ useEffect(() => {
         });
         moveFolderEntityToLayer(folderId, entityId, layerId, area, index);
       },
+      // Exclude "나"(family-me) slot — and on a small viewport its visible
+      // left/right neighbor slots — from drop candidacy during a folder
+      // ghost drag. Otherwise a finger that started over the folder's
+      // leftmost member can land on a slot adjacent to me and the swap
+      // makes it look like the folder member was dropped on me. Hidden
+      // (more) area only excludes me's exact slot; adjacency is not
+      // meaningful there since it's a separate panel.
+      shouldSkipDropTarget: (candidate) => {
+        if (typeof candidate.index !== "number") {
+          return false;
+        }
+        const layer = layoutState[candidate.layerId];
+        if (!layer) {
+          return false;
+        }
+        const slots =
+          candidate.area === "visible"
+            ? layer.visibleSlotIds
+            : layer.hiddenSlotIds;
+        if (slots[candidate.index] === "family-me") {
+          return true;
+        }
+        if (candidate.area === "visible") {
+          if (slots[candidate.index - 1] === "family-me") {
+            return true;
+          }
+          if (slots[candidate.index + 1] === "family-me") {
+            return true;
+          }
+        }
+        return false;
+      },
     });
 
   const handleFolderLongPressDragStart = useCallback(
