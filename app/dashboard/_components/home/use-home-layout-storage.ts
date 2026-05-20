@@ -771,7 +771,96 @@ function scrubLayoutAndFolders(
     dissolveChanged = true;
   }
 
-  const changed = foldersChanged || layoutChanged || dissolveChanged;
+  // ---- Pass 4: pin family-me to its canonical slot ----
+  // Invariant: workLayout["family"].visibleSlotIds[0] === "family-me".
+  // Pass 1 already strips family-me out of folder memberIds, and Pass 2
+  // dedupes the root layout so at most one occurrence of family-me remains
+  // in workLayout. Here we move that single occurrence (or restore one if
+  // it was lost entirely, e.g., user had me inside a folder before this
+  // scrubber existed) to its canonical home, and gently re-house whoever
+  // was sitting at the canonical slot into the first empty slot inside
+  // the family layer so we don't shove an unrelated entity across layers.
+  // Idempotent: a no-op when the invariant already holds. Combined with
+  // the family-me drag-source lock (1.15B) this also lets a previously
+  // corrupted localStorage self-heal on the next hydration.
+  const CANONICAL_LAYER_ID = "family";
+  const CANONICAL_INDEX = 0;
+  let familyMePinChanged = false;
+
+  const familyLayer = workLayout[CANONICAL_LAYER_ID];
+  if (familyLayer && familyLayer.visibleSlotIds.length > CANONICAL_INDEX) {
+    type MeLoc = {
+      layerId: string;
+      area: "visible" | "hidden";
+      index: number;
+    };
+
+    let meLoc: MeLoc | null = null;
+    for (const [layerId, layer] of Object.entries(workLayout)) {
+      const vIdx = layer.visibleSlotIds.indexOf("family-me");
+      if (vIdx >= 0) {
+        meLoc = { layerId, area: "visible", index: vIdx };
+        break;
+      }
+      const hIdx = layer.hiddenSlotIds.indexOf("family-me");
+      if (hIdx >= 0) {
+        meLoc = { layerId, area: "hidden", index: hIdx };
+        break;
+      }
+    }
+
+    const isAlreadyCanonical =
+      meLoc !== null &&
+      meLoc.layerId === CANONICAL_LAYER_ID &&
+      meLoc.area === "visible" &&
+      meLoc.index === CANONICAL_INDEX;
+
+    if (!isAlreadyCanonical) {
+      // Clear me's stale position (if any) before writing the canonical one,
+      // so the displaced entity can reuse that slot when it lives in the
+      // family layer.
+      if (meLoc) {
+        const arr =
+          meLoc.area === "visible"
+            ? workLayout[meLoc.layerId].visibleSlotIds
+            : workLayout[meLoc.layerId].hiddenSlotIds;
+        arr[meLoc.index] = null;
+      }
+
+      const targetArray = familyLayer.visibleSlotIds;
+      const displaced = targetArray[CANONICAL_INDEX];
+      targetArray[CANONICAL_INDEX] = "family-me";
+
+      if (displaced && displaced !== "family-me") {
+        // Prefer family layer's own visible row for the displaced entity so
+        // the user's mental model of "who sits in family" stays intact. Fall
+        // back to family hidden, then to a push if both are full.
+        let placed = false;
+        for (let i = 1; i < targetArray.length; i += 1) {
+          if (targetArray[i] == null) {
+            targetArray[i] = displaced;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          const hiddenArr = familyLayer.hiddenSlotIds;
+          const hiddenEmpty = hiddenArr.indexOf(null);
+          if (hiddenEmpty >= 0) {
+            hiddenArr[hiddenEmpty] = displaced;
+          } else {
+            hiddenArr.push(displaced);
+          }
+          familyLayer.hiddenSlotIds = normalizeHiddenSlots(hiddenArr);
+        }
+      }
+
+      familyMePinChanged = true;
+    }
+  }
+
+  const changed =
+    foldersChanged || layoutChanged || dissolveChanged || familyMePinChanged;
   return changed
     ? { layout: workLayout, folders: workFolders, changed: true }
     : { layout, folders, changed: false };
