@@ -720,6 +720,8 @@ export function PersonTile({
       <div
      className={cn(
   "relative overflow-visible rounded-[20px] p-[2px] transition-all duration-200",
+  "[@media(pointer:coarse)]:motion-safe:group-active:scale-[1.04]",
+  "[@media(pointer:coarse)]:group-active:ring-[1.5px] [@media(pointer:coarse)]:group-active:ring-slate-400/40",
   isDragActive && "bg-white/55",
   isDropTarget &&
     "bg-white/92 shadow-[0_10px_24px_rgba(15,23,42,0.12)] ring-1 ring-slate-300/70",
