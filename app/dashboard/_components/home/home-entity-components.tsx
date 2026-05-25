@@ -1009,11 +1009,11 @@ export function CompactMoreIcon({
 
       <button
         type="button"
-        aria-label={`더보기 ${hiddenCount <= 0 ? "E" : `+${hiddenCount}`}명`}
+        aria-label={`더보기 ${hiddenCount <= 0 ? "꽉 참" : `+${hiddenCount}명`}`}
         onClick={onClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        className="relative z-10 block shrink-0 cursor-pointer overflow-visible transition-all duration-150 hover:-translate-y-[1px] active:scale-[0.985]"
+        className="relative z-10 block shrink-0 cursor-pointer overflow-visible p-[9px] transition-all duration-150 hover:-translate-y-[1px] active:scale-[0.985]"
       >
         <div
           className="flex h-[40px] w-[40px] items-center justify-center text-[12px] font-semibold shadow-[0_4px_10px_rgba(15,23,42,0.04)] transition-all duration-150"
@@ -1027,7 +1027,7 @@ export function CompactMoreIcon({
               : "0 4px 10px rgba(15,23,42,0.04)",
           }}
         >
-          {hiddenCount <= 0 ? "E" : `+${hiddenCount}`}
+          {hiddenCount <= 0 ? "✓" : `+${hiddenCount}`}
         </div>
       </button>
     </div>
