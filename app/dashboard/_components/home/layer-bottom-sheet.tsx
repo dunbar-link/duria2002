@@ -259,13 +259,16 @@ function BottomSheetGrid({
                 if (!canPromote) return;
                 onPromote?.(entityId);
               }}
+              // Sit just inside the face's bottom-right corner so the button
+              // is never clipped by the outer overflow-y-auto scroll
+              // container (which transparently promotes overflow-x to clip).
               className={cn(
-                "absolute right-[-4px] z-30 flex h-[22px] w-[22px] items-center justify-center rounded-full border border-slate-300 bg-white text-[12px] font-semibold leading-none text-slate-600 shadow-[0_4px_10px_rgba(15,23,42,0.10)] transition-colors duration-150",
+                "pointer-events-auto absolute z-20 flex h-[22px] w-[22px] items-center justify-center rounded-full border border-slate-300 bg-white text-[12px] font-semibold leading-none text-slate-600 shadow-[0_4px_10px_rgba(15,23,42,0.18)] transition-colors duration-150",
                 canPromote
                   ? "active:scale-95 hover:bg-slate-50"
                   : "cursor-not-allowed opacity-40",
               )}
-              style={{ top: SHEET_TILE_WIDTH - 20 }}
+              style={{ right: 6, bottom: 24 }}
             >
               ↑
             </button>
