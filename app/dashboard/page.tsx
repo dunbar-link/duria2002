@@ -1419,10 +1419,18 @@ useEffect(() => {
     dragState: layerSheetLongPressDragState,
     beginDrag: beginLayerSheetLongPressDrag,
   } = useFolderLongPressDrag({
-    onDrop: ({ entityId, layerId, area, index, action }) => {
+    onDrop: ({ entityId, layerId, area, index }) => {
       if (!isPersonEntityId(entityId)) {
         return;
       }
+
+      // Step F1 (mobile MVP): combine disabled. The incoming action from
+      // useFolderLongPressDrag is intentionally ignored — every drop is
+      // treated as "swap" so the combine branch below never fires. This
+      // keeps combineEntityIntoTarget intact for desktop (D2) and for
+      // future re-enablement, while mobile long-press only does
+      // swap/move/noop on occupied slots / empty slots / me / folders.
+      const action = "swap" as "swap" | "combine";
 
       // Mobile combine: only when the long-press drag landed in the centre
       // band of an occupied visible slot (action==="combine"). All other
@@ -1565,10 +1573,16 @@ useEffect(() => {
     dragState: homeMainLongPressDragState,
     beginDrag: beginHomeMainLongPressDrag,
   } = useFolderLongPressDrag({
-    onDrop: ({ entityId, layerId, area, index, action }) => {
+    onDrop: ({ entityId, layerId, area, index }) => {
       if (!isPersonEntityId(entityId)) {
         return;
       }
+
+      // Step F1 (mobile MVP): combine disabled — same policy as the
+      // layer-sheet path above. Force-downgrade to "swap" so the combine
+      // branch never fires. Desktop HTML5 path (use-home-drag-drop) keeps
+      // its own combine behavior untouched (D2).
+      const action = "swap" as "swap" | "combine";
 
       // Mobile combine: identical gate to the layer-sheet path above —
       // action==="combine" + occupied visible slot + neither side is me/folder.
@@ -2386,12 +2400,12 @@ const isJoined =
         </div>
 
         <div
-          className={`hide-scrollbar min-h-0 flex-1 overflow-x-hidden px-[10px] pb-[120px] pt-[6px] [overscroll-behavior-y:contain] ${
+          className={`hide-scrollbar min-h-0 flex-1 overflow-hidden px-[10px] pt-[6px] [overscroll-behavior-y:contain] ${
             folderLongPressDragState ||
             layerSheetLongPressDragState ||
             homeMainLongPressDragState
-              ? "overflow-y-hidden touch-none"
-              : "overflow-y-auto"
+              ? "touch-none"
+              : ""
           }`}
         >
           <DashboardHomeShell>
