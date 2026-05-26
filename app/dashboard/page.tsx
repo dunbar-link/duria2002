@@ -53,6 +53,7 @@ import {
 import Link from "next/link";
 import { sendSignal } from "@/lib/signal/send-signal";
 import HomeRecommendationList from "./_components/recommendation/HomeRecommendationList";
+import HomeRecommendationSheet from "./_components/home/home-recommendation-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DashboardHomeHeader from "./_components/dashboard-home-header";
@@ -943,6 +944,10 @@ useEffect(() => {
   const [connectableStateMap, setConnectableStateMap] =
     useState<ConnectableCandidateStateMap>({});
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
+  // Recommendation sheet visibility. Decouples the recommendation feed from
+  // the fixed home view so the home stops needing vertical scroll. The sheet
+  // mounts the existing HomeRecommendationList unchanged.
+  const [recommendationSheetOpen, setRecommendationSheetOpen] = useState(false);
   const [selectedHomePersonId, setSelectedHomePersonId] = useState<
     string | null
   >(null);
@@ -2441,29 +2446,32 @@ const isJoined =
                 }}
               />
 
+              {/* Recommendation feed lives in a bottom sheet (Step A1).
+                 The home view keeps a single compact opener that clearly
+                 reads as a recommendation entry rather than a search icon.
+                 Layout: left context label "연결 가능" + right action
+                 "추천 보기 ›" so the button intent is unambiguous on
+                 mobile at a glance. */}
               <div className="pt-[2px]">
-                <HomeRecommendationList
-                  ownerUserId={FIXED_OWNER_USER_ID}
-                  occupiedEntityIds={occupiedEntityIds}
-                  suppressedEntityIds={suppressedConnectableEntityIds}
-                  connectableStateMap={connectableStateMap}
-                  isDraggingCandidate={isConnectableDragActive}
-                  onOpenSearch={() => {
-                    setSearchSheetOpen(true);
-                  }}
-                  onExploreCandidate={handleExploreRecommendation}
-                  onDismissCandidate={handleDismissCandidate}
-                  onDeferCandidate={handleDeferCandidate}
-                  onDragStartCandidate={(entityId) => {
-                    handleDragStart(
-                      CONNECTABLE_SOURCE_LAYER_ID,
-                      -1,
-                      entityId,
-                      "visible",
-                    );
-                  }}
-                  onDragEndCandidate={handleDragEnd}
-                />
+                <button
+                  type="button"
+                  onClick={() => setRecommendationSheetOpen(true)}
+                  aria-label="연결 가능 추천 보기"
+                  className="flex w-full items-center justify-between rounded-[18px] border border-slate-200/85 bg-white/92 px-[16px] py-[12px] shadow-[0_2px_6px_rgba(15,23,42,0.05)] transition active:scale-[0.985]"
+                >
+                  <span className="text-[12px] font-medium text-slate-500">
+                    연결 가능
+                  </span>
+                  <span className="flex items-center gap-[6px] text-[13px] font-semibold text-slate-700">
+                    추천 보기
+                    <span
+                      aria-hidden="true"
+                      className="text-[16px] leading-none text-slate-400"
+                    >
+                      ›
+                    </span>
+                  </span>
+                </button>
               </div>
             </div>
           </DashboardHomeShell>
@@ -2486,6 +2494,36 @@ const isJoined =
         }}
         onAddToLayer={handleAddFromSearch}
         onExploreCandidate={handleExploreFromSearch}
+      />
+
+      <HomeRecommendationSheet
+        open={recommendationSheetOpen}
+        onClose={() => setRecommendationSheetOpen(false)}
+        ownerUserId={FIXED_OWNER_USER_ID}
+        occupiedEntityIds={occupiedEntityIds}
+        suppressedEntityIds={suppressedConnectableEntityIds}
+        connectableStateMap={connectableStateMap}
+        isDraggingCandidate={isConnectableDragActive}
+        onOpenSearch={() => {
+          setRecommendationSheetOpen(false);
+          setSearchSheetOpen(true);
+        }}
+        onExploreCandidate={handleExploreRecommendation}
+        onDismissCandidate={handleDismissCandidate}
+        onDeferCandidate={handleDeferCandidate}
+        onDragStartCandidate={(entityId) => {
+          // Close the sheet before the ghost starts flying so the home
+          // tiles below become the drop targets. drag/drop/persistence
+          // logic itself is unchanged — only the opener is dismissed.
+          setRecommendationSheetOpen(false);
+          handleDragStart(
+            CONNECTABLE_SOURCE_LAYER_ID,
+            -1,
+            entityId,
+            "visible",
+          );
+        }}
+        onDragEndCandidate={handleDragEnd}
       />
 
       {openLayer && openLayerId ? (
