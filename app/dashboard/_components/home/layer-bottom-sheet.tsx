@@ -10,6 +10,7 @@ import {
   SHEET_GRID_COLUMN_COUNT,
   SHEET_GRID_GAP_X,
   SHEET_TILE_WIDTH,
+  VISIBLE_SLOT_COUNT,
   layerBlueprints,
 } from "./home-page-types";
 import { cn, getEntityRealCount } from "./home-page-utils";
@@ -18,14 +19,18 @@ import { EmptyDropSlot, PersonTile } from "./home-entity-components";
 function SheetSectionTitle({
   title,
   count,
+  rightLabel,
 }: {
   title: string;
   count: number;
+  rightLabel?: string;
 }) {
   return (
     <div className="mb-[7px] flex items-center justify-between">
       <h3 className="text-[12px] font-medium text-slate-500">{title}</h3>
-      <span className="text-[11px] text-slate-400">{count}명</span>
+      <span className="text-[11px] text-slate-400">
+        {rightLabel ?? `${count}명`}
+      </span>
     </div>
   );
 }
@@ -263,10 +268,10 @@ function BottomSheetGrid({
               // is never clipped by the outer overflow-y-auto scroll
               // container (which transparently promotes overflow-x to clip).
               className={cn(
-                "pointer-events-auto absolute z-20 flex h-[22px] w-[22px] items-center justify-center rounded-full border border-slate-300 bg-white text-[12px] font-semibold leading-none text-slate-600 shadow-[0_4px_10px_rgba(15,23,42,0.18)] transition-colors duration-150",
+                "pointer-events-auto absolute z-20 flex h-[22px] w-[22px] items-center justify-center rounded-full border text-[12px] font-semibold leading-none shadow-[0_4px_10px_rgba(15,23,42,0.18)] transition-colors duration-150",
                 canPromote
-                  ? "active:scale-95 hover:bg-slate-50"
-                  : "cursor-not-allowed opacity-40",
+                  ? "border-slate-300 bg-white text-slate-600 active:scale-95 hover:bg-slate-50"
+                  : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-40",
               )}
               style={{ right: 6, bottom: 24 }}
             >
@@ -353,6 +358,7 @@ export default function LayerBottomSheet({
   onPromoteHiddenToVisible,
 }: LayerBottomSheetProps) {
   const canPromoteHidden = visibleSlotIds.some((id) => id === null);
+  const visibleFilledCount = visibleSlotIds.filter(Boolean).length;
 
   return (
     <>
@@ -416,6 +422,7 @@ export default function LayerBottomSheet({
                 .reduce((sum, entityId) => {
                   return sum + getEntityRealCount(entityId as string, folders);
                 }, 0)}
+              rightLabel={`${visibleFilledCount}/${VISIBLE_SLOT_COUNT}`}
             />
 
             <SheetSectionShell>
