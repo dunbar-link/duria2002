@@ -659,6 +659,22 @@ export function PersonTile({
   const isConnected = !folder && isJoinedEntity(entityId);
   const isHighPriority = !folder && showUrgentBadge;
 
+  // Step F6: aria-label/title hint mirroring handleHomePersonClick's branches.
+  // Visual UI unchanged; this only helps screen readers and desktop hover
+  // learn what a tap will actually do (signal reply / invite share / detail).
+  const tileLabel =
+    entityId === "family-me" && meTileLabel
+      ? meTileLabel
+      : getEntityLabel(entityId, folders);
+  const tapActionHint =
+    entityId === "family-me"
+      ? "내 프로필"
+      : showBlueSignalBadge
+        ? `${tileLabel} — 신호 답장`
+        : !isConnected
+          ? `${tileLabel} — 초대 공유`
+          : `${tileLabel} — 상세 보기`;
+
   // family-me is never a valid drag source under any path; combine with the
   // consumer-provided suppressDragSource (e.g., set true while a folder
   // ghost drag is already in flight) to gate both long-press and HTML5
@@ -827,6 +843,8 @@ export function PersonTile({
       <div
         role="button"
         tabIndex={0}
+        aria-label={tapActionHint}
+        title={tapActionHint}
         onClick={() => {
           if (consumeLongPressClickIfNeeded()) return;
           onPersonClick(entityId);
