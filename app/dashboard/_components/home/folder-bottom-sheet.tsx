@@ -444,6 +444,7 @@ export default function FolderBottomSheet({
     markContacted(member.personId);
   }
 
+  setSignalOpen(false);
   setSignalFeedback(`${emoji} ${connectedMemberIds.length}명에게 보냈어요.`);
 }
 
