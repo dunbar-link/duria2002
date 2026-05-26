@@ -180,8 +180,11 @@ function hasUrgentInFolder(
 export function UrgentBadge() {
   return (
     <span
-      className="pointer-events-none absolute right-[-2px] top-[-2px] z-20 rounded-full border-2 border-white bg-[#E24B4A]"
-      style={{ width: 9, height: 9 }}
+      role="img"
+      aria-label="챙길 사람"
+      title="챙길 사람"
+      className="pointer-events-none absolute right-[-2px] top-[-2px] z-20 rounded-full border-2 border-white bg-[#E24B4A] shadow-[0_2px_6px_rgba(226,75,74,0.30)]"
+      style={{ width: 10, height: 10 }}
     />
   );
 }
@@ -189,7 +192,12 @@ export function UrgentBadge() {
 
 export function BlueSignalBadge() {
   return (
-    <span className="pointer-events-none absolute left-[-2px] top-[-2px] z-20 h-[11px] w-[11px] rounded-full border-2 border-white bg-blue-500 shadow-[0_3px_8px_rgba(59,130,246,0.26)]" />
+    <span
+      role="img"
+      aria-label="받은 신호"
+      title="받은 신호"
+      className="pointer-events-none absolute left-[-2px] top-[-2px] z-20 h-[12px] w-[12px] rounded-full border-2 border-white bg-blue-500 shadow-[0_3px_8px_rgba(59,130,246,0.26)]"
+    />
   );
 }
 
