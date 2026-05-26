@@ -122,6 +122,8 @@ function BottomSheetGrid({
   onOpenFolder,
   onLongPressDragStart,
   suppressDragSource = false,
+  onPromote,
+  canPromote = false,
 }: {
   layer: LayerBlueprint;
   ids: Array<string | null>;
@@ -156,6 +158,12 @@ function BottomSheetGrid({
     point: { x: number; y: number },
   ) => void;
   suppressDragSource?: boolean;
+  // When provided and area === "hidden", each non-folder, non-me tile gets a
+  // small "↑" button at its bottom-right that promotes the entity to the
+  // first empty visible slot. Drag inside this grid is fully disabled when
+  // this hook is wired up (Step F2).
+  onPromote?: (entityId: string) => void;
+  canPromote?: boolean;
 }) {
   const isDragActive = dragState !== null;
 
@@ -194,7 +202,14 @@ function BottomSheetGrid({
           );
         }
 
-        return (
+        const isFolder = Boolean(folders[entityId]);
+        const showPromoteButton =
+          Boolean(onPromote) &&
+          area === "hidden" &&
+          !isFolder &&
+          entityId !== "family-me";
+
+        const tile = (
           <PersonTile
             key={`${layer.id}-${area}-${entityId}`}
             entityId={entityId}
@@ -221,6 +236,40 @@ function BottomSheetGrid({
             onOpenFolder={onOpenFolder}
             onLongPressDragStart={onLongPressDragStart}
           />
+        );
+
+        if (!showPromoteButton) {
+          return tile;
+        }
+
+        return (
+          <div
+            key={`${layer.id}-${area}-${entityId}`}
+            className="relative shrink-0 overflow-visible"
+            style={{ width: SHEET_TILE_WIDTH }}
+          >
+            {tile}
+            <button
+              type="button"
+              aria-label="홈으로 올리기"
+              aria-disabled={!canPromote}
+              disabled={!canPromote}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!canPromote) return;
+                onPromote?.(entityId);
+              }}
+              className={cn(
+                "absolute right-[-4px] z-30 flex h-[22px] w-[22px] items-center justify-center rounded-full border border-slate-300 bg-white text-[12px] font-semibold leading-none text-slate-600 shadow-[0_4px_10px_rgba(15,23,42,0.10)] transition-colors duration-150",
+                canPromote
+                  ? "active:scale-95 hover:bg-slate-50"
+                  : "cursor-not-allowed opacity-40",
+              )}
+              style={{ top: SHEET_TILE_WIDTH - 20 }}
+            >
+              ↑
+            </button>
+          </div>
         );
       })}
     </div>
@@ -271,6 +320,10 @@ type LayerBottomSheetProps = {
   // or long-press drag. Used to lock out the +N sheet as a drag source
   // while a folder ghost drag is already in flight.
   suppressDragSource?: boolean;
+  // Step F2: button-based promotion for entities sitting in the hidden
+  // section. When provided, the hidden grid loses its long-press drag and
+  // each non-folder, non-me tile gets a small "↑" button.
+  onPromoteHiddenToVisible?: (entityId: string) => void;
 };
 
 export default function LayerBottomSheet({
@@ -294,7 +347,10 @@ export default function LayerBottomSheet({
   onOpenFolder,
   onLongPressDragStart,
   suppressDragSource = false,
+  onPromoteHiddenToVisible,
 }: LayerBottomSheetProps) {
+  const canPromoteHidden = visibleSlotIds.some((id) => id === null);
+
   return (
     <>
       <button
@@ -408,8 +464,11 @@ export default function LayerBottomSheet({
                 onDragOver={onDragOver}
                 onDrop={onDrop}
                 onOpenFolder={onOpenFolder}
-                onLongPressDragStart={onLongPressDragStart}
-                suppressDragSource={suppressDragSource}
+                // Step F2: +N hidden section is button-only — no long-press
+                // drag, and HTML5 drag also blocked on these tiles.
+                suppressDragSource
+                onPromote={onPromoteHiddenToVisible}
+                canPromote={canPromoteHidden}
               />
             </SheetSectionShell>
           </section>

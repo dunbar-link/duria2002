@@ -82,6 +82,7 @@ import {
   createInitialLayoutState,
   findEntityLocation,
   getEntityLabel,
+  getFirstEmptyIndex,
   getHomeLayerDerivedStateMap,
   getSuppressedConnectableEntityIds,
   insertExternalEntityToTarget,
@@ -1569,6 +1570,78 @@ useEffect(() => {
     ],
   );
 
+  // Step F2: button-based hidden -> visible promotion. The +N sheet no
+  // longer supports long-press drag inside its hidden grid; instead each
+  // tile exposes a small "↑" button that calls this handler. Moves the
+  // entity to the first empty visible slot of the open layer. family-me
+  // and full-visible cases are silent no-ops.
+  const handlePromoteHiddenToVisible = useCallback(
+    (entityId: string) => {
+      if (!openLayerId) {
+        return;
+      }
+      if (entityId === "family-me") {
+        return;
+      }
+      if (!isPersonEntityId(entityId)) {
+        return;
+      }
+
+      let didMove = false;
+
+      setLayoutState((current) => {
+        const targetLayer = current[openLayerId];
+        if (!targetLayer) {
+          return current;
+        }
+
+        const emptyIndex = getFirstEmptyIndex(targetLayer.visibleSlotIds);
+        if (emptyIndex < 0) {
+          return current;
+        }
+
+        const location = findEntityLocation(current, entityId);
+        if (!location) {
+          return current;
+        }
+
+        if (
+          location.layerId === openLayerId &&
+          location.area === "visible"
+        ) {
+          return current;
+        }
+
+        const next = moveEntityToTarget(
+          current,
+          {
+            sourceLayerId: location.layerId,
+            sourceIndex: location.index,
+            entityId,
+            sourceArea: location.area,
+          },
+          openLayerId,
+          "visible",
+          emptyIndex,
+        );
+
+        if (next === current) {
+          return current;
+        }
+
+        didMove = true;
+        return next;
+      });
+
+      if (didMove) {
+        usePeopleStore
+          .getState()
+          .updatePersonTier(entityId, getTierByLayerId(openLayerId));
+      }
+    },
+    [openLayerId, setLayoutState],
+  );
+
   const {
     dragState: homeMainLongPressDragState,
     beginDrag: beginHomeMainLongPressDrag,
@@ -2565,6 +2638,7 @@ const isJoined =
           // folder ghost drag begins, prevent its tiles from acting as a
           // second drag source.
           suppressDragSource={Boolean(folderLongPressDragState)}
+          onPromoteHiddenToVisible={handlePromoteHiddenToVisible}
         />
       ) : null}
 
