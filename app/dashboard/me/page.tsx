@@ -294,6 +294,23 @@ export default function DashboardMePage() {
     }
   }
 
+  // Step G2: small "back to default" reset. Only clears the local image
+  // references so the existing fallback (initials placeholder) renders again.
+  // Supabase storage object is intentionally left alone — re-upload uses the
+  // same path with upsert so no orphan accumulation. PROFILE_UPDATED_EVENT
+  // is dispatched by the existing save effect, which keeps the home
+  // family-me tile in sync.
+  function handleResetImage() {
+    setProfile((prev) => ({
+      ...prev,
+      imageUrl: "",
+      imageDataUrl: "",
+    }));
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
   if (!hasHydrated || !isLoaded) {
     return (
       <main className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-y-auto bg-[#F5F3EE] px-5 py-6 text-[#0F172A]">
@@ -318,22 +335,36 @@ export default function DashboardMePage() {
             </h1>
           </div>
 
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] text-[26px] font-bold shadow-[0_8px_18px_rgba(15,23,42,0.05)] active:scale-95"
-            style={{ background: PROFILE_BG, color: PROFILE_TEXT, border: `2.5px solid ${PROFILE_BORDER}` }}
-            aria-label="프로필 사진 변경"
-          >
-            {profile.imageUrl || profile.imageDataUrl ? (
-              <img src={profile.imageUrl || profile.imageDataUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              getInitial(profile.name)
-            )}
-            <span className="absolute bottom-[-1px] right-[-1px] flex h-[27px] w-[27px] items-center justify-center rounded-full bg-[#2C2C2A] text-[#F1EFE8] ring-2 ring-[#FAFAF8]">
-              <IconCamera />
-            </span>
-          </button>
+          <div className="flex shrink-0 flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] text-[26px] font-bold shadow-[0_8px_18px_rgba(15,23,42,0.05)] active:scale-95"
+              style={{ background: PROFILE_BG, color: PROFILE_TEXT, border: `2.5px solid ${PROFILE_BORDER}` }}
+              aria-label="프로필 사진 변경"
+            >
+              {profile.imageUrl || profile.imageDataUrl ? (
+                <img src={profile.imageUrl || profile.imageDataUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                getInitial(profile.name)
+              )}
+              <span className="absolute bottom-[-1px] right-[-1px] flex h-[27px] w-[27px] items-center justify-center rounded-full bg-[#2C2C2A] text-[#F1EFE8] ring-2 ring-[#FAFAF8]">
+                <IconCamera />
+              </span>
+            </button>
+
+            {(profile.imageUrl || profile.imageDataUrl) ? (
+              <button
+                type="button"
+                onClick={handleResetImage}
+                className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[#8D99AE] transition-colors duration-150 hover:text-[#0F172A] active:scale-95"
+                aria-label="프로필 사진 기본으로 되돌리기"
+                title="프로필 사진 기본으로 되돌리기"
+              >
+                기본으로
+              </button>
+            ) : null}
+          </div>
 
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
         </div>
