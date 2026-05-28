@@ -5,6 +5,70 @@ export type SignalItem = {
   emoji: string;
 };
 
+export type SignalCategoryId =
+  | "recent"
+  | "react"
+  | "heart"
+  | "greet"
+  | "cheer"
+  | "fun"
+  | "misc";
+
+export type SignalGridCategoryId = Exclude<SignalCategoryId, "recent">;
+
+export type SignalCategory = {
+  id: SignalCategoryId;
+  label: string;
+};
+
+// 칩 표시 순서 (시트 상단 점프 칩)
+export const SIGNAL_CATEGORIES: SignalCategory[] = [
+  { id: "recent", label: "자주" },
+  { id: "react", label: "반응" },
+  { id: "heart", label: "마음" },
+  { id: "greet", label: "인사" },
+  { id: "cheer", label: "응원" },
+  { id: "fun", label: "재미" },
+  { id: "misc", label: "기타" },
+];
+
+// 그리드 그룹 순서 (recent 제외 — recent는 별도 행에 표시)
+export const SIGNAL_GRID_CATEGORY_ORDER: SignalGridCategoryId[] = [
+  "react",
+  "heart",
+  "greet",
+  "cheer",
+  "fun",
+  "misc",
+];
+
+const GREET_IDS = new Set(["63", "64", "116", "117", "118"]);
+const FUN_IDS = new Set([
+  "110",
+  "111",
+  "112",
+  "113",
+  "114",
+  "115",
+  "206",
+  "207",
+  "208",
+]);
+
+export function getSignalCategory(id: string): SignalGridCategoryId {
+  if (GREET_IDS.has(id)) return "greet";
+  if (FUN_IDS.has(id)) return "fun";
+
+  const n = Number.parseInt(id, 10);
+  if (Number.isNaN(n)) return "misc";
+
+  if (n >= 1 && n <= 44) return "react";
+  if (n >= 50 && n <= 62) return "heart";
+  if (n >= 200 && n <= 205) return "cheer";
+  // 음식 70-83, 이동 90-104, 운동 120-134, 그리고 매핑 외 → 기타
+  return "misc";
+}
+
 export const SIGNALS: SignalItem[] = [
   // 😀 감정
   { id: "1", emoji: "😀" }, { id: "2", emoji: "😁" }, { id: "3", emoji: "😂" }, { id: "4", emoji: "🤣" },
