@@ -425,13 +425,17 @@ export default function DashboardMePage() {
         </div>
       </section>
 
+      <p className="mt-3 text-center text-[11px] font-medium text-[#8D99AE]">
+        입력하는 동안 자동으로 저장돼요
+      </p>
+
       <button
         type="button"
         onClick={() => {
           window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
           window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
         }}
-        className="mt-3 h-[58px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
+        className="mt-2 h-[58px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
       >
         저장하기
       </button>
