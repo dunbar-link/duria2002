@@ -187,6 +187,12 @@ export default function DashboardMePage() {
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Step G5: monotonic upload token. Increments on every new upload start
+  // and on handleResetImage so late-arriving Supabase callbacks can compare
+  // their captured token against the current ref value and bail out if a
+  // newer operation has invalidated them. Plain ref — no re-renders, no
+  // new state/store/event introduced.
+  const uploadTokenRef = useRef(0);
   const [profile, setProfile] = useState<MeProfile>(defaultProfile);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -278,17 +284,22 @@ export default function DashboardMePage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const token = ++uploadTokenRef.current;
+
     const previewDataUrl = await readFileAsDataUrl(file);
+    if (uploadTokenRef.current !== token) return;
     setProfile((prev) => ({ ...prev, imageDataUrl: previewDataUrl }));
 
     try {
       const uploadedUrl = await uploadProfileImageToSupabase(file);
+      if (uploadTokenRef.current !== token) return;
       setProfile((prev) => ({
         ...prev,
         imageUrl: uploadedUrl,
         imageDataUrl: previewDataUrl,
       }));
     } catch (error) {
+      if (uploadTokenRef.current !== token) return;
       console.warn("프로필 이미지 Supabase 업로드 실패:", error);
       setProfile((prev) => ({ ...prev, imageUrl: "", imageDataUrl: previewDataUrl }));
     }
@@ -301,6 +312,7 @@ export default function DashboardMePage() {
   // is dispatched by the existing save effect, which keeps the home
   // family-me tile in sync.
   function handleResetImage() {
+    uploadTokenRef.current += 1;
     setProfile((prev) => ({
       ...prev,
       imageUrl: "",
