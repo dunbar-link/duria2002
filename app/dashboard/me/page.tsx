@@ -222,6 +222,31 @@ export default function DashboardMePage() {
     window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
   }, [profile, isLoaded]);
 
+  // me 이름이 바뀌면 디바운스 후 dl_invites의 박제된 snapshot 이름을
+  // 일괄 복원한다. WHERE 절은 서버 측에서 inviter_user_id = me /
+  // accepted_person_id = me 로 강하게 제한됨. 실패는 silent fail —
+  // 사용자 흐름을 막지 않는다(toast 없음).
+  useEffect(() => {
+    if (!isLoaded) return;
+    const trimmed = profile.name.trim();
+    if (!trimmed) return;
+
+    const handle = window.setTimeout(() => {
+      const userId = getCurrentUserId();
+      if (!userId) return;
+
+      void fetch("/api/invites/refresh-name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, name: trimmed }),
+      }).catch(() => {
+        // silent fail
+      });
+    }, 800);
+
+    return () => window.clearTimeout(handle);
+  }, [profile.name, isLoaded]);
+
   const acceptedInviteCount = useMemo(() => {
     return inviteDrafts.filter((draft) => draft.status === "accepted").length;
   }, [inviteDrafts]);

@@ -2,7 +2,10 @@
 
 import { subscribePushForUser } from "@/lib/push/push-client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
-import { writeMeProfileNameIfEmpty } from "@/lib/me/profile-name";
+import {
+  readMeProfileName,
+  writeMeProfileNameIfEmpty,
+} from "@/lib/me/profile-name";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -267,6 +270,12 @@ function clearPendingInviteToken() {
 }
 
 function getInviteeNameFromRow(row: Record<string, unknown>) {
+  // dl_invites에 placeholder("초대받은 사람")를 박제하지 않는다.
+  // me 이름이 비어있으면 invite 시 정호가 입력한 invitee_name으로 fallback.
+  // 모두 비어있으면 빈 문자열 → /api/invites/accept 가 400으로 거부하여
+  // 보류 상태 유지. 사용자가 me 이름 입력 후 재시도되거나 invitee_name이
+  // 채워진 시점에 정상 수락된다.
+  const meName = readMeProfileName();
   const acceptedName =
     typeof row.accepted_person_name === "string"
       ? row.accepted_person_name.trim()
@@ -274,7 +283,7 @@ function getInviteeNameFromRow(row: Record<string, unknown>) {
   const inviteeName =
     typeof row.invitee_name === "string" ? row.invitee_name.trim() : "";
 
-  return acceptedName || inviteeName || "초대받은 사람";
+  return meName || acceptedName || inviteeName || "";
 }
 
 function getTierByLayerId(layerId: string): 1 | 5 | 15 | 50 | 150 {

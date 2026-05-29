@@ -671,7 +671,10 @@ export const usePeopleStore = create<PeopleState>()(
           getDefaultRelationshipLabel(relationshipType);
 
         const inviterUserId = getCurrentUserId() || null;
-        const inviterName = readMeProfileName() || "초대한 사람";
+        // me 이름이 비어 있을 때 placeholder("초대한 사람")를 dl_invites에
+        // 박제하지 않는다. null로 두면 나중에 me 이름이 채워졌을 때
+        // /api/invites/refresh-name 으로 일괄 동기화된다.
+        const inviterName = readMeProfileName() || null;
 
         const draft: InviteDraft = {
           token,
@@ -902,11 +905,18 @@ export const usePeopleStore = create<PeopleState>()(
                 item.acceptedPersonId !== currentUserId,
             )
             .map((item) => {
+              // 자기 자신이 acceptedPerson인 케이스는 이미 위 filter에서
+              // 제외되지만, 안전망으로 self 우선 readMeProfileName() 사용.
+              // placeholder는 더 이상 사용하지 않는다 — 자기 me 이름 또는
+              // snapshot 이름(acceptedPersonName/inviteeName)으로 fallback.
+              const acceptedUserId = cleanText(item.acceptedPersonId);
+              const isSelf =
+                Boolean(acceptedUserId) && acceptedUserId === deviceUserId;
               const acceptedName =
+                (isSelf ? readMeProfileName() : "") ||
                 cleanText(item.acceptedPersonName) ||
                 cleanText(item.inviteeName) ||
-                "초대받은 사람";
-              const acceptedUserId = cleanText(item.acceptedPersonId);
+                "";
               const key = acceptedUserId
                 ? `user:${acceptedUserId}`
                 : `name:${normalizePersonName(acceptedName)}`;
@@ -955,9 +965,18 @@ export const usePeopleStore = create<PeopleState>()(
                 cleanText(item.inviterUserId) || cleanText(item.inviterName),
             )
             .map((item) => {
+              // 자기 자신이 inviter인 케이스는 위 filter에서 제외되지만,
+              // 안전망으로 self 우선 readMeProfileName() 사용. placeholder는
+              // 더 이상 사용하지 않는다 — snapshot 이름이 비어있으면 빈
+              // 문자열로 두고, /api/invites/refresh-name 호출 이후의
+              // 다음 sync에서 회복된다.
               const inviterUserId = cleanText(item.inviterUserId);
+              const isSelf =
+                Boolean(inviterUserId) && inviterUserId === deviceUserId;
               const inviterName =
-                cleanText(item.inviterName) || "초대한 사람";
+                (isSelf ? readMeProfileName() : "") ||
+                cleanText(item.inviterName) ||
+                "";
               const key = inviterUserId
                 ? `user:${inviterUserId}`
                 : `name:${normalizePersonName(inviterName)}`;
