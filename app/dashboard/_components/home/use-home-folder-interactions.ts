@@ -12,9 +12,9 @@ import type {
 import {
   extractEntityFromFolderHierarchy,
   findEntityLocation,
+  getEntityPersonIdsForTierSync,
   getFirstEmptyIndex,
   getTierByLayerId,
-  isPersonEntityId,
   moveEntityToTarget,
   moveFolderEntityWithinFolder,
   renameFolderEntity,
@@ -23,12 +23,25 @@ import { useHomeFolderMoveMenu } from "./use-home-folder-move-menu";
 import { useHomeFolderSheet } from "./use-home-folder-sheet";
 import { usePeopleStore } from "../../people/store";
 
-function syncPersonTierForLayer(entityId: string, targetLayerId: string) {
-  if (!isPersonEntityId(entityId)) {
+/**
+ * entity가 target layer로 이동했을 때 person.tier를 일괄 sync한다.
+ * person이면 자기 자신만, nested folder가 layer로 빠지는 경우 내부 멤버
+ * person id 전체를 target tier로 갱신.
+ */
+function syncPersonTierForLayer(
+  entityId: string,
+  targetLayerId: string,
+  folders: FolderMap,
+) {
+  const personIds = getEntityPersonIdsForTierSync(entityId, folders);
+  if (personIds.length === 0) {
     return;
   }
   const nextTier = getTierByLayerId(targetLayerId);
-  usePeopleStore.getState().updatePersonTier(entityId, nextTier);
+  const updatePersonTier = usePeopleStore.getState().updatePersonTier;
+  for (const personId of personIds) {
+    updatePersonTier(personId, nextTier);
+  }
 }
 
 export function useHomeFolderInteractions({
@@ -260,7 +273,7 @@ export function useHomeFolderInteractions({
 
     setLayoutState(nextLayout);
     setFolders(nextFolders);
-    syncPersonTierForLayer(entityId, targetLayerId);
+    syncPersonTierForLayer(entityId, targetLayerId, folders);
     closeFolderMoveMenu();
   }
 

@@ -47,6 +47,66 @@ export function isPersonEntityId(entityId: string | null | undefined): boolean {
   return true;
 }
 
+/**
+ * 폴더가 layer 간 이동될 때 내부 멤버 person.tier를 일괄 sync하기 위한
+ * 도우미. nested folder를 재귀로 펼쳐 person id만 수집한다.
+ * visited set으로 self-reference / cycle 무한 루프를 차단한다.
+ */
+export function collectFolderMemberPersonIds(
+  folderId: string,
+  folders: FolderMap,
+  visited: Set<string> = new Set(),
+): string[] {
+  if (visited.has(folderId)) {
+    return [];
+  }
+  visited.add(folderId);
+
+  const folder = folders[folderId];
+  if (!folder) {
+    return [];
+  }
+
+  const collected: string[] = [];
+
+  for (const memberId of folder.memberIds) {
+    if (typeof memberId !== "string" || memberId.length === 0) {
+      continue;
+    }
+
+    if (folders[memberId]) {
+      collected.push(
+        ...collectFolderMemberPersonIds(memberId, folders, visited),
+      );
+      continue;
+    }
+
+    if (isPersonEntityId(memberId)) {
+      collected.push(memberId);
+    }
+  }
+
+  return Array.from(new Set(collected));
+}
+
+/**
+ * entity가 layer로 이동/배치될 때 person.tier sync 대상 person id 목록을
+ * 반환한다. person이면 자기 자신 1개, folder면 내부 멤버 person id 전부,
+ * 그 외(me, connectable 등)는 빈 배열.
+ */
+export function getEntityPersonIdsForTierSync(
+  entityId: string,
+  folders: FolderMap,
+): string[] {
+  if (isPersonEntityId(entityId)) {
+    return [entityId];
+  }
+  if (folders[entityId]) {
+    return collectFolderMemberPersonIds(entityId, folders);
+  }
+  return [];
+}
+
 export function fillSlots(
   ids: Array<string | null>,
   minSlots: number

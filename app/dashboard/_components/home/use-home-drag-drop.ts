@@ -15,21 +15,34 @@ import type {
 import { CONNECTABLE_SOURCE_LAYER_ID } from "./home-page-types";
 import {
   combineEntityIntoTarget,
+  getEntityPersonIdsForTierSync,
   getHoverActionFromPointer,
   getTierByLayerId,
   insertExternalEntityToTarget,
-  isPersonEntityId,
   moveEntityToTarget,
   resolveRailTarget,
 } from "./home-page-utils";
 import { usePeopleStore } from "../../people/store";
 
-function syncPersonTierForLayer(entityId: string, targetLayerId: string) {
-  if (!isPersonEntityId(entityId)) {
+/**
+ * entity가 target layer로 이동했을 때 person.tier를 일괄 sync한다.
+ * person이면 자기 자신만, folder면 내부 멤버(person, nested 포함)
+ * 모두 target tier로 갱신. 그 외(me, connectable 등)는 no-op.
+ */
+function syncPersonTierForLayer(
+  entityId: string,
+  targetLayerId: string,
+  folders: FolderMap,
+) {
+  const personIds = getEntityPersonIdsForTierSync(entityId, folders);
+  if (personIds.length === 0) {
     return;
   }
   const nextTier = getTierByLayerId(targetLayerId);
-  usePeopleStore.getState().updatePersonTier(entityId, nextTier);
+  const updatePersonTier = usePeopleStore.getState().updatePersonTier;
+  for (const personId of personIds) {
+    updatePersonTier(personId, nextTier);
+  }
 }
 
 type UseHomeDragDropParams = {
@@ -215,7 +228,7 @@ export function useHomeDragDrop({
               targetIndex
             )
           );
-          syncPersonTierForLayer(dragState.entityId, targetLayerId);
+          syncPersonTierForLayer(dragState.entityId, targetLayerId, folders);
           clearDragUiState();
           return;
         }
@@ -231,7 +244,7 @@ export function useHomeDragDrop({
 
         setLayoutState(result.layout);
         setFolders(result.folders);
-        syncPersonTierForLayer(dragState.entityId, targetLayerId);
+        syncPersonTierForLayer(dragState.entityId, targetLayerId, folders);
         clearDragUiState();
         return;
       }
@@ -246,7 +259,7 @@ export function useHomeDragDrop({
         )
       );
 
-      syncPersonTierForLayer(dragState.entityId, targetLayerId);
+      syncPersonTierForLayer(dragState.entityId, targetLayerId, folders);
       clearDragUiState();
     },
     [
@@ -306,7 +319,7 @@ export function useHomeDragDrop({
         moveEntityToTarget(current, dragState, layerId, "hidden")
       );
 
-      syncPersonTierForLayer(dragState.entityId, layerId);
+      syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
     [clearDragUiState, dragState, onExternalEntityAdded, setLayoutState]
@@ -399,7 +412,7 @@ export function useHomeDragDrop({
         );
       });
 
-      syncPersonTierForLayer(dragState.entityId, layerId);
+      syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
     [clearDragUiState, dragState, layoutState, onExternalEntityAdded, setLayoutState]
@@ -448,7 +461,7 @@ export function useHomeDragDrop({
         moveEntityToTarget(current, dragState, layerId, "hidden")
       );
 
-      syncPersonTierForLayer(dragState.entityId, layerId);
+      syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
     [clearDragUiState, dragState, onExternalEntityAdded, setLayoutState]
