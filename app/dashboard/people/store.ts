@@ -151,6 +151,7 @@ type PeopleState = {
   getWhyNowReason: (person: DashboardPerson) => string;
 
   createInviteDraft: (input: CreateInviteDraftInput) => InviteDraft;
+  setInviteDrafts: (drafts: InviteDraft[]) => void;
   getInviteDraftByToken: (token: string) => InviteDraft | null;
   syncInviteDraftsFromRemote: (rows: RemoteInviteDraftLike[]) => void;
   syncAcceptedInvitesToPeople: () => Promise<void>;
@@ -263,6 +264,50 @@ function generateInviteToken() {
 
 function buildProvisionalPersonId(token: string) {
   return `invite-pending-${token}`;
+}
+
+/**
+ * 같은 sourcePersonId 에 pending invite draft 가 여러 개면 가장 최근 1개만
+ * 남기고 나머지 pending 중복을 제거한다. accepted draft 와 sourcePersonId 가
+ * 없는(폼 기반 단발) pending draft 는 손대지 않는다.
+ *
+ * createInviteDraft 내부 dedup 이전에 이미 persist 된 stale 중복을 hydration
+ * 시점에 1회 정리하기 위한 순수 함수. 입력과 동일하면 같은 배열 참조를 반환해
+ * 불필요한 state 갱신을 피한다.
+ */
+function dedupePendingInviteDraftsBySource(
+  drafts: InviteDraft[],
+): InviteDraft[] {
+  const newestPendingTokenBySource = new Map<string, string>();
+
+  for (const draft of drafts) {
+    if (draft.status !== "pending") continue;
+    const src = draft.sourcePersonId?.trim();
+    if (!src) continue;
+
+    const currentToken = newestPendingTokenBySource.get(src);
+    if (!currentToken) {
+      newestPendingTokenBySource.set(src, draft.token);
+      continue;
+    }
+
+    const currentDraft = drafts.find((d) => d.token === currentToken);
+    const currentCreatedAt = currentDraft?.createdAt ?? "";
+    if (draft.createdAt.localeCompare(currentCreatedAt) > 0) {
+      newestPendingTokenBySource.set(src, draft.token);
+    }
+  }
+
+  const keepTokens = new Set(newestPendingTokenBySource.values());
+
+  const next = drafts.filter((draft) => {
+    if (draft.status !== "pending") return true;
+    const src = draft.sourcePersonId?.trim();
+    if (!src) return true;
+    return keepTokens.has(draft.token);
+  });
+
+  return next.length === drafts.length ? drafts : next;
 }
 
 function normalizeTier(value: unknown): AddDashboardPersonInput["tier"] {
@@ -664,6 +709,44 @@ export const usePeopleStore = create<PeopleState>()(
       },
 
       createInviteDraft: (input) => {
+        const sourcePersonId = input.sourcePersonId?.trim() || null;
+
+        // sourcePersonId 기준 dedup (store 내부에서 최신 state 로 판정).
+        // 같은 사람한테 여러 번 초대해도 local pending draft 는 1개만 유지한다.
+        // call-site 가드는 React state closure 에 의존하므로 연타/race 시
+        // 빠져나갈 수 있다. 여기서 freshest state 로 한 번 더 막아 중복 token
+        // 생성 자체를 차단한다.
+        //
+        // sourcePersonId 가 없는 invite(폼 기반 단발 초대)는 서로 묶이면 안
+        // 되므로 dedup 하지 않고 항상 새로 만든다.
+        if (sourcePersonId) {
+          const existingPending = get()
+            .inviteDrafts.filter(
+              (d) =>
+                d.sourcePersonId === sourcePersonId && d.status === "pending",
+            )
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+          if (existingPending.length > 0) {
+            const keep = existingPending[0];
+
+            // stale 중복 정리: 같은 sourcePersonId 의 pending draft 가 2개
+            // 이상이면 가장 최근 1개만 남기고 제거.
+            if (existingPending.length > 1) {
+              const staleTokens = new Set(
+                existingPending.slice(1).map((d) => d.token),
+              );
+              set((state) => ({
+                inviteDrafts: state.inviteDrafts.filter(
+                  (d) => !staleTokens.has(d.token),
+                ),
+              }));
+            }
+
+            return keep;
+          }
+        }
+
         const token = generateInviteToken();
         const relationshipType = input.relationshipType;
         const relationshipLabel =
@@ -682,7 +765,7 @@ export const usePeopleStore = create<PeopleState>()(
           createdAt: new Date().toISOString(),
           invitePath: `/invite/${token}`,
           inviteeName: cleanText(input.inviteeName),
-          sourcePersonId: input.sourcePersonId?.trim() || null,
+          sourcePersonId,
           tier: normalizeTier(input.tier),
           relationshipType,
           relationshipLabel,
@@ -701,6 +784,8 @@ export const usePeopleStore = create<PeopleState>()(
 
         return draft;
       },
+
+      setInviteDrafts: (drafts) => set({ inviteDrafts: drafts }),
 
       getInviteDraftByToken: (token) => {
         const target = token.trim();
@@ -1130,7 +1215,16 @@ export const usePeopleStore = create<PeopleState>()(
         inviteDrafts: state.inviteDrafts,
       }),
       onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+        if (!state) return;
+
+        // persist 된 stale 중복 pending invite(같은 sourcePersonId 다중)를
+        // hydration 시 1회 정리. 새 token 생성 없이 가장 최근 1개만 남긴다.
+        const deduped = dedupePendingInviteDraftsBySource(state.inviteDrafts);
+        if (deduped !== state.inviteDrafts) {
+          state.setInviteDrafts(deduped);
+        }
+
+        state.setHasHydrated(true);
       },
     },
   ),
