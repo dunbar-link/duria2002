@@ -2368,7 +2368,7 @@ const isJoined =
       return;
     }
 
-    
+
     if (!isJoined) {
       dismissRedActionForPerson(targetPerson.id);
 
@@ -2376,7 +2376,12 @@ const isJoined =
         personCatalog[targetPerson.id].urgent = false;
       }
 
-      void handleSendInviteForPerson(targetPerson);
+      // 미가입 사람을 탭하면 더 이상 자동으로 초대를 보내지 않는다.
+      // 액션 시트만 열고, 사용자가 명시적으로 "초대 보내기" 버튼을 눌렀을 때만
+      // handleSendInviteFromPersonSheet → handleSendInviteForPerson 가 동작한다.
+      // 결과적으로 invite row / 설치대기 count / 클립보드 복사 모두
+      // 명시적 클릭 단계에서만 발생.
+      setSelectedHomePersonId(targetPerson.id);
       return;
     }
 
@@ -2440,14 +2445,25 @@ const isJoined =
   }
 
   async function handleSendInviteForPerson(targetPerson: (typeof people)[number]) {
-    // 클로즈 베타용 1클릭 초대 UX:
-    // 홈 아이콘을 누르면 액션 시트를 거치지 않고 바로 공유창을 연다.
-    const draft = createInviteDraft({
-      sourcePersonId: targetPerson.id,
-      inviteeName: targetPerson.name,
-      tier: normalizeInviteTier(targetPerson.tier),
-      relationshipType: targetPerson.relationshipType,
-    });
+    // 같은 사람한테 이미 pending invite 가 있으면 새 draft 를 만들지 않고
+    // 그대로 재사용한다. createInviteDraft 는 호출될 때마다 새 token 으로
+    // local draft 를 누적 push 하므로, 명시 "초대 보내기" 버튼을 여러 번
+    // 눌렀을 때 설치대기 count 가 부풀려지는 부작용을 차단.
+    const existingDraft = inviteDrafts
+      .filter(
+        (item) =>
+          item.sourcePersonId === targetPerson.id && item.status === "pending",
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+
+    const draft =
+      existingDraft ??
+      createInviteDraft({
+        sourcePersonId: targetPerson.id,
+        inviteeName: targetPerson.name,
+        tier: normalizeInviteTier(targetPerson.tier),
+        relationshipType: targetPerson.relationshipType,
+      });
 
     const saved = await ensureRemoteInviteDraft(draft);
     if (!saved) {
