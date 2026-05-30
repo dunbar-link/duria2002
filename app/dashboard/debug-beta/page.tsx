@@ -59,11 +59,16 @@ function readHomeLayoutFromStorage(): {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as {
+      // Home(useHomeLayoutStorage.buildPayload)이 저장하는 실제 shape 은
+      // { layers, folders }. 과거 debug-beta 는 존재하지 않는 키
+      // parsed.layoutState 를 읽어 항상 {} → 모든 Home count 0 이었다.
+      // 실제 키 `layers` 를 우선 읽고, 안전망으로 layoutState 도 fallback.
+      layers?: Record<string, LayerLayoutState>;
       layoutState?: Record<string, LayerLayoutState>;
       folders?: FolderMap;
     };
     return {
-      layoutState: parsed.layoutState ?? {},
+      layoutState: parsed.layers ?? parsed.layoutState ?? {},
       folders: parsed.folders ?? {},
     };
   } catch {
