@@ -77,28 +77,38 @@ function readHomeLayoutFromStorage(): {
 }
 
 /**
- * Home count 와 동일한 의미. family-me 는 0 으로 친다(People 와 동일 기준).
- * folder 멤버는 재귀 펼침. cycle 방지 visited set.
+ * 실제 Home 의 getEntityRealCount/getLayerRealCount 와 동일한 의미로 센다.
+ *
+ * 실제 Home(home-page-utils.getEntityRealCount):
+ *  - family-me → 0
+ *  - folder → memberIds 재귀 합산
+ *  - personCatalog[id] 가 없으면 → 0 (stale/unknown id 는 세지 않음)
+ *  - 그 외 person → 1
+ *  - cross-slot visited 가드 없음 (같은 layer 안에서 같은 person 이 여러 경로로
+ *    닿으면 각각 센다)
+ *
+ * debug-beta 는 personCatalog 싱글톤을 mutate 하지 않기 위해(read-only 유지),
+ * "실제 person 인지" 판정을 store 의 people id 집합(knownPersonIds)으로 복제한다.
+ * folder cycle 로 인한 무한 재귀만 depth guard 로 막는다(실제 Home 은 가드가
+ * 없지만 정상 데이터에선 동일 결과, 비정상 cycle 에서만 다름).
  */
 function countLayerEntities(
   layer: LayerLayoutState | undefined,
   folders: FolderMap,
+  knownPersonIds: Set<string>,
 ): number {
   if (!layer) return 0;
-  const visited = new Set<string>();
-  function countOne(id: string | null): number {
-    if (!id) return 0;
+  function countOne(id: string | null, depth: number): number {
+    if (!id || depth > 32) return 0;
     if (id === "family-me") return 0;
-    if (visited.has(id)) return 0;
-    visited.add(id);
     const f = folders[id];
     if (f) {
-      return f.memberIds.reduce((s, m) => s + countOne(m), 0);
+      return f.memberIds.reduce((s, m) => s + countOne(m, depth + 1), 0);
     }
-    return 1;
+    return knownPersonIds.has(id) ? 1 : 0;
   }
   return [...layer.visibleSlotIds, ...layer.hiddenSlotIds].reduce(
-    (s, id) => s + countOne(id),
+    (s, id) => s + countOne(id, 0),
     0,
   );
 }
@@ -261,10 +271,15 @@ export default function DashboardDebugBetaPage() {
   }, [people, inviteState]);
 
   const tierComparison = useMemo(() => {
+    // 실제 Home getEntityRealCount 의 personCatalog 멤버십을 read-only 복제.
+    // store people id 에 없는 slot id(stale/unknown)는 Home 과 동일하게 0 으로
+    // 센다.
+    const knownPersonIds = new Set(people.map((p) => p.id));
     return LAYER_DEFS.map((def) => {
       const homeCount = countLayerEntities(
         home?.layoutState?.[def.id],
         home?.folders ?? {},
+        knownPersonIds,
       );
       const peopleCount = people.filter((p) => getTierBand(p.tier) === def.id).length;
       return {
