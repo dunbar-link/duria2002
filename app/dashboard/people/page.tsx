@@ -1068,7 +1068,15 @@ export default function DashboardPeoplePage() {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        {/*
+          Mobile: keep tier chips on a single line. Container becomes a
+          horizontal scroller (flex-nowrap + overflow-x-auto). -mx-5/px-5
+          extends the scroll track to the screen edges so the last chip
+          (친근) can scroll off-screen cleanly instead of wrapping to a
+          second row. shrink-0 on each chip prevents narrow viewports from
+          squeezing labels and counts.
+        */}
+        <div className="-mx-5 mt-3 flex flex-nowrap gap-2 overflow-x-auto px-5 pb-1">
           {tierTabs.map((tab) => {
             const isActive = tierFilter === tab;
 
@@ -1078,7 +1086,7 @@ export default function DashboardPeoplePage() {
                 type="button"
                 onClick={() => setTierFilter(tab)}
                 className={[
-                  "flex h-[34px] items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition active:scale-95",
+                  "flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition active:scale-95",
                   isActive
                     ? "bg-[#2C2C2A] text-[#F1EFE8]"
                     : "bg-white text-[#60656F] ring-1 ring-[#D3D1C7]",
