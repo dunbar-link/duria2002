@@ -322,7 +322,7 @@ export function useHomeDragDrop({
       syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
-    [clearDragUiState, dragState, onExternalEntityAdded, setLayoutState]
+    [clearDragUiState, dragState, folders, onExternalEntityAdded, setLayoutState]
   );
 
   const handleDragOverRailLayer = useCallback(
@@ -415,7 +415,7 @@ export function useHomeDragDrop({
       syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
-    [clearDragUiState, dragState, layoutState, onExternalEntityAdded, setLayoutState]
+    [clearDragUiState, dragState, folders, layoutState, onExternalEntityAdded, setLayoutState]
   );
 
   const handleDragOverHiddenContainer = useCallback(
@@ -464,7 +464,7 @@ export function useHomeDragDrop({
       syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
-    [clearDragUiState, dragState, onExternalEntityAdded, setLayoutState]
+    [clearDragUiState, dragState, folders, onExternalEntityAdded, setLayoutState]
   );
 
   const isConnectableDragActive =
