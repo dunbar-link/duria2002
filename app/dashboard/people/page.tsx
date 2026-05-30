@@ -1114,13 +1114,13 @@ export default function DashboardPeoplePage() {
 
   return (
     <main className="flex h-full min-h-0 flex-col overflow-hidden bg-[#F5F3EE] text-[#0F172A]">
-      <div className="sticky top-0 z-20 border-b border-[#D3D1C7] bg-[#FAFAF8] px-5 pb-4 pt-5">
+      <div className="sticky top-0 z-20 border-b border-[#D3D1C7] bg-[#FAFAF8] px-5 pb-3 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-[#8D99AE]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8D99AE]">
               PEOPLE
             </p>
-            <h1 className="mt-2 text-[28px] font-bold tracking-[-0.04em] text-[#0F172A]">
+            <h1 className="mt-1 text-[24px] font-bold tracking-[-0.04em] text-[#0F172A]">
               친구들
             </h1>
           </div>
@@ -1154,15 +1154,15 @@ export default function DashboardPeoplePage() {
           </div>
         ) : null}
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <div className="rounded-[18px] bg-[#DDF7EE] px-4 py-3 ring-1 ring-[#8EE5CA]">
-            <p className="text-[11px] font-semibold text-[#0B7A5D]">가입 완료</p>
-            <p className="mt-1 text-[22px] font-bold text-[#0B7A5D]">{summaryAcceptedCount}</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-[14px] bg-[#DDF7EE] px-3 py-2 ring-1 ring-[#8EE5CA]">
+            <p className="text-[10px] font-semibold text-[#0B7A5D]">가입 완료</p>
+            <p className="mt-0.5 text-[19px] font-bold leading-tight text-[#0B7A5D]">{summaryAcceptedCount}</p>
           </div>
 
-          <div className="rounded-[18px] bg-[#FCE8C9] px-4 py-3 ring-1 ring-[#F7B95C]">
-            <p className="text-[11px] font-semibold text-[#936018]">설치 대기</p>
-            <p className="mt-1 text-[22px] font-bold text-[#936018]">{summaryPendingCount}</p>
+          <div className="rounded-[14px] bg-[#FCE8C9] px-3 py-2 ring-1 ring-[#F7B95C]">
+            <p className="text-[10px] font-semibold text-[#936018]">설치 대기</p>
+            <p className="mt-0.5 text-[19px] font-bold leading-tight text-[#936018]">{summaryPendingCount}</p>
           </div>
         </div>
 
@@ -1173,7 +1173,7 @@ export default function DashboardPeoplePage() {
           shrunk so 전체·가족·핵심·신뢰·친밀·친근 all fit without horizontal
           scroll on standard mobile widths.
         */}
-        <div className="mt-3 flex flex-nowrap gap-1 overflow-x-auto pb-0.5">
+        <div className="mt-3 flex flex-nowrap gap-[5px] overflow-x-auto pb-0.5">
           {tierTabs.map((tab) => {
             const isActive = tierFilter === tab;
 
@@ -1183,7 +1183,7 @@ export default function DashboardPeoplePage() {
                 type="button"
                 onClick={() => setTierFilter(tab)}
                 className={[
-                  "flex h-[26px] shrink-0 items-center justify-center gap-1 rounded-full px-2 text-[11px] font-semibold transition active:scale-95",
+                  "flex h-[26px] shrink-0 items-center justify-center gap-[3px] rounded-full px-[9px] text-[11px] font-semibold transition active:scale-95",
                   isActive
                     ? "bg-[#2C2C2A] text-[#F1EFE8]"
                     : "bg-white text-[#60656F] ring-1 ring-[#D3D1C7]",
@@ -1192,7 +1192,7 @@ export default function DashboardPeoplePage() {
                 <span>{getTierFilterLabel(tab)}</span>
                 <span
                   className={
-                    isActive ? "text-[#F1EFE8]/80" : "text-[#A9A59A]"
+                    isActive ? "text-[#F1EFE8]/70" : "text-[#A9A59A]"
                   }
                 >
                   {tierCounts[tab]}
@@ -1203,11 +1203,11 @@ export default function DashboardPeoplePage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[120px] pt-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[120px] pt-3">
         {filteredPeople.length === 0 ? (
           <EmptyState title="아직 없어요" body="가입 완료된 사람이 여기에 보여요." />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {filteredPeople.map((person) => {
               const pendingInviteDraft = pendingInviteMapByPersonId[person.id] ?? null;
               // local-only pendingInviteDraft 는 invitePath 라우팅용으로 유지.
@@ -1240,13 +1240,13 @@ export default function DashboardPeoplePage() {
               return (
                 <div
                   key={person.id}
-                  className="rounded-[24px] bg-[#FAFAF8] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] ring-1 ring-[#D3D1C7]"
+                  className="rounded-[20px] bg-[#FAFAF8] p-3 shadow-[0_8px_22px_rgba(15,23,42,0.04)] ring-1 ring-[#D3D1C7]"
                 >
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => openDetail(person.id)}
-                      className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[14px] text-[18px] font-bold shadow-[0_6px_14px_rgba(15,23,42,0.04)] active:scale-95"
+                      className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] text-[17px] font-bold shadow-[0_6px_14px_rgba(15,23,42,0.04)] active:scale-95"
                       style={{
                         background: tierStyle.bg,
                         border: `${borderStyle} ${tierStyle.text}`,
@@ -1259,7 +1259,7 @@ export default function DashboardPeoplePage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h2 className="truncate text-[19px] font-bold tracking-[-0.03em] text-[#0F172A]">
+                        <h2 className="truncate text-[17px] font-bold tracking-[-0.03em] text-[#0F172A]">
                           {person.name}
                         </h2>
                         {isNewestAccepted ? (
@@ -1281,7 +1281,7 @@ export default function DashboardPeoplePage() {
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <button
                         type="button"
                         onClick={(event) => {
@@ -1295,7 +1295,7 @@ export default function DashboardPeoplePage() {
 
                           openDetail(person.id);
                         }}
-                        className="flex h-[42px] w-[42px] items-center justify-center rounded-[15px] bg-[#0F172A] text-white active:scale-95"
+                        className="flex h-[38px] w-[38px] items-center justify-center rounded-[13px] bg-[#0F172A] text-white active:scale-95"
                         aria-label="상세 보기"
                       >
                         <IconDetail />
@@ -1304,7 +1304,7 @@ export default function DashboardPeoplePage() {
                       <button
                         type="button"
                         onClick={(event) => handlePrimaryAction(event, person)}
-                        className="flex h-[42px] w-[42px] items-center justify-center rounded-[15px] bg-[#2C2C2A] text-[#F1EFE8] active:scale-95"
+                        className="flex h-[38px] w-[38px] items-center justify-center rounded-[13px] bg-[#2C2C2A] text-[#F1EFE8] active:scale-95"
                         aria-label="연락하기"
                       >
                         <IconContact />
@@ -1313,7 +1313,7 @@ export default function DashboardPeoplePage() {
                       <button
                         type="button"
                         onClick={(event) => handleDeletePerson(event, person)}
-                        className="flex h-[42px] w-[42px] items-center justify-center rounded-[15px] bg-[#FBEAF0] text-[#993556] ring-1 ring-[#F4C0D1] active:scale-95"
+                        className="flex h-[38px] w-[38px] items-center justify-center rounded-[13px] bg-[#FBEAF0] text-[#993556] ring-1 ring-[#F4C0D1] active:scale-95"
                         aria-label="삭제"
                       >
                         <IconDelete />
