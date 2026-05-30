@@ -1060,11 +1060,20 @@ export default function DashboardPeoplePage() {
   const needTabs: NeedFilter[] = ["all", "need", "ok", "later", "done"];
 
   // 설치대기: local + remote pending invite 의 token 으로 dedup 된 실제 invite 수.
-  // 가입완료: enrichedPeople 중 pending invite 매칭이 없는 사람 = 진짜 가입한 사람.
+  // 가입완료: person.isJoined === true && serverId(userId/dlUserId/acceptedPersonId
+  // 중 하나)가 있는 사람만. local-only(Home 빈 슬롯에서 추가만 한 사람)는
+  // pending invite 도 없고 serverId 도 없으므로 어디에도 카운트되지 않는다.
+  function isAcceptedPerson(p: (typeof enrichedPeople)[number]) {
+    const r = p.raw as Record<string, unknown>;
+    if (r.isJoined !== true) return false;
+    const candidates = [r.userId, r.dlUserId, r.acceptedPersonId];
+    return candidates.some(
+      (value) => typeof value === "string" && value.trim().length > 0,
+    );
+  }
+
   const summaryPendingCount = allPendingInvitesDedup.length;
-  const summaryAcceptedCount = enrichedPeople.filter(
-    (p) => !findPendingForPerson(p),
-  ).length;
+  const summaryAcceptedCount = enrichedPeople.filter(isAcceptedPerson).length;
 
   if (!hasHydrated) {
     return (

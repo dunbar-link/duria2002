@@ -246,6 +246,13 @@ export function getDisplayName(person: {
 }
 
 export function getEntityRealCount(entityId: string, folders: FolderMap): number {
+  // "나"(family-me)는 사람 수 카운트에서 제외한다. Home 가족 layer 의
+  // count 가 People 가족 chip(자기 자신은 항상 제외)과 일치하도록 통일.
+  // me 는 family layer 의 첫 슬롯에 시각적으로 그대로 표시된다.
+  if (entityId === "family-me") {
+    return 0;
+  }
+
   if (folders[entityId]) {
     return folders[entityId].memberIds.reduce((sum, memberId) => {
       if (!memberId) {
