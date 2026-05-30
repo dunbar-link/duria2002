@@ -85,6 +85,7 @@ import {
   createInitialLayoutState,
   findEntityLocation,
   getEntityLabel,
+  getEntityPersonIdsForTierSync,
   getFirstEmptyIndex,
   getHomeLayerDerivedStateMap,
   getSuppressedConnectableEntityIds,
@@ -1496,6 +1497,12 @@ useEffect(() => {
       }
 
       let didMove = false;
+      // Capture swap meta so we can sync the displaced target entity's
+      // person.tier(s) to the source's old layer. Without this a person→folder
+      // swap (mobile path) leaves the folder's members on their previous tier
+      // even though Home count already reflects the new layer.
+      let sourceOldLayerId: string | null = null;
+      let swappedTargetEntityId: string | null = null;
 
       setLayoutState((current) => {
         const targetLayer = current[layerId];
@@ -1529,6 +1536,23 @@ useEffect(() => {
         }
 
         didMove = true;
+        sourceOldLayerId = location.layerId;
+
+        if (typeof index === "number") {
+          const targetSlots =
+            area === "visible"
+              ? targetLayer.visibleSlotIds
+              : targetLayer.hiddenSlotIds;
+          const occupant = targetSlots[index] ?? null;
+          if (
+            occupant &&
+            occupant !== entityId &&
+            occupant !== "family-me" &&
+            location.layerId !== layerId
+          ) {
+            swappedTargetEntityId = occupant;
+          }
+        }
 
         return moveEntityToTarget(
           current,
@@ -1546,6 +1570,21 @@ useEffect(() => {
 
       if (didMove) {
         usePeopleStore.getState().updatePersonTier(entityId, getTierByLayerId(layerId));
+
+        // Mobile swap target sync: the entity displaced into source's old
+        // layer must have its person.tier (or folder member tiers) updated
+        // so People count stays consistent with Home.
+        if (swappedTargetEntityId && sourceOldLayerId) {
+          const swappedTier = getTierByLayerId(sourceOldLayerId);
+          const swappedPersonIds = getEntityPersonIdsForTierSync(
+            swappedTargetEntityId,
+            folders,
+          );
+          const updatePersonTier = usePeopleStore.getState().updatePersonTier;
+          for (const pid of swappedPersonIds) {
+            updatePersonTier(pid, swappedTier);
+          }
+        }
       }
     },
   });
@@ -1720,6 +1759,12 @@ useEffect(() => {
       }
 
       let didMove = false;
+      // Mirror layer-sheet path: capture swap meta so the displaced target
+      // entity (often a folder) gets its members re-tiered to source's
+      // old layer. Without this, mobile person→folder swap leaves People
+      // count out of sync with Home count.
+      let sourceOldLayerId: string | null = null;
+      let swappedTargetEntityId: string | null = null;
 
       setLayoutState((current) => {
         const targetLayer = current[layerId];
@@ -1753,6 +1798,23 @@ useEffect(() => {
         }
 
         didMove = true;
+        sourceOldLayerId = location.layerId;
+
+        if (typeof index === "number") {
+          const targetSlots =
+            area === "visible"
+              ? targetLayer.visibleSlotIds
+              : targetLayer.hiddenSlotIds;
+          const occupant = targetSlots[index] ?? null;
+          if (
+            occupant &&
+            occupant !== entityId &&
+            occupant !== "family-me" &&
+            location.layerId !== layerId
+          ) {
+            swappedTargetEntityId = occupant;
+          }
+        }
 
         return moveEntityToTarget(
           current,
@@ -1772,6 +1834,18 @@ useEffect(() => {
         usePeopleStore
           .getState()
           .updatePersonTier(entityId, getTierByLayerId(layerId));
+
+        if (swappedTargetEntityId && sourceOldLayerId) {
+          const swappedTier = getTierByLayerId(sourceOldLayerId);
+          const swappedPersonIds = getEntityPersonIdsForTierSync(
+            swappedTargetEntityId,
+            folders,
+          );
+          const updatePersonTier = usePeopleStore.getState().updatePersonTier;
+          for (const pid of swappedPersonIds) {
+            updatePersonTier(pid, swappedTier);
+          }
+        }
       }
     },
   });
