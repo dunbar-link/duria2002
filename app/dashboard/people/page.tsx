@@ -627,6 +627,29 @@ export default function DashboardPeoplePage() {
     return { byId, byName };
   }, [allPendingInvitesDedup]);
 
+  // person-level dedup: 같은 사람에게 여러 번 초대 버튼을 눌러 invite 가
+  // 여러 행 생겨도 설치대기 count 는 1 로만 친다. key 우선순위는 sourcePersonId
+  // → provisionalPersonId → 정규화된 inviteeName 순. 셋 다 비면 token 으로 fallback.
+  const allPendingInvitesByPerson = useMemo<DedupPending[]>(() => {
+    const seen = new Set<string>();
+    const result: DedupPending[] = [];
+    for (const inv of allPendingInvitesDedup) {
+      let personKey = "";
+      if (inv.sourcePersonId) {
+        personKey = `pid:${inv.sourcePersonId}`;
+      } else if (inv.provisionalPersonId) {
+        personKey = `pid:${inv.provisionalPersonId}`;
+      } else {
+        const n = normalizeName(inv.inviteeName);
+        personKey = n ? `name:${n}` : `token:${inv.token}`;
+      }
+      if (seen.has(personKey)) continue;
+      seen.add(personKey);
+      result.push(inv);
+    }
+    return result;
+  }, [allPendingInvitesDedup]);
+
   function findPendingForPerson(person: { id: string; name: string }) {
     const byId = pendingPersonIndex.byId.get(person.id);
     if (byId) return byId;
@@ -1072,7 +1095,9 @@ export default function DashboardPeoplePage() {
     );
   }
 
-  const summaryPendingCount = allPendingInvitesDedup.length;
+  // 설치대기는 person 단위 dedup 결과를 사용해 같은 사람 중복 카운트 차단.
+  // 가입완료는 isAcceptedPerson 그대로 (isJoined + serverId).
+  const summaryPendingCount = allPendingInvitesByPerson.length;
   const summaryAcceptedCount = enrichedPeople.filter(isAcceptedPerson).length;
 
   if (!hasHydrated) {
@@ -1142,14 +1167,13 @@ export default function DashboardPeoplePage() {
         </div>
 
         {/*
-          Mobile: keep tier chips on a single line. Container becomes a
-          horizontal scroller (flex-nowrap + overflow-x-auto). -mx-5/px-5
-          extends the scroll track to the screen edges so the last chip
-          (친근) can scroll off-screen cleanly instead of wrapping to a
-          second row. shrink-0 on each chip prevents narrow viewports from
-          squeezing labels and counts.
+          Mobile: 6 tier chips must fit on a single row at ~360px viewport.
+          Container uses flex-nowrap for no wrap and overflow-x-auto as a
+          safety net for ultra-narrow widths. Chip height/padding/font are
+          shrunk so 전체·가족·핵심·신뢰·친밀·친근 all fit without horizontal
+          scroll on standard mobile widths.
         */}
-        <div className="-mx-5 mt-3 flex flex-nowrap gap-2 overflow-x-auto px-5 pb-1">
+        <div className="mt-3 flex flex-nowrap gap-1 overflow-x-auto pb-0.5">
           {tierTabs.map((tab) => {
             const isActive = tierFilter === tab;
 
@@ -1159,14 +1183,18 @@ export default function DashboardPeoplePage() {
                 type="button"
                 onClick={() => setTierFilter(tab)}
                 className={[
-                  "flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition active:scale-95",
+                  "flex h-[26px] shrink-0 items-center justify-center gap-1 rounded-full px-2 text-[11px] font-semibold transition active:scale-95",
                   isActive
                     ? "bg-[#2C2C2A] text-[#F1EFE8]"
                     : "bg-white text-[#60656F] ring-1 ring-[#D3D1C7]",
                 ].join(" ")}
               >
                 <span>{getTierFilterLabel(tab)}</span>
-                <span className={isActive ? "text-[#F1EFE8]/80" : "text-[#A9A59A]"}>
+                <span
+                  className={
+                    isActive ? "text-[#F1EFE8]/80" : "text-[#A9A59A]"
+                  }
+                >
                   {tierCounts[tab]}
                 </span>
               </button>
@@ -1203,7 +1231,11 @@ export default function DashboardPeoplePage() {
                 : buildChannelChoices(person.raw as DashboardPerson);
 
               const tierStyle = getSimpleTierStyle(person.tierValue);
-              const borderStyle = isPendingInstall ? "1.5px dashed" : "2.5px solid";
+              // border 기준: accepted 만 solid. local-only / pending 모두 dashed
+              // (Home tile 점선 정책과 일치). isPendingInstall 은 채널 / CTA
+              // 분기에 그대로 사용한다.
+              const accepted = isAcceptedPerson(person);
+              const borderStyle = accepted ? "2.5px solid" : "1.5px dashed";
 
               return (
                 <div
@@ -1246,11 +1278,6 @@ export default function DashboardPeoplePage() {
                         >
                           {tierStyle.label}
                         </span>
-                        {isPendingInstall ? (
-                          <span className="rounded-full bg-[#FCE8C9] px-2.5 py-1 text-[11px] font-semibold text-[#936018] ring-1 ring-[#F7B95C]">
-                            대기
-                          </span>
-                        ) : null}
                       </div>
                     </div>
 
