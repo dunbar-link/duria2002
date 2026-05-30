@@ -347,6 +347,12 @@ export default function DashboardDebugBetaPage() {
         <p className="mt-1 text-[11px] leading-relaxed text-[#94A3B8]">
           read-only. write 없음. 사용자에게 공개되지 않는 진단 화면.
         </p>
+        <div className="mt-2 rounded-[10px] border border-[#334155] bg-[#1E293B] px-3 py-2">
+          <p className="text-[11px] leading-relaxed text-[#CBD5E1]">
+            이 화면은 현재 브라우저의 localStorage 기준이에요. PC와 모바일의
+            Home / People 상태는 서로 다를 수 있어요. (MVP 구조상 정상)
+          </p>
+        </div>
         {!hasHydrated ? (
           <p className="mt-2 text-[11px] text-[#F59E0B]">store hydrate 중...</p>
         ) : null}
