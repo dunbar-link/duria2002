@@ -575,6 +575,66 @@ export default function DashboardPeoplePage() {
     );
   }, [pendingInvites]);
 
+  // 가입완료/설치대기 분리용 dedupe pending pool.
+  // 동일 token 의 local/remote pending 을 한 번만 카운트하고,
+  // 사람 카드에 매핑하기 위해 sourcePersonId / provisionalPersonId / inviteeName 으로
+  // 색인한다. 기존 pendingInviteMapByPersonId 는 invitePath 등 local 한정 필드 사용을 위해 그대로 둔다.
+  type DedupPending = {
+    token: string;
+    inviteeName: string;
+    sourcePersonId: string | null;
+    provisionalPersonId: string | null;
+  };
+
+  const allPendingInvitesDedup = useMemo<DedupPending[]>(() => {
+    const tokens = new Set<string>();
+    const dedup: DedupPending[] = [];
+
+    for (const inv of pendingInvites) {
+      const token = inv.token?.trim();
+      if (!token || tokens.has(token)) continue;
+      tokens.add(token);
+      dedup.push({
+        token,
+        inviteeName: inv.inviteeName ?? "",
+        sourcePersonId: inv.sourcePersonId ?? null,
+        provisionalPersonId: inv.provisionalPersonId ?? null,
+      });
+    }
+    for (const inv of remotePendingInvites) {
+      const token = inv.token?.trim();
+      if (!token || tokens.has(token)) continue;
+      tokens.add(token);
+      dedup.push({
+        token,
+        inviteeName: inv.invitee_name ?? "",
+        sourcePersonId: null,
+        provisionalPersonId: null,
+      });
+    }
+    return dedup;
+  }, [pendingInvites, remotePendingInvites]);
+
+  const pendingPersonIndex = useMemo(() => {
+    const byId = new Map<string, DedupPending>();
+    const byName = new Map<string, DedupPending>();
+    for (const inv of allPendingInvitesDedup) {
+      if (inv.provisionalPersonId) byId.set(inv.provisionalPersonId, inv);
+      if (inv.sourcePersonId) byId.set(inv.sourcePersonId, inv);
+      const n = normalizeName(inv.inviteeName);
+      if (n) byName.set(n, inv);
+    }
+    return { byId, byName };
+  }, [allPendingInvitesDedup]);
+
+  function findPendingForPerson(person: { id: string; name: string }) {
+    const byId = pendingPersonIndex.byId.get(person.id);
+    if (byId) return byId;
+    const n = normalizeName(person.name);
+    if (n) return pendingPersonIndex.byName.get(n) ?? null;
+    return null;
+  }
+
   const mergedPeopleSource = useMemo(() => {
   const map = new Map<string, DashboardPerson>();
   const deviceUserId = getCurrentUserId();
@@ -999,8 +1059,12 @@ export default function DashboardPeoplePage() {
 
   const needTabs: NeedFilter[] = ["all", "need", "ok", "later", "done"];
 
-  const summaryPendingCount = remotePendingInvites.length + pendingInvites.length;
-  const summaryAcceptedCount = enrichedPeople.length;
+  // 설치대기: local + remote pending invite 의 token 으로 dedup 된 실제 invite 수.
+  // 가입완료: enrichedPeople 중 pending invite 매칭이 없는 사람 = 진짜 가입한 사람.
+  const summaryPendingCount = allPendingInvitesDedup.length;
+  const summaryAcceptedCount = enrichedPeople.filter(
+    (p) => !findPendingForPerson(p),
+  ).length;
 
   if (!hasHydrated) {
     return (
@@ -1109,7 +1173,12 @@ export default function DashboardPeoplePage() {
           <div className="space-y-3">
             {filteredPeople.map((person) => {
               const pendingInviteDraft = pendingInviteMapByPersonId[person.id] ?? null;
-              const isPendingInstall = Boolean(pendingInviteDraft);
+              // local-only pendingInviteDraft 는 invitePath 라우팅용으로 유지.
+              // dashed border / "대기" 뱃지 등 시각 표시는 remote pending 도
+              // 잡도록 통합 findPendingForPerson() 기준으로 결정한다.
+              const isPendingInstall = Boolean(
+                pendingInviteDraft || findPendingForPerson(person),
+              );
               const isNewestAccepted =
                 !isPendingInstall &&
                 (latestAcceptedPersonId === person.id ||

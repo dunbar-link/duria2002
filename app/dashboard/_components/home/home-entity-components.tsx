@@ -217,24 +217,61 @@ function isJoinedEntity(entityId: string) {
     const parsed = JSON.parse(raw);
     const state = parsed?.state ?? parsed;
     const people = Array.isArray(state?.people) ? state.people : [];
+    const inviteDrafts = Array.isArray(state?.inviteDrafts)
+      ? state.inviteDrafts
+      : [];
 
-    return people.some((person: Record<string, unknown>) => {
-      if (person.id !== entityId) {
+    const person = people.find(
+      (item: Record<string, unknown>) => item.id === entityId,
+    );
+
+    if (!person) {
+      return false;
+    }
+    if (person.isJoined !== true) {
+      return false;
+    }
+    const serverIdCandidates = [
+      person.userId,
+      person.dlUserId,
+      person.acceptedPersonId,
+    ];
+    const hasServerId = serverIdCandidates.some(
+      (value) => typeof value === "string" && value.trim().length > 0,
+    );
+    if (!hasServerId) {
+      return false;
+    }
+
+    // Safety net: if a pending invite is still attached to this person, treat
+    // the tile as "not connected yet" so the dashed border (PersonFace) stays.
+    // Prevents the 진한 테두리 false-positive when isJoined/userId leak in
+    // before the invite is actually accepted (stale matchers in
+    // syncAcceptedInvitesToPeople etc.). Accepted invites have status="accepted"
+    // and are intentionally excluded from this gate.
+    const personName =
+      typeof person.name === "string" ? person.name.trim().toLowerCase() : "";
+    const hasPendingInvite = inviteDrafts.some(
+      (draft: Record<string, unknown>) => {
+        if (draft.status !== "pending") return false;
+        if (draft.sourcePersonId === entityId) return true;
+        if (draft.provisionalPersonId === entityId) return true;
+        const inviteeName =
+          typeof draft.inviteeName === "string"
+            ? draft.inviteeName.trim().toLowerCase()
+            : "";
+        if (personName && inviteeName && personName === inviteeName) {
+          return true;
+        }
         return false;
-      }
-      if (person.isJoined !== true) {
-        return false;
-      }
-      const serverIdCandidates = [
-        person.userId,
-        person.dlUserId,
-        person.acceptedPersonId,
-      ];
-      return serverIdCandidates.some(
-        (value) =>
-          typeof value === "string" && value.trim().length > 0,
-      );
-    });
+      },
+    );
+
+    if (hasPendingInvite) {
+      return false;
+    }
+
+    return true;
   } catch {
     return false;
   }
