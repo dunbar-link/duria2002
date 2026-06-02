@@ -915,17 +915,18 @@ export const usePeopleStore = create<PeopleState>()(
             }
 
             const acceptedName = cleanText(matchedInvite.acceptedPersonName);
-            const inviteeNameText = cleanText(matchedInvite.inviteeName);
-            const matchesInviteeName =
-              inviteeNameText.length > 0 &&
-              normalizePersonName(person.name) ===
-                normalizePersonName(inviteeNameText);
             const personNameIsEmpty = person.name.trim() === "";
+            // 초대자(PC) 카드명 보존 원칙:
+            // PC 가 이름을 넣어 초대한 카드(person.name 존재)는 수락자의 me
+            // 이름(acceptedPersonName)으로 절대 덮어쓰지 않는다. 이전에는
+            // matchesInviteeName(person.name == inviteeName) 분기 때문에
+            // "테스트A"로 초대한 카드가 수락자 기존 me "기존이름B"로 바뀌었다.
+            // 이제는 카드명이 비어 있던 경우(이름 없이 초대)에만 수락자 이름으로
+            // 채운다. 연결 상태(isJoined/serverId)는 아래에서 항상 반영된다.
             const shouldOverwriteName =
               acceptedName.length > 0 &&
               matchedInvite.acceptedPersonId !== deviceUserId &&
-              (matchesInviteeName ||
-                (inviteeNameText.length === 0 && personNameIsEmpty));
+              personNameIsEmpty;
 
             return {
               ...person,

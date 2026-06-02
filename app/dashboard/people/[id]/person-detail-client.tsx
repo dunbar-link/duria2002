@@ -499,41 +499,86 @@ export default function PersonDetailClient({ person }: Props) {
   }
 
   async function handleSendInvite() {
-  const { inviteDraft, inviteUrl, shareTitle, shareText } =
-    buildInviteSharePayload();
-
-  try {
-    await syncInviteDraftToRemote(inviteDraft);
-
-    // ✅ 카카오 / 문자 선택 UX
+    const { inviteDraft, inviteUrl, shareTitle, shareText } =
+      buildInviteSharePayload();
     const fullText = `${shareTitle}\n${shareText}`;
 
-    if (typeof navigator !== "undefined" && navigator.share) {
-      await navigator.share({
-        title: shareTitle,
-        text: shareText,
-        url: inviteUrl,
-      });
+    // 모바일 Web Share 는 user-gesture tick 안에서 호출돼야 한다(특히 iOS Safari).
+    // 원격 저장(syncInviteDraftToRemote)을 await 로 먼저 기다리면 gesture 가
+    // 소실되어 navigator.share 가 막히고 clipboard fallback 만 탔다.
+    // 해결: 저장은 await 없이 "시작"만 하고, navigator.share 를 첫 await 이전에
+    // 호출해 gesture 를 보존한다. 저장 결과(reject 포함)는 share 이후 회수한다.
+    // app/dashboard/page.tsx 의 handleSendInviteForPerson 과 동일 원칙.
+    const saveResult = syncInviteDraftToRemote(inviteDraft).then(
+      () => ({ ok: true as const }),
+      (err: unknown) => ({ ok: false as const, err }),
+    );
+
+    const canShare =
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function";
+
+    let shareOutcome: "shared" | "aborted" | "none" = "none";
+
+    if (canShare) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: inviteUrl,
+        });
+        shareOutcome = "shared";
+      } catch (err) {
+        const name = (err as { name?: string } | undefined)?.name;
+        if (name === "AbortError") {
+          // 사용자가 공유창을 닫음 → 복사 완료로 오인시키지 않는다.
+          shareOutcome = "aborted";
+        } else {
+          console.warn("[invite] navigator.share 실패, 링크 복사로 대체:", err);
+          shareOutcome = "none";
+        }
+      }
+    }
+
+    const saved = await saveResult;
+
+    if (!saved.ok) {
+      setSavedMessageTone("neutral");
+      setSavedMessage("초대에 실패했어요.");
+      return;
+    }
+
+    if (shareOutcome === "shared") {
       setSavedMessageTone("success");
       setSavedMessage("공유 창을 열었어요.");
       return;
     }
 
-    // fallback: 복사
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(fullText);
-      setSavedMessageTone("success");
-      setSavedMessage("링크를 복사했어요. 카톡에 붙여넣어 보내세요.");
+    if (shareOutcome === "aborted") {
+      setSavedMessageTone("neutral");
+      setSavedMessage("공유를 취소했어요.");
       return;
+    }
+
+    // Web Share 미지원/비-secure context → 링크 복사 fallback.
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function"
+    ) {
+      try {
+        await navigator.clipboard.writeText(fullText);
+        setSavedMessageTone("success");
+        setSavedMessage("링크를 복사했어요. 카톡에 붙여넣어 보내세요.");
+        return;
+      } catch {
+        // clipboard 도 실패하면 아래 안내로 떨어진다.
+      }
     }
 
     setSavedMessageTone("neutral");
     setSavedMessage("공유를 지원하지 않는 환경이에요.");
-  } catch {
-    setSavedMessageTone("neutral");
-    setSavedMessage("초대에 실패했어요.");
   }
-}
 
   async function handleCopyInviteLink() {
     const { inviteDraft, inviteUrl } = buildInviteSharePayload();

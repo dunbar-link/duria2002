@@ -2465,12 +2465,6 @@ const isJoined =
         relationshipType: targetPerson.relationshipType,
       });
 
-    const saved = await ensureRemoteInviteDraft(draft);
-    if (!saved) {
-      setSelectedHomePersonId(targetPerson.id);
-      return;
-    }
-
     const inviteUrl =
       typeof window !== "undefined"
         ? `${window.location.origin}${draft.invitePath}`
@@ -2479,30 +2473,74 @@ const isJoined =
     const shareTitle = "던바링크 초대";
     const shareText = `${targetPerson.name}님, 던바링크에 들어와서 자기 정보를 입력해줘.\n${inviteUrl}`;
 
-    try {
-      if (typeof navigator !== "undefined" && navigator.share) {
+    // 모바일 Web Share 는 user-gesture tick 안에서 호출돼야 한다(특히 iOS Safari).
+    // 원격 저장 fetch 를 await 로 먼저 기다리면 gesture 가 소실되어
+    // navigator.share 가 NotAllowedError 로 막히고 clipboard fallback 만 탔다.
+    // 해결: 저장 fetch 는 await 없이 "시작"만 하고(=동기 dispatch),
+    // navigator.share 를 그 직후(첫 await 이전) 호출해 gesture 를 보존한다.
+    // 저장 결과는 share 이후에 회수한다.
+    const savePromise = ensureRemoteInviteDraft(draft);
+
+    const canShare =
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function";
+
+    let shareOutcome: "shared" | "aborted" | "none" = "none";
+
+    if (canShare) {
+      try {
         await navigator.share({
           title: shareTitle,
           text: shareText,
           url: inviteUrl,
         });
-        setPersonActionFeedback("");
-        return;
+        shareOutcome = "shared";
+      } catch (err) {
+        const name = (err as { name?: string } | undefined)?.name;
+        if (name === "AbortError") {
+          // 사용자가 공유창을 닫음 → 복사 완료로 오인시키지 않는다.
+          shareOutcome = "aborted";
+        } else {
+          console.warn("[invite] navigator.share 실패, 링크 복사로 대체:", err);
+          shareOutcome = "none";
+        }
       }
+    }
 
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
+    const saved = await savePromise;
+
+    if (!saved) {
+      // ensureRemoteInviteDraft 가 실패 피드백을 이미 설정함.
+      setSelectedHomePersonId(targetPerson.id);
+      return;
+    }
+
+    if (shareOutcome === "shared") {
+      // 공유 시트가 열렸으면 중복 토스트를 띄우지 않는다.
+      setPersonActionFeedback("");
+      return;
+    }
+
+    if (shareOutcome === "aborted") {
+      setSelectedHomePersonId(targetPerson.id);
+      setPersonActionFeedback("공유를 취소했어요.");
+      return;
+    }
+
+    // Web Share 미지원/비-secure context → 링크 복사 fallback.
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      try {
         await navigator.clipboard.writeText(`${shareTitle}\n${shareText}`);
         setSelectedHomePersonId(targetPerson.id);
         setPersonActionFeedback("초대 링크를 복사했어요.");
         return;
+      } catch {
+        // clipboard 도 실패하면 아래 안내로 떨어진다.
       }
-
-      setSelectedHomePersonId(targetPerson.id);
-      setPersonActionFeedback("공유 기능을 사용할 수 없어요. 상세에서 다시 시도해 주세요.");
-    } catch {
-      setSelectedHomePersonId(targetPerson.id);
-      setPersonActionFeedback("공유를 취소했어요.");
     }
+
+    setSelectedHomePersonId(targetPerson.id);
+    setPersonActionFeedback("공유 기능을 사용할 수 없어요. 상세에서 다시 시도해 주세요.");
   }
 
   async function handleSendInviteFromPersonSheet() {
