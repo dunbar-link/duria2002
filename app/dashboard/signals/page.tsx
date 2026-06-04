@@ -89,6 +89,7 @@ function removeBlueSignalSenderIds(senderIds: string[]) {
 
 export default function SignalsPage() {
   const people = usePeopleStore((state) => state.people);
+  const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
 
   const [currentUserId, setCurrentUserId] = useState("");
   const [signals, setSignals] = useState<SignalRecord[]>([]);
@@ -119,6 +120,7 @@ export default function SignalsPage() {
         return "나";
       }
 
+      // 1순위: people store 에서 senderId 매핑(직접 라벨링한 이름).
       const matched = people.find((person) => {
         const record = person as unknown as Record<string, unknown>;
         return (
@@ -129,9 +131,42 @@ export default function SignalsPage() {
         );
       });
 
-      return matched?.name || "알 수 없음";
+      if (matched?.name?.trim()) {
+        return matched.name;
+      }
+
+      // 2순위: inviteDrafts 로 senderId 보강. signals 테이블에는 sender_name
+      // 컬럼이 없어(스키마 변경 금지) 렌더 시 senderId 로 이름을 찾아야 하는데,
+      // people 에 아직 반영되지 않은 연결(초대자/수락자)이 있으면 여기서 찾는다.
+      // A 가 me 이름을 바꾸면 refresh-name 으로 inviterName 이 갱신되어 이 경로로
+      // 새 이름이 표시된다. 매핑이 가능하면 "알 수 없음" 으로 떨어지지 않는다.
+      const draftMatch = inviteDrafts.find(
+        (draft) =>
+          (draft.inviterUserId && draft.inviterUserId === userId) ||
+          (draft.acceptedPersonId && draft.acceptedPersonId === userId),
+      );
+
+      if (draftMatch) {
+        if (
+          draftMatch.inviterUserId === userId &&
+          draftMatch.inviterName?.trim()
+        ) {
+          return draftMatch.inviterName;
+        }
+        if (
+          draftMatch.acceptedPersonId === userId &&
+          draftMatch.acceptedPersonName?.trim()
+        ) {
+          return draftMatch.acceptedPersonName;
+        }
+        if (draftMatch.inviteeName?.trim()) {
+          return draftMatch.inviteeName;
+        }
+      }
+
+      return "알 수 없음";
     },
-    [currentUserId, people],
+    [currentUserId, people, inviteDrafts],
   );
 
   const loadSignals = useCallback(async () => {

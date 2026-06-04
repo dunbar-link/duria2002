@@ -398,7 +398,7 @@ export default function DashboardMePage() {
                 aria-label="프로필 사진 기본으로 되돌리기"
                 title="프로필 사진 기본으로 되돌리기"
               >
-                기본으로
+                사진 초기화
               </button>
             ) : null}
           </div>
