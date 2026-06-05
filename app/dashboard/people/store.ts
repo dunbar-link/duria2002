@@ -915,18 +915,17 @@ export const usePeopleStore = create<PeopleState>()(
             }
 
             const acceptedName = cleanText(matchedInvite.acceptedPersonName);
-            const personNameIsEmpty = person.name.trim() === "";
-            // 초대자(PC) 카드명 보존 원칙:
-            // PC 가 이름을 넣어 초대한 카드(person.name 존재)는 수락자의 me
-            // 이름(acceptedPersonName)으로 절대 덮어쓰지 않는다. 이전에는
-            // matchesInviteeName(person.name == inviteeName) 분기 때문에
-            // "테스트A"로 초대한 카드가 수락자 기존 me "기존이름B"로 바뀌었다.
-            // 이제는 카드명이 비어 있던 경우(이름 없이 초대)에만 수락자 이름으로
-            // 채운다. 연결 상태(isJoined/serverId)는 아래에서 항상 반영된다.
+            // 제품 규칙(정정): 연결(accepted) 후에는 counterpart 의 실제 Me 이름이
+            // 정답이다. normalizedRows 는 /api/invites/mine?status=accepted 결과라
+            // 모두 accepted 상태이므로, acceptedPersonName 이 있으면 person.name 을
+            // 갱신한다(연결된 타일의 "?"/옛 이름 제거). 단:
+            //  - acceptedName 이 비어 있으면 기존 local 이름을 지우지 않는다.
+            //  - acceptedPersonId 가 본인(deviceUserId)이면 적용하지 않는다.
+            // (이전 52cff96 의 "초대자 카드명 보존"은 연결 전 단계 기준이었고,
+            //  연결 후에는 본 규칙이 우선한다.)
             const shouldOverwriteName =
               acceptedName.length > 0 &&
-              matchedInvite.acceptedPersonId !== deviceUserId &&
-              personNameIsEmpty;
+              matchedInvite.acceptedPersonId !== deviceUserId;
 
             return {
               ...person,
