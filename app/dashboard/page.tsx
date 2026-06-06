@@ -1007,6 +1007,30 @@ useEffect(() => {
     return getHomeLayerDerivedStateMap(layoutState, folders);
   }, [layoutState, folders]);
 
+  // Home stale 방지: 타일 라벨은 모듈 전역 personCatalog 에서 오는데, catalog 는
+  // effect(렌더 후)에서 갱신되어 people 변경 직후 렌더에는 옛 이름이 남았다
+  // (People/Signals 는 김철수2 인데 Home 만 철수임시). 렌더 중(useMemo)에 people 의
+  // 최신 getPersonDisplayName 으로 catalog 의 이름 필드만 동기화해, 같은 렌더
+  // 패스에서 타일이 최신 displayName 을 읽도록 한다. urgent 등 다른 필드 보존을
+  // 위해 entry 를 교체하지 않고 이름/이니셜만 mutate 한다(신규 person 만 등록).
+  useMemo(() => {
+    if (!hasHydrated) {
+      return null;
+    }
+    for (const person of people) {
+      const display = getPersonDisplayName(person);
+      const existing = personCatalog[person.id];
+      if (existing) {
+        existing.canonicalName = display;
+        existing.myAlias = display;
+        existing.initials = getInitialsFromName(display);
+      } else {
+        registerAddedPersonToHomeCatalog({ id: person.id, name: display });
+      }
+    }
+    return null;
+  }, [people, hasHydrated]);
+
   const occupiedEntityIds = useMemo<Set<string>>(() => {
   const set = new Set<string>();
 

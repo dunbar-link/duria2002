@@ -519,11 +519,11 @@ export const usePeopleStore = create<PeopleState>()(
       },
 
       // 내가 친구를 부르는 표시 이름(별명)을 직접 수정한다.
-      // - alias 가 비어 있지 않으면: 표시 이름(person.name) = alias, localAlias 보존.
-      // - alias 를 비우면: localAlias 제거 후 person.name 을 remoteProfileName
-      //   (없으면 기존 이름)으로 되돌린다.
-      // remote sync(syncAcceptedInvitesToPeople)는 localAlias 가 있으면 name 을
-      // 덮어쓰지 않으므로, 사용자가 지정한 별명이 상대 이름 변경에 의해 사라지지 않는다.
+      // - localAlias 만 변경한다. person.name(canonical)/remoteProfileName 은
+      //   별명으로 절대 오염시키지 않는다(기본정보 이름 = remoteProfileName 보존).
+      // - 별명 해제(빈 값) 시 localAlias 제거 + person.name 을 remoteProfileName 으로
+      //   치료한다(과거 오염 데이터 복구). 화면 표시는 getPersonDisplayName 이
+      //   localAlias > remoteProfileName > name 으로 계산한다.
       updatePersonAlias: (id, alias) => {
         const trimmedId = id.trim();
         if (!trimmedId) {
@@ -535,14 +535,19 @@ export const usePeopleStore = create<PeopleState>()(
             if (person.id !== trimmedId) {
               return person;
             }
-            // localAlias 만 변경한다. person.name(canonical=상대 실제 이름)과
-            // remoteProfileName 은 절대 건드리지 않는다.
-            // 화면 표시 이름은 getPersonDisplayName resolver 가
-            // localAlias > remoteProfileName > name 순으로 계산하므로,
-            // 별명을 비우면(undefined) 자동으로 remoteProfileName 으로 복귀한다.
+            if (nextAlias) {
+              // 별명 설정: localAlias 만 설정. canonical(name/remoteProfileName) 미변경.
+              return { ...person, localAlias: nextAlias };
+            }
+            // 별명 해제: localAlias 제거 + canonical 복구.
+            // 과거 코드가 person.name 을 별명으로 오염시켰을 수 있어,
+            // remoteProfileName(상대 실제 이름)이 유효하면 그 값으로 person.name 을
+            // 치료한다. 없으면 기존 이름 유지(다음 sync 가 서버 remoteName 으로 치료).
+            const remoteName = cleanText(person.remoteProfileName);
             return {
               ...person,
-              localAlias: nextAlias || undefined,
+              localAlias: undefined,
+              name: remoteName || person.name,
             };
           }),
         }));

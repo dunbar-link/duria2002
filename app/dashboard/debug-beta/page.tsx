@@ -639,19 +639,28 @@ export default function DashboardDebugBetaPage() {
                 inv?.accepted_person_name?.trim() ||
                 inv?.inviter_name?.trim() ||
                 "";
+              const personNameTrim = p.name?.trim() ?? "";
+              // canonical(person.name / remoteProfileName)이 서버 실명(remoteName)과
+              // 다르면 과거 별명 오염 또는 sync 미반영이다. localAlias 유무와 무관하게
+              // 데이터 무결성 문제로 먼저 표시한다.
+              const canonicalContaminated = Boolean(
+                remoteName &&
+                  ((remoteProfileName &&
+                    normalizeName(remoteProfileName) !==
+                      normalizeName(remoteName)) ||
+                    (personNameTrim &&
+                      normalizeName(personNameTrim) !==
+                        normalizeName(remoteName))),
+              );
               let verdict = "OK";
               if (!inv) {
                 verdict = "matched invite MISSING";
-              } else if (localAlias) {
-                verdict = "alias active (display=alias)";
               } else if (!remoteProfileName && !remoteName) {
                 verdict = "remote missing";
-              } else if (
-                remoteName &&
-                remoteProfileName &&
-                normalizeName(remoteName) !== normalizeName(remoteProfileName)
-              ) {
-                verdict = "server NEWER than store (sync pending)";
+              } else if (canonicalContaminated) {
+                verdict = "CANONICAL_CONTAMINATED (store name != server)";
+              } else if (localAlias) {
+                verdict = "ALIAS_ACTIVE (display=alias)";
               }
               // counterpart 방향 진단: 내가 inviter 인지 acceptedPerson 인지.
               const iAmInviter = Boolean(
