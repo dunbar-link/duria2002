@@ -273,24 +273,23 @@ function clearPendingInviteToken() {
   window.localStorage.removeItem(PENDING_INVITE_META_STORAGE_KEY);
 }
 
-function getInviteeNameFromRow(row: Record<string, unknown>) {
-  // dl_invites에 placeholder("초대받은 사람")를 박제하지 않는다.
-  // me 이름이 비어있으면 invite 시 정호가 입력한 invitee_name으로 fallback.
-  // 모두 비어있으면 빈 문자열 → /api/invites/accept 가 400으로 거부하여
-  // 보류 상태 유지. 사용자가 me 이름 입력 후 재시도되거나 invitee_name이
-  // 채워진 시점에 정상 수락된다.
+function getAcceptedSelfNameFromRow(row: Record<string, unknown>) {
+  // 자동 수락(보류 토큰) 시 사용할 "수락자 본인" 이름을 결정한다.
+  // 버그 수정: invitee_name 은 초대자가 입력한 수락자 임시 카드명일 뿐,
+  // 수락자의 실제 이름이 아니다. 이를 자동 채택하면 수락자 Me 이름이
+  // "철수" 같은 임시명으로 오염된다(완료 화면/연결 person 도 어긋남).
+  // 따라서 수락자 이름은 (1) 수락자 자신의 Me 이름(meName), 또는
+  // (2) 이미 저장된 acceptedPersonName(이전에 폼으로 직접 입력한 값) 으로만
+  // 결정한다. 둘 다 없으면 "" → /api/invites/accept 가 400 으로 거부 →
+  // 보류 유지 → 수락자가 자기 이름을 입력해야만 수락된다(invitee_name 미사용).
   const rawMeName = readMeProfileName();
-  // "나"/빈 값은 실제 이름이 아니므로 무시한다. 모두 비어 있으면 빈 문자열을
-  // 반환하여 /api/invites/accept 가 400 으로 거부하고 보류 상태를 유지한다.
   const meName = isIncompleteMeName(rawMeName) ? "" : rawMeName;
   const acceptedName =
     typeof row.accepted_person_name === "string"
       ? row.accepted_person_name.trim()
       : "";
-  const inviteeName =
-    typeof row.invitee_name === "string" ? row.invitee_name.trim() : "";
 
-  return meName || acceptedName || inviteeName || "";
+  return meName || acceptedName || "";
 }
 
 function getTierByLayerId(layerId: string): 1 | 5 | 15 | 50 | 150 {
@@ -885,7 +884,7 @@ useEffect(() => {
 
       const inviteRow = (await inviteRes.json()) as Record<string, unknown>;
 
-      const acceptedPersonName = getInviteeNameFromRow(
+      const acceptedPersonName = getAcceptedSelfNameFromRow(
         inviteRow as Record<string, unknown>,
       );
 

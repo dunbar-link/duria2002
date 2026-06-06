@@ -136,9 +136,11 @@ export default function DashboardDebugBetaPage() {
   } | null>(null);
   const [remoteInvites, setRemoteInvites] = useState<RemoteInviteRow[]>([]);
   const [remoteError, setRemoteError] = useState<string>("");
+  const [myUserId, setMyUserId] = useState<string>("");
 
   useEffect(() => {
     setHome(readHomeLayoutFromStorage());
+    setMyUserId(getCurrentUserId());
   }, []);
 
   useEffect(() => {
@@ -611,6 +613,9 @@ export default function DashboardDebugBetaPage() {
           display = localAlias &gt; remoteProfileName &gt; name. invite.* 는 서버
           /api/invites/mine 값(refresh-name 반영 여부 확인용).
         </p>
+        <div className="mb-2">
+          <KV k="myUserId(getCurrentUserId)" v={myUserId || "-"} />
+        </div>
         {classified.accepted.length === 0 ? (
           <p className="text-[#64748B]">accepted person 없음</p>
         ) : (
@@ -648,6 +653,20 @@ export default function DashboardDebugBetaPage() {
               ) {
                 verdict = "server NEWER than store (sync pending)";
               }
+              // counterpart 방향 진단: 내가 inviter 인지 acceptedPerson 인지.
+              const iAmInviter = Boolean(
+                inv && myUserId && inv.inviter_user_id === myUserId,
+              );
+              const iAmAccepter = Boolean(
+                inv && myUserId && inv.accepted_person_id === myUserId,
+              );
+              const counterpartRole = !inv
+                ? "-"
+                : iAmInviter
+                  ? `나=inviter · counterpart=accepter(${inv.accepted_person_name ?? "-"})`
+                  : iAmAccepter
+                    ? `나=acceptedPerson · counterpart=inviter(${inv.inviter_name ?? "-"})`
+                    : "role 불명 (myUserId 가 invite 의 inviter/accepted 와 불일치)";
               return (
                 <li
                   key={p.id}
@@ -707,6 +726,10 @@ export default function DashboardDebugBetaPage() {
                       <span className="text-[#64748B]">invite.status:</span>{" "}
                       {inv?.status ?? "-"}
                     </div>
+                  </div>
+                  <div className="mt-1 text-[10px] text-[#CBD5E1]">
+                    <span className="text-[#64748B]">counterpart:</span>{" "}
+                    {counterpartRole}
                   </div>
                   <div
                     className={`mt-1 text-[10px] font-semibold ${

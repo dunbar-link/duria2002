@@ -7,6 +7,7 @@ import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
   isIncompleteMeName,
   ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileName,
   writeMeProfileNameIfEmpty,
 } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../../dashboard/people/store";
@@ -66,6 +67,9 @@ export default function InviteEntryPage() {
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
   const getInviteDraftByToken = usePeopleStore((state) => state.getInviteDraftByToken);
   const acceptInvite = usePeopleStore((state) => state.acceptInvite);
+  const syncAcceptedInvitesToPeople = usePeopleStore(
+    (state) => state.syncAcceptedInvitesToPeople,
+  );
 
   const [invite, setInvite] = useState<InviteRow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,7 +100,12 @@ export default function InviteEntryPage() {
 
       const data = (await res.json()) as InviteRow;
       setInvite(data);
-      setForm({ name: "", phone: data.invitee_phone ?? "" });
+      // 폼 기본값은 "수락자 본인" 이름이어야 한다. invitee_name(초대자가 입력한
+      // 임시 카드명)은 절대 기본값으로 쓰지 않는다. 기존 Me 이름이 유효하면
+      // 그 값을 채워 재입력 부담을 줄이고, 없거나 "나"면 빈칸으로 둔다.
+      const existingMe = readMeProfileName();
+      const defaultName = isIncompleteMeName(existingMe) ? "" : existingMe;
+      setForm({ name: defaultName, phone: data.invitee_phone ?? "" });
       setIsLoading(false);
     }
 
@@ -190,6 +199,13 @@ export default function InviteEntryPage() {
 
       writeMeProfileNameIfEmpty(trimmedName);
 
+      // 수락 직후 수락자 기기에도 초대자(inviter)를 connected person 으로
+      // 생성한다. syncAcceptedInvitesToPeople 의 inviterPeople 경로가
+      // /api/invites/mine(=서버 row, inviter_user_id/inviter_name 포함)을 읽어
+      // 만들어 주므로, Home 진입 전에도 양방향 연결이 준비되고 새로고침 후에도
+      // 복구된다.
+      void syncAcceptedInvitesToPeople();
+
       if (localInviteExists) {
         acceptInvite({
           token,
@@ -258,7 +274,9 @@ export default function InviteEntryPage() {
             <p className="text-sm font-semibold text-slate-500">초대 링크</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">연결됐어요</h1>
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              {invite.accepted_person_name ?? "상대"}님과 연결됐어요.
+              {/* 수락자 기준 counterpart 는 초대자(inviter)다. 수락자 본인 이름
+                  (accepted_person_name)이 아니라 inviter_name 을 보여준다. */}
+              {invite.inviter_name?.trim() || "상대"}님과 연결됐어요.
             </p>
             <div className="mt-5 grid grid-cols-1 gap-3">
               <Link href="/dashboard" className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white">
