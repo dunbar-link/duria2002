@@ -3,6 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { getCurrentUserId } from "@/lib/auth/current-user";
+import { isIncompleteMeName } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../people/store";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
@@ -229,7 +230,10 @@ export default function DashboardMePage() {
   useEffect(() => {
     if (!isLoaded) return;
     const trimmed = profile.name.trim();
-    if (!trimmed) return;
+    // 빈 값 또는 "나"(임시 placeholder)면 refresh-name 을 호출하지 않는다.
+    // "나"/빈 값이 dl_invites 의 inviter_name / accepted_person_name 으로
+    // 박제되는 것을 막는다.
+    if (isIncompleteMeName(trimmed)) return;
 
     const handle = window.setTimeout(() => {
       const userId = getCurrentUserId();

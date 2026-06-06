@@ -5,6 +5,11 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AddDashboardPersonInput } from "../data";
 import { usePeopleStore } from "../store";
+import {
+  isIncompleteMeName,
+  ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileName,
+} from "@/lib/me/profile-name";
 
 const tierOptions: Array<{
   value: AddDashboardPersonInput["tier"];
@@ -222,6 +227,13 @@ ${latestInviteUrl}`;
 
     if (!trimmedName) {
       showFeedback("이름을 입력해 주세요.");
+      return;
+    }
+
+    // 초대를 보내려면 내(me) 이름이 실제 이름이어야 한다. "나"/빈 값이면
+    // draft 생성·서버 upsert 를 막고 이름 입력을 안내한다.
+    if (isIncompleteMeName(readMeProfileName())) {
+      showFeedback(ME_NAME_REQUIRED_MESSAGE);
       return;
     }
 

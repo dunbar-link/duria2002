@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
-import { writeMeProfileNameIfEmpty } from "@/lib/me/profile-name";
+import {
+  isIncompleteMeName,
+  ME_NAME_REQUIRED_MESSAGE,
+  writeMeProfileNameIfEmpty,
+} from "@/lib/me/profile-name";
 import { usePeopleStore } from "../../dashboard/people/store";
 
 type InviteRow = {
@@ -143,9 +147,11 @@ export default function InviteEntryPage() {
     if (isSubmitting || !invite) return;
 
     const trimmedName = form.name.trim();
-    if (!trimmedName) {
+    // 빈 값 또는 "나"면 수락을 막는다. acceptedPersonName 으로 "나"가
+    // 저장되는 것을 방지한다.
+    if (isIncompleteMeName(trimmedName)) {
       setFeedbackTone("error");
-      setFeedback("이름을 입력해 주세요.");
+      setFeedback(ME_NAME_REQUIRED_MESSAGE);
       return;
     }
 

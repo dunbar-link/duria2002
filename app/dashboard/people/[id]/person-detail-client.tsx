@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { sendSignal } from "@/lib/signal/send-signal";
+import {
+  isIncompleteMeName,
+  ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileName,
+} from "@/lib/me/profile-name";
 import SignalBottomSheet from "../../_components/home/signal-bottom-sheet";
 import { DashboardPerson } from "../data";
 import {
@@ -499,6 +504,13 @@ export default function PersonDetailClient({ person }: Props) {
   }
 
   async function handleSendInvite() {
+    // me 이름이 미완성("나"/빈 값)이면 초대 draft 생성·원격 저장·공유를 막는다.
+    if (isIncompleteMeName(readMeProfileName())) {
+      setSavedMessageTone("neutral");
+      setSavedMessage(ME_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+
     const { inviteDraft, inviteUrl, shareTitle, shareText } =
       buildInviteSharePayload();
     const fullText = `${shareTitle}\n${shareText}`;
@@ -581,6 +593,13 @@ export default function PersonDetailClient({ person }: Props) {
   }
 
   async function handleCopyInviteLink() {
+    // me 이름이 미완성이면 초대 draft 생성·원격 저장·링크 복사를 막는다.
+    if (isIncompleteMeName(readMeProfileName())) {
+      setSavedMessageTone("neutral");
+      setSavedMessage(ME_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+
     const { inviteDraft, inviteUrl } = buildInviteSharePayload();
 
     try {
@@ -711,6 +730,11 @@ export default function PersonDetailClient({ person }: Props) {
                 if (!isJoined || !receiverUserId) {
                   setSavedMessageTone("neutral");
                   setSavedMessage("가입 완료 후 신호를 보낼 수 있어요.");
+                  return;
+                }
+                if (isIncompleteMeName(readMeProfileName())) {
+                  setSavedMessageTone("neutral");
+                  setSavedMessage(ME_NAME_REQUIRED_MESSAGE);
                   return;
                 }
                 setSignalOpen(true);

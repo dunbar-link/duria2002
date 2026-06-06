@@ -1,7 +1,7 @@
 "use client";
 
 import { getCurrentUserId } from "@/lib/auth/current-user";
-import { readMeProfileName } from "@/lib/me/profile-name";
+import { isIncompleteMeName, readMeProfileName } from "@/lib/me/profile-name";
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -754,10 +754,13 @@ export const usePeopleStore = create<PeopleState>()(
           getDefaultRelationshipLabel(relationshipType);
 
         const inviterUserId = getCurrentUserId() || null;
-        // me 이름이 비어 있을 때 placeholder("초대한 사람")를 dl_invites에
-        // 박제하지 않는다. null로 두면 나중에 me 이름이 채워졌을 때
+        // me 이름이 비어 있거나 "나"(placeholder)면 dl_invites에 박제하지
+        // 않는다. null로 두면 나중에 me 이름이 채워졌을 때
         // /api/invites/refresh-name 으로 일괄 동기화된다.
-        const inviterName = readMeProfileName() || null;
+        const rawInviterName = readMeProfileName();
+        const inviterName = isIncompleteMeName(rawInviterName)
+          ? null
+          : rawInviterName;
 
         const draft: InviteDraft = {
           token,

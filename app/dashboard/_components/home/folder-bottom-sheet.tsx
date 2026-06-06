@@ -2,6 +2,11 @@
 
 import { sendSignal } from "@/lib/signal/send-signal";
 import { getCurrentUserId } from "@/lib/auth/current-user";
+import {
+  isIncompleteMeName,
+  ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileName,
+} from "@/lib/me/profile-name";
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { useLongPress } from "../use-long-press";
 import type {
@@ -416,6 +421,12 @@ export default function FolderBottomSheet({
   }
 
   function handleOpenSignalSheet() {
+    // me 이름이 미완성이면 폴더 신호 시트를 열지 않고 이름 입력을 안내한다.
+    if (isIncompleteMeName(readMeProfileName())) {
+      setSignalFeedback(ME_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+
     if (!canSendFolderSignal) {
       setSignalFeedback("연결된 사람이 아직 없어요. 먼저 초대해 주세요.");
       return;

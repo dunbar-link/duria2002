@@ -3,6 +3,8 @@
 import { subscribePushForUser } from "@/lib/push/push-client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
+  isIncompleteMeName,
+  ME_NAME_REQUIRED_MESSAGE,
   readMeProfileName,
   writeMeProfileNameIfEmpty,
 } from "@/lib/me/profile-name";
@@ -276,7 +278,10 @@ function getInviteeNameFromRow(row: Record<string, unknown>) {
   // 모두 비어있으면 빈 문자열 → /api/invites/accept 가 400으로 거부하여
   // 보류 상태 유지. 사용자가 me 이름 입력 후 재시도되거나 invitee_name이
   // 채워진 시점에 정상 수락된다.
-  const meName = readMeProfileName();
+  const rawMeName = readMeProfileName();
+  // "나"/빈 값은 실제 이름이 아니므로 무시한다. 모두 비어 있으면 빈 문자열을
+  // 반환하여 /api/invites/accept 가 400 으로 거부하고 보류 상태를 유지한다.
+  const meName = isIncompleteMeName(rawMeName) ? "" : rawMeName;
   const acceptedName =
     typeof row.accepted_person_name === "string"
       ? row.accepted_person_name.trim()
@@ -2178,6 +2183,13 @@ useEffect(() => {
       return;
     }
 
+    // me 이름이 미완성이면 신호 시트를 열지 않고 이름 입력을 안내한다.
+    if (isIncompleteMeName(readMeProfileName())) {
+      setSelectedHomePersonId(targetPerson.id);
+      setPersonActionFeedback(ME_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+
     const latestInviteDraft =
       inviteDrafts
         .filter((item) => item.sourcePersonId === targetPerson.id)
@@ -2341,6 +2353,14 @@ const isJoined =
 
     // 🔵 파란점: 받은 신호가 있으면 클릭 즉시 읽음 처리 후 바로 답장 신호를 연다.
     if (blueSignalSenderIds.includes(targetPerson.id) && receiverUserId) {
+      // me 이름이 미완성이면 답장 신호 시트를 열지 않고(파란점도 유지) 이름
+      // 입력을 안내한다.
+      if (isIncompleteMeName(readMeProfileName())) {
+        setSelectedHomePersonId(targetPerson.id);
+        setPersonActionFeedback(ME_NAME_REQUIRED_MESSAGE);
+        return;
+      }
+
       const currentUserId = getCurrentUserId();
 
       setSignalTarget({
@@ -2445,6 +2465,14 @@ const isJoined =
   }
 
   async function handleSendInviteForPerson(targetPerson: (typeof people)[number]) {
+    // me 이름이 미완성("나"/빈 값)이면 초대 draft 생성·서버 upsert·공유 시트를
+    // 모두 막고 이름 입력을 안내한다.
+    if (isIncompleteMeName(readMeProfileName())) {
+      setSelectedHomePersonId(targetPerson.id);
+      setPersonActionFeedback(ME_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+
     // 같은 사람한테 이미 pending invite 가 있으면 새 draft 를 만들지 않고
     // 그대로 재사용한다. createInviteDraft 는 호출될 때마다 새 token 으로
     // local draft 를 누적 push 하므로, 명시 "초대 보내기" 버튼을 여러 번
