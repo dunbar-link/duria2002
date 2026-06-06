@@ -90,6 +90,9 @@ function removeBlueSignalSenderIds(senderIds: string[]) {
 export default function SignalsPage() {
   const people = usePeopleStore((state) => state.people);
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
+  const syncAcceptedInvitesToPeople = usePeopleStore(
+    (state) => state.syncAcceptedInvitesToPeople,
+  );
 
   const [currentUserId, setCurrentUserId] = useState("");
   const [signals, setSignals] = useState<SignalRecord[]>([]);
@@ -101,6 +104,13 @@ export default function SignalsPage() {
     const userId = getCurrentUserId();
     setCurrentUserId(userId);
   }, []);
+
+  // 신호함 진입 시에도 연결된 사람 이름을 최신화한다. 상대가 Me 이름을
+  // 바꾸면(refresh-name) /api/invites/mine 재조회로 people.name 이 갱신되어
+  // 보낸사람/받는사람 표시가 stale 되지 않는다.
+  useEffect(() => {
+    void syncAcceptedInvitesToPeople();
+  }, [syncAcceptedInvitesToPeople]);
 
   const unreadSignals = useMemo(() => {
     return signals.filter(

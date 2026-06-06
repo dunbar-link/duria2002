@@ -4,7 +4,7 @@ const PROFILE_STORAGE_KEY_V1 = "dunbar-link-me-profile-v1";
 export const PROFILE_UPDATED_EVENT = "dunbar-link-me-profile-updated";
 
 /** 핵심 기능(초대/수락/신호) 차단 시 보여줄 정확한 안내 문구. */
-export const ME_NAME_REQUIRED_MESSAGE = "이름을 입력하세요";
+export const ME_NAME_REQUIRED_MESSAGE = "먼저 자신의 이름을 입력하세요";
 
 /**
  * me 이름이 "미완성"인지 판정한다.

@@ -129,6 +129,7 @@ type PeopleState = {
 
   addPerson: (input: AddDashboardPersonInput) => DashboardPerson;
   updatePersonTier: (id: string, tier: DashboardTier) => void;
+  updatePersonAlias: (id: string, alias: string) => void;
   markContacted: (id: string, at?: string) => void;
   snooze: (id: string, days?: number) => void;
   snoozePerson: (id: string) => void;
@@ -517,6 +518,33 @@ export const usePeopleStore = create<PeopleState>()(
         });
       },
 
+      // 내가 친구를 부르는 표시 이름(별명)을 직접 수정한다.
+      // - alias 가 비어 있지 않으면: 표시 이름(person.name) = alias, localAlias 보존.
+      // - alias 를 비우면: localAlias 제거 후 person.name 을 remoteProfileName
+      //   (없으면 기존 이름)으로 되돌린다.
+      // remote sync(syncAcceptedInvitesToPeople)는 localAlias 가 있으면 name 을
+      // 덮어쓰지 않으므로, 사용자가 지정한 별명이 상대 이름 변경에 의해 사라지지 않는다.
+      updatePersonAlias: (id, alias) => {
+        const trimmedId = id.trim();
+        if (!trimmedId) {
+          return;
+        }
+        const nextAlias = cleanText(alias);
+        set((state) => ({
+          people: state.people.map((person) => {
+            if (person.id !== trimmedId) {
+              return person;
+            }
+            const remoteName = cleanText(person.remoteProfileName);
+            return {
+              ...person,
+              localAlias: nextAlias || undefined,
+              name: nextAlias || remoteName || person.name,
+            };
+          }),
+        }));
+      },
+
       markContacted: (id, at) =>
         set((state) => ({
           people: state.people.map((person) =>
@@ -884,10 +912,12 @@ export const usePeopleStore = create<PeopleState>()(
           const updatedPeople = state.people.map((person) => {
             const extended = person as DashboardPerson &
               Record<string, unknown>;
-            const currentUserId = getStoredUserId(extended);
+            const counterpartId = getStoredUserId(extended);
             const personName = normalizePersonName(person.name);
 
-            const matchedInvite = normalizedRows.find((item) => {
+            // 방향 1: 상대가 "수락자"(내가 초대자)인 초대.
+            // 이때 상대의 현재 이름은 acceptedPersonName 이다.
+            const acceptedInvite = normalizedRows.find((item) => {
               if (
                 item.acceptedPersonId &&
                 item.acceptedPersonId === deviceUserId
@@ -897,7 +927,7 @@ export const usePeopleStore = create<PeopleState>()(
                 return true;
               if (
                 item.acceptedPersonId &&
-                item.acceptedPersonId === currentUserId
+                item.acceptedPersonId === counterpartId
               )
                 return true;
               if (
@@ -913,35 +943,69 @@ export const usePeopleStore = create<PeopleState>()(
               return false;
             });
 
-            if (!matchedInvite) {
+            // 방향 2(버그 수정): 상대가 "초대자"(내가 수락자)인 초대.
+            // 이때 상대의 현재 이름은 inviterName 이다. 기존에는 이 방향이
+            // 위 matcher 의 `acceptedPersonId === deviceUserId` 조건에서 제외돼,
+            // 상대가 Me 이름을 바꿔도(refresh-name → inviter_name 갱신) 기존
+            // person.name 이 갱신되지 않았다. (철수 → 김철수 미반영 원인)
+            const inviterInvite = normalizedRows.find((item) => {
+              if (item.acceptedPersonId !== deviceUserId) return false;
+              if (item.inviterUserId && item.inviterUserId === deviceUserId)
+                return false;
+              if (item.sourcePersonId && item.sourcePersonId === person.id)
+                return true;
+              if (item.inviterUserId && item.inviterUserId === counterpartId)
+                return true;
+              if (
+                item.inviterName &&
+                normalizePersonName(item.inviterName) === personName
+              )
+                return true;
+              return false;
+            });
+
+            if (!acceptedInvite && !inviterInvite) {
               return person;
             }
 
-            const acceptedName = cleanText(matchedInvite.acceptedPersonName);
-            // 제품 규칙(정정): 연결(accepted) 후에는 counterpart 의 실제 Me 이름이
-            // 정답이다. normalizedRows 는 /api/invites/mine?status=accepted 결과라
-            // 모두 accepted 상태이므로, acceptedPersonName 이 있으면 person.name 을
-            // 갱신한다(연결된 타일의 "?"/옛 이름 제거). 단:
-            //  - acceptedName 이 비어 있으면 기존 local 이름을 지우지 않는다.
-            //  - acceptedPersonId 가 본인(deviceUserId)이면 적용하지 않는다.
-            // (이전 52cff96 의 "초대자 카드명 보존"은 연결 전 단계 기준이었고,
-            //  연결 후에는 본 규칙이 우선한다.)
-            const shouldOverwriteName =
-              acceptedName.length > 0 &&
-              matchedInvite.acceptedPersonId !== deviceUserId;
+            // 상대의 현재 remote 이름: 방향1(acceptedPersonName) 우선,
+            // 없으면 방향2(inviterName). 본인(deviceUserId)이면 적용하지 않는다.
+            const acceptedName =
+              acceptedInvite &&
+              acceptedInvite.acceptedPersonId !== deviceUserId
+                ? cleanText(acceptedInvite.acceptedPersonName)
+                : "";
+            const inviterName =
+              inviterInvite && inviterInvite.inviterUserId !== deviceUserId
+                ? cleanText(inviterInvite.inviterName)
+                : "";
+            const remoteName = acceptedName || inviterName;
+
+            // 내가 직접 지정한 별명(localAlias)이 있으면 remote 이름이
+            // 표시 이름을 덮어쓰지 않는다(친구 이름 직접 수정 보존).
+            const aliasName = cleanText(person.localAlias);
+
+            const counterpartUserId =
+              (acceptedInvite?.acceptedPersonId ??
+                inviterInvite?.inviterUserId ??
+                counterpartId) ||
+              undefined;
+
+            const linkAcceptedAt =
+              acceptedInvite?.acceptedAt ?? inviterInvite?.acceptedAt ?? now;
 
             return {
               ...person,
-              name: shouldOverwriteName ? acceptedName : person.name,
+              // 표시 이름 우선순위: alias > remote > 기존.
+              // remoteName 이 비어 있으면 기존 이름을 지우지 않는다.
+              name: aliasName || remoteName || person.name,
+              remoteProfileName:
+                remoteName || person.remoteProfileName || undefined,
               isJoined: true,
-              userId:
-                (matchedInvite.acceptedPersonId ?? currentUserId) || undefined,
-              dlUserId:
-                (matchedInvite.acceptedPersonId ?? currentUserId) || undefined,
-              acceptedPersonId:
-                (matchedInvite.acceptedPersonId ?? currentUserId) || undefined,
-              lastContactAt:
-                person.lastContactAt ?? matchedInvite.acceptedAt ?? now,
+              userId: counterpartUserId,
+              dlUserId: counterpartUserId,
+              acceptedPersonId: counterpartUserId,
+              lastContactAt: person.lastContactAt ?? linkAcceptedAt,
             };
           });
 
@@ -1031,6 +1095,7 @@ export const usePeopleStore = create<PeopleState>()(
                 userId: acceptedUserId || undefined,
                 dlUserId: acceptedUserId || undefined,
                 acceptedPersonId: acceptedUserId || undefined,
+                remoteProfileName: acceptedName || undefined,
                 lastContactAt: item.acceptedAt ?? now,
                 lastContactedAt: item.acceptedAt ?? now,
               } as DashboardPerson;
@@ -1090,6 +1155,7 @@ export const usePeopleStore = create<PeopleState>()(
                 userId: inviterUserId || undefined,
                 dlUserId: inviterUserId || undefined,
                 acceptedPersonId: inviterUserId || undefined,
+                remoteProfileName: inviterName || undefined,
                 lastContactAt: item.acceptedAt ?? now,
                 lastContactedAt: item.acceptedAt ?? now,
               } as DashboardPerson;

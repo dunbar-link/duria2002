@@ -229,6 +229,7 @@ export default function PersonDetailClient({ person }: Props) {
   const syncInviteDraftsFromRemote = usePeopleStore(
     (state) => state.syncInviteDraftsFromRemote,
   );
+  const updatePersonAlias = usePeopleStore((state) => state.updatePersonAlias);
 
   const [note, setNote] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
@@ -237,6 +238,12 @@ export default function PersonDetailClient({ person }: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isHydrated, setIsHydrated] = useState(false);
   const [signalOpen, setSignalOpen] = useState(false);
+  // 친구 표시 이름(별명) 편집 입력값. person.localAlias 와 동기화한다.
+  const [aliasDraft, setAliasDraft] = useState(person.localAlias ?? "");
+
+  useEffect(() => {
+    setAliasDraft(person.localAlias ?? "");
+  }, [person.id, person.localAlias]);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -471,6 +478,18 @@ export default function PersonDetailClient({ person }: Props) {
     setSavedMessageTone("success");
     setSavedMessage("노트를 저장했어요.");
     setRefreshKey((value) => value + 1);
+  }
+
+  // 친구 표시 이름(별명)을 저장한다. 비우면 상대 프로필 이름으로 되돌아간다.
+  // person 은 store 에서 파생되므로 저장 즉시 헤더/People/Home/Signals 에 반영된다.
+  function handleSaveAlias() {
+    updatePersonAlias(person.id, aliasDraft);
+    setSavedMessageTone("success");
+    setSavedMessage(
+      aliasDraft.trim()
+        ? "표시 이름을 저장했어요."
+        : "표시 이름을 원래대로 되돌렸어요.",
+    );
   }
 
   function ensureInviteDraft() {
@@ -757,6 +776,39 @@ export default function PersonDetailClient({ person }: Props) {
                 현재 {remainingSnoozeDays}일 보류 중
               </p>
             ) : null}
+          </div>
+        </section>
+
+        <section className="mt-3 px-4">
+          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-[17px] font-bold">표시 이름</h2>
+              {person.remoteProfileName &&
+              person.remoteProfileName.trim() &&
+              person.remoteProfileName.trim() !== person.name.trim() ? (
+                <span className="shrink-0 text-[12px] font-medium text-[#8D99AE]">
+                  상대 프로필: {person.remoteProfileName.trim()}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
+              내 화면에서만 보이는 이름이에요. 비우면 상대가 입력한 이름으로 표시돼요.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                value={aliasDraft}
+                onChange={(event) => setAliasDraft(event.target.value)}
+                placeholder={person.name || "이름"}
+                className="h-[44px] min-w-0 flex-1 rounded-[14px] border border-transparent bg-white px-3 text-[14px] text-[#0F172A] outline-none ring-1 ring-[#D3D1C7] placeholder:text-[#A9A59A] focus:border-[#4B2E83]"
+              />
+              <button
+                type="button"
+                onClick={handleSaveAlias}
+                className="h-[44px] shrink-0 rounded-[14px] bg-[#079863] px-4 text-[14px] font-bold text-white active:scale-95"
+              >
+                저장
+              </button>
+            </div>
           </div>
         </section>
 

@@ -47,6 +47,13 @@ export type DashboardPerson = {
   kakaoTalkUrl: string | null;
   instagramUsername: string | null;
   messengerUsername: string | null;
+
+  // 연결된 상대가 자기 Me 에 입력한 현재 이름(remote profile name).
+  // sync 로 갱신되며 detail/debug 확인용. 표시에는 localAlias 가 우선한다.
+  remoteProfileName?: string;
+  // 내가 내 화면에서 이 친구를 부르는 별명. 설정 시 remote 이름이
+  // 이를 덮어쓰지 않는다. 비어 있으면 remote/원래 이름을 표시한다.
+  localAlias?: string;
 };
 
 export type AddDashboardPersonInput = {
