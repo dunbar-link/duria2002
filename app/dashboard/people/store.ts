@@ -535,11 +535,19 @@ export const usePeopleStore = create<PeopleState>()(
             if (person.id !== trimmedId) {
               return person;
             }
-            const remoteName = cleanText(person.remoteProfileName);
+            // 별명을 새로 설정하기 직전의 표시 이름(canonical)을 remoteProfileName
+            // 에 보존한다(아직 비어 있을 때만). sync 가 remoteProfileName 을 아직
+            // 못 채운 상태여도, 나중에 별명을 비우면 이 이름으로 정확히 복귀한다.
+            // (052e4e7 버그: remoteProfileName 이 비면 해제 시 별명이 그대로 남던 문제)
+            const preservedRemote =
+              cleanText(person.remoteProfileName) ||
+              (nextAlias ? cleanText(person.name) : "");
             return {
               ...person,
               localAlias: nextAlias || undefined,
-              name: nextAlias || remoteName || person.name,
+              remoteProfileName: preservedRemote || person.remoteProfileName,
+              // 표시 이름 우선순위: alias > 보존된 remote(canonical) > 기존.
+              name: nextAlias || preservedRemote || person.name,
             };
           }),
         }));
@@ -883,6 +891,9 @@ export const usePeopleStore = create<PeopleState>()(
 
         const res = await fetch(
           `/api/invites/mine?userId=${encodeURIComponent(currentUserId)}&status=accepted`,
+          // 브라우저 HTTP 캐시로 stale 이름이 내려오면 Home/People/Signals 가 모두
+          // 옛 이름으로 고정된다. 다른 mine fetch 와 동일하게 no-store 로 강제 최신화.
+          { cache: "no-store" },
         );
 
         const payload = (await res.json().catch(() => null)) as

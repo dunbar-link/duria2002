@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// 연결된 상대의 최신 이름(inviter_name / accepted_person_name)을 항상 최신으로
+// 내려야 하므로 절대 캐시하지 않는다.
+export const dynamic = "force-dynamic";
+
 const ALLOWED_STATUS = new Set(["pending", "accepted"]);
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;

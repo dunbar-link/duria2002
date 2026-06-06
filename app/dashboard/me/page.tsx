@@ -463,6 +463,23 @@ export default function DashboardMePage() {
         onClick={() => {
           window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
           window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
+
+          // 명시 저장 시점에 refresh-name 을 즉시(디바운스 없이) 호출한다.
+          // 디바운스 effect 는 800ms 전 화면 이탈 시 cleanup 으로 취소될 수 있어,
+          // 상대에게 새 이름이 전달되지 않는 경우를 방지한다. "나"/빈 값은 제외.
+          const trimmedName = profile.name.trim();
+          if (!isIncompleteMeName(trimmedName)) {
+            const userId = getCurrentUserId();
+            if (userId) {
+              void fetch("/api/invites/refresh-name", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, name: trimmedName }),
+              }).catch(() => {
+                // silent fail
+              });
+            }
+          }
         }}
         className="mt-2 h-[58px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
       >
