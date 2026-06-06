@@ -12,6 +12,7 @@ import { cn, getEntityLabel } from "./home-page-utils";
 import { personCatalog } from "./home-page-types";
 import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
+import { getPersonDisplayName } from "../../people/data";
 import { getLayerColor } from "./layer-color";
 import { useLongPress } from "../use-long-press";
 
@@ -699,10 +700,21 @@ export function PersonTile({
   // Step F6: aria-label/title hint mirroring handleHomePersonClick's branches.
   // Visual UI unchanged; this only helps screen readers and desktop hover
   // learn what a tap will actually do (signal reply / invite share / detail).
+  // Home 타일 표시명은 live people store 의 getPersonDisplayName 을 최우선 사용한다.
+  // personCatalog(모듈 전역) 라벨은 갱신 타이밍/읽기 경로상 stale 될 수 있어
+  // (People/Signals 는 최신인데 Home 만 옛 이름) catalog 는 fallback 으로만 둔다.
+  // PersonTile 은 위에서 people 를 구독하므로 store 변경에 즉시 반응한다.
+  const livePersonForLabel =
+    folder || entityId === "family-me"
+      ? null
+      : people.find((candidate) => candidate.id === entityId) ?? null;
+  const liveDisplayName = livePersonForLabel
+    ? getPersonDisplayName(livePersonForLabel)
+    : "";
   const tileLabel =
     entityId === "family-me" && meTileLabel
       ? meTileLabel
-      : getEntityLabel(entityId, folders);
+      : liveDisplayName || getEntityLabel(entityId, folders);
   const tapActionHint =
     entityId === "family-me"
       ? "내 프로필"
@@ -815,7 +827,7 @@ export function PersonTile({
       >
         {entityId === "family-me" && meTileLabel
           ? meTileLabel
-          : getEntityLabel(entityId, folders)}
+          : liveDisplayName || getEntityLabel(entityId, folders)}
       </span>
     </div>
   );

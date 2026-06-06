@@ -652,15 +652,27 @@ export default function DashboardDebugBetaPage() {
                       normalizeName(personNameTrim) !==
                         normalizeName(remoteName))),
               );
+              // localAlias 가 canonical(person.name/remoteProfileName)과 같으면
+              // 과거에 별명이 canonical 로 새어 들어간 흔적(leak)이다.
+              const aliasLeak = Boolean(
+                localAlias &&
+                  ((personNameTrim &&
+                    normalizeName(localAlias) === normalizeName(personNameTrim)) ||
+                    (remoteProfileName &&
+                      normalizeName(localAlias) ===
+                        normalizeName(remoteProfileName))),
+              );
               let verdict = "OK";
               if (!inv) {
                 verdict = "matched invite MISSING";
+              } else if (aliasLeak) {
+                verdict = "LOCAL_ALIAS_LEAK_RISK (alias == canonical)";
               } else if (!remoteProfileName && !remoteName) {
                 verdict = "remote missing";
               } else if (canonicalContaminated) {
                 verdict = "CANONICAL_CONTAMINATED (store name != server)";
               } else if (localAlias) {
-                verdict = "ALIAS_ACTIVE (display=alias)";
+                verdict = "LOCAL_ALIAS_ACTIVE (display=alias)";
               }
               // counterpart 방향 진단: 내가 inviter 인지 acceptedPerson 인지.
               const iAmInviter = Boolean(

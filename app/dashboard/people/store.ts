@@ -518,12 +518,12 @@ export const usePeopleStore = create<PeopleState>()(
         });
       },
 
-      // 내가 친구를 부르는 표시 이름(별명)을 직접 수정한다.
-      // - localAlias 만 변경한다. person.name(canonical)/remoteProfileName 은
-      //   별명으로 절대 오염시키지 않는다(기본정보 이름 = remoteProfileName 보존).
-      // - 별명 해제(빈 값) 시 localAlias 제거 + person.name 을 remoteProfileName 으로
-      //   치료한다(과거 오염 데이터 복구). 화면 표시는 getPersonDisplayName 이
-      //   localAlias > remoteProfileName > name 으로 계산한다.
+      // 내가 친구를 부르는 표시 이름(별명)을 직접 수정한다. 100% 로컬 전용.
+      // - localAlias 만 변경한다. person.name(canonical)/remoteProfileName/userId/
+      //   서버 식별자는 절대 건드리지 않고, 서버(refresh-name 등)도 호출하지 않는다.
+      //   (PC 에서 친구 별명을 비우면 모바일 상대 Me 이름이 바뀌던 leak 차단)
+      // - 빈 값이면 localAlias 만 제거 → displayName 은 remoteProfileName 으로 계산.
+      // - canonical 치료(오염 복구)는 오직 syncAcceptedInvitesToPeople(서버 remoteName)에서만 한다.
       updatePersonAlias: (id, alias) => {
         const trimmedId = id.trim();
         if (!trimmedId) {
@@ -535,19 +535,12 @@ export const usePeopleStore = create<PeopleState>()(
             if (person.id !== trimmedId) {
               return person;
             }
-            if (nextAlias) {
-              // 별명 설정: localAlias 만 설정. canonical(name/remoteProfileName) 미변경.
-              return { ...person, localAlias: nextAlias };
-            }
-            // 별명 해제: localAlias 제거 + canonical 복구.
-            // 과거 코드가 person.name 을 별명으로 오염시켰을 수 있어,
-            // remoteProfileName(상대 실제 이름)이 유효하면 그 값으로 person.name 을
-            // 치료한다. 없으면 기존 이름 유지(다음 sync 가 서버 remoteName 으로 치료).
-            const remoteName = cleanText(person.remoteProfileName);
+            // localAlias 만 변경. canonical(name)/remoteProfileName/식별자 미변경.
+            // 빈 값이면 localAlias 만 제거(undefined) → displayName resolver 가
+            // remoteProfileName 으로 복귀시킨다. canonical 치료는 sync 전담.
             return {
               ...person,
-              localAlias: undefined,
-              name: remoteName || person.name,
+              localAlias: nextAlias || undefined,
             };
           }),
         }));
