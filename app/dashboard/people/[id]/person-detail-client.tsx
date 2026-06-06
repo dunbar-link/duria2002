@@ -11,7 +11,7 @@ import {
   readMeProfileName,
 } from "@/lib/me/profile-name";
 import SignalBottomSheet from "../../_components/home/signal-bottom-sheet";
-import { DashboardPerson } from "../data";
+import { DashboardPerson, getPersonDisplayName } from "../data";
 import {
   buildActionDraft,
   buildReasonText,
@@ -701,12 +701,13 @@ export default function PersonDetailClient({ person }: Props) {
 
           <div className="mt-5 flex items-center gap-3">
             <div className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[16px] border-[2.5px] border-[#7E57C2] bg-[#EFE7FA] text-[20px] font-bold text-[#4B2E83]">
-              {person.name.trim().slice(0, 2) || "?"}
+              {getPersonDisplayName(person).slice(0, 2) || "?"}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
+                {/* 헤더 큰 이름 = 표시 이름(localAlias > remoteProfileName > name) */}
                 <h1 className="truncate text-[28px] font-bold tracking-[-0.04em]">
-                  {person.name}
+                  {getPersonDisplayName(person)}
                 </h1>
                 {isJoined ? <span className="h-2 w-2 rounded-full bg-[#079863]" /> : null}
               </div>
@@ -785,7 +786,7 @@ export default function PersonDetailClient({ person }: Props) {
               <h2 className="text-[17px] font-bold">표시 이름</h2>
               {person.remoteProfileName &&
               person.remoteProfileName.trim() &&
-              person.remoteProfileName.trim() !== person.name.trim() ? (
+              person.remoteProfileName.trim() !== getPersonDisplayName(person) ? (
                 <span className="shrink-0 text-[12px] font-medium text-[#8D99AE]">
                   상대 프로필: {person.remoteProfileName.trim()}
                 </span>
@@ -798,7 +799,7 @@ export default function PersonDetailClient({ person }: Props) {
               <input
                 value={aliasDraft}
                 onChange={(event) => setAliasDraft(event.target.value)}
-                placeholder={person.name || "이름"}
+                placeholder={person.remoteProfileName?.trim() || person.name || "이름"}
                 className="h-[44px] min-w-0 flex-1 rounded-[14px] border border-transparent bg-white px-3 text-[14px] text-[#0F172A] outline-none ring-1 ring-[#D3D1C7] placeholder:text-[#A9A59A] focus:border-[#4B2E83]"
               />
               <button
@@ -816,7 +817,12 @@ export default function PersonDetailClient({ person }: Props) {
           <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
             <h2 className="text-[17px] font-bold">기본 정보</h2>
             <div className="mt-4 grid gap-2">
-              <CompactInfoRow label="이름" value={person.name} />
+              {/* 기본정보 이름 = 상대 실제 프로필 이름(remoteProfileName) 우선.
+                  내 별명(localAlias)은 여기에 절대 들어가지 않는다. */}
+              <CompactInfoRow
+                label="이름"
+                value={person.remoteProfileName?.trim() || person.name}
+              />
               <CompactInfoRow label="관계" value={compactSummary || person.roleLabel} />
               <CompactInfoRow label="연락" value={compactContactSummary} />
               <CompactInfoRow label="전화번호" value={person.phone} />

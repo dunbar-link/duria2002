@@ -353,6 +353,42 @@ function getPreferredChannelsFromInput(input: AddDashboardPersonInput): ContactC
   return [...new Set(channels)];
 }
 
+/**
+ * 이름 모델 분리 resolver.
+ * - remoteProfileName: 상대가 자기 Me 에 입력한 현재 실제 이름(연결 sync 로 갱신).
+ * - localAlias: 내가 내 화면에서 친구를 부르는 별명(별도 "표시 이름" 입력칸 전용).
+ * - displayName: 화면 표시용 = localAlias > remoteProfileName > person.name > "알 수 없음".
+ *
+ * 주의: 상세의 "기본 정보 > 이름"에는 getPersonDisplayName 을 쓰지 않는다.
+ * 기본 정보 이름은 remoteProfileName(또는 canonical person.name)을 보여줘야 한다.
+ */
+type PersonNameFields = {
+  name?: unknown;
+  remoteProfileName?: unknown;
+  localAlias?: unknown;
+};
+
+function trimmedString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export function getRemoteProfileName(person: PersonNameFields): string {
+  return trimmedString(person.remoteProfileName);
+}
+
+export function getLocalAlias(person: PersonNameFields): string {
+  return trimmedString(person.localAlias);
+}
+
+export function getPersonDisplayName(person: PersonNameFields): string {
+  return (
+    getLocalAlias(person) ||
+    getRemoteProfileName(person) ||
+    trimmedString(person.name) ||
+    "알 수 없음"
+  );
+}
+
 export function buildAddedPerson(input: AddDashboardPersonInput): DashboardPerson {
   const trimmedName = input.name.trim();
   const relationshipType = normalizeRelationshipType(input.relationshipType);

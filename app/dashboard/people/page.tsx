@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { KeyboardEvent, MouseEvent, useEffect, useMemo, useState } from "react";
 import type { ContactChannel, DashboardPerson } from "./data";
-import { getDashboardTierLabel } from "./data";
+import { getDashboardTierLabel, getPersonDisplayName } from "./data";
 import { usePeopleStore } from "./store";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
@@ -714,7 +714,8 @@ export default function DashboardPeoplePage() {
       .map((person) => {
         const safePerson = person as DashboardPerson & Record<string, unknown>;
         const id = getPersonId(safePerson);
-        const name = getPersonName(safePerson);
+        // 표시 이름: localAlias > remoteProfileName > person.name (resolver).
+        const name = getPersonDisplayName(safePerson);
         const tierValue = getTierValue(safePerson);
         const tierLabel = getTierLabelByValue(tierValue);
 

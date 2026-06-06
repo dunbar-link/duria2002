@@ -535,19 +535,14 @@ export const usePeopleStore = create<PeopleState>()(
             if (person.id !== trimmedId) {
               return person;
             }
-            // 별명을 새로 설정하기 직전의 표시 이름(canonical)을 remoteProfileName
-            // 에 보존한다(아직 비어 있을 때만). sync 가 remoteProfileName 을 아직
-            // 못 채운 상태여도, 나중에 별명을 비우면 이 이름으로 정확히 복귀한다.
-            // (052e4e7 버그: remoteProfileName 이 비면 해제 시 별명이 그대로 남던 문제)
-            const preservedRemote =
-              cleanText(person.remoteProfileName) ||
-              (nextAlias ? cleanText(person.name) : "");
+            // localAlias 만 변경한다. person.name(canonical=상대 실제 이름)과
+            // remoteProfileName 은 절대 건드리지 않는다.
+            // 화면 표시 이름은 getPersonDisplayName resolver 가
+            // localAlias > remoteProfileName > name 순으로 계산하므로,
+            // 별명을 비우면(undefined) 자동으로 remoteProfileName 으로 복귀한다.
             return {
               ...person,
               localAlias: nextAlias || undefined,
-              remoteProfileName: preservedRemote || person.remoteProfileName,
-              // 표시 이름 우선순위: alias > 보존된 remote(canonical) > 기존.
-              name: nextAlias || preservedRemote || person.name,
             };
           }),
         }));
@@ -992,10 +987,6 @@ export const usePeopleStore = create<PeopleState>()(
                 : "";
             const remoteName = acceptedName || inviterName;
 
-            // 내가 직접 지정한 별명(localAlias)이 있으면 remote 이름이
-            // 표시 이름을 덮어쓰지 않는다(친구 이름 직접 수정 보존).
-            const aliasName = cleanText(person.localAlias);
-
             const counterpartUserId =
               (acceptedInvite?.acceptedPersonId ??
                 inviterInvite?.inviterUserId ??
@@ -1007,9 +998,10 @@ export const usePeopleStore = create<PeopleState>()(
 
             return {
               ...person,
-              // 표시 이름 우선순위: alias > remote > 기존.
+              // person.name 은 canonical(상대 실제 이름)로만 유지한다(별명 미포함).
+              // 화면 표시는 getPersonDisplayName resolver 가 localAlias 우선으로 계산.
               // remoteName 이 비어 있으면 기존 이름을 지우지 않는다.
-              name: aliasName || remoteName || person.name,
+              name: remoteName || person.name,
               remoteProfileName:
                 remoteName || person.remoteProfileName || undefined,
               isJoined: true,

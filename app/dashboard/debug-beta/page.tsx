@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { usePeopleStore } from "../people/store";
+import { getPersonDisplayName } from "../people/data";
 import { STORAGE_KEY } from "../_components/home/home-page-types";
 
 type FolderMap = Record<string, { id: string; memberIds: string[] }>;
@@ -33,6 +34,8 @@ type RemoteInviteRow = {
   status: string;
   accepted_person_id: string | null;
   accepted_person_name: string | null;
+  inviter_user_id: string | null;
+  inviter_name: string | null;
   source_person_id: string | null;
   tier: number;
   created_at: string | null;
@@ -251,6 +254,36 @@ export default function DashboardDebugBetaPage() {
       const b = normalizeName(person.name);
       return Boolean(a && b && a === b);
     });
+  }
+
+  // Name Sync Inspector 용 read-only 매칭. store sync 의 매처와 같은 의미로,
+  // 해당 person 에 연결된 remote invite row 를 찾는다(수정/저장 없음).
+  function findRemoteInviteForInspector(
+    person: (typeof people)[number],
+  ): RemoteInviteRow | null {
+    const r = person as Record<string, unknown>;
+    const storedId =
+      (typeof r.userId === "string" && r.userId.trim()) ||
+      (typeof r.dlUserId === "string" && r.dlUserId.trim()) ||
+      (typeof r.acceptedPersonId === "string" && r.acceptedPersonId.trim()) ||
+      "";
+    const personName = normalizeName(person.name);
+    return (
+      remoteInvites.find((inv) => {
+        if (inv.source_person_id && inv.source_person_id === person.id)
+          return true;
+        if (storedId && inv.accepted_person_id === storedId) return true;
+        if (storedId && inv.inviter_user_id === storedId) return true;
+        if (
+          inv.accepted_person_name &&
+          normalizeName(inv.accepted_person_name) === personName
+        )
+          return true;
+        if (inv.inviter_name && normalizeName(inv.inviter_name) === personName)
+          return true;
+        return false;
+      }) ?? null
+    );
   }
 
   const classified = useMemo(() => {
@@ -570,6 +603,123 @@ export default function DashboardDebugBetaPage() {
             </ul>
           )}
         </div>
+      </Section>
+
+      <Section title="섹션 8. Name Sync Inspector (이름 동기화 진단)">
+        <p className="mb-2 text-[10px] leading-relaxed text-[#94A3B8]">
+          remoteProfileName = 상대 실제 이름 / localAlias = 내 별명 /
+          display = localAlias &gt; remoteProfileName &gt; name. invite.* 는 서버
+          /api/invites/mine 값(refresh-name 반영 여부 확인용).
+        </p>
+        {classified.accepted.length === 0 ? (
+          <p className="text-[#64748B]">accepted person 없음</p>
+        ) : (
+          <ul className="space-y-2">
+            {classified.accepted.map((p) => {
+              const r = p as Record<string, unknown>;
+              const storedId =
+                (typeof r.userId === "string" && r.userId) ||
+                (typeof r.dlUserId === "string" && r.dlUserId) ||
+                (typeof r.acceptedPersonId === "string" && r.acceptedPersonId) ||
+                "";
+              const remoteProfileName =
+                typeof r.remoteProfileName === "string"
+                  ? r.remoteProfileName.trim()
+                  : "";
+              const localAlias =
+                typeof r.localAlias === "string" ? r.localAlias.trim() : "";
+              const displayName = getPersonDisplayName(p);
+              const inv = findRemoteInviteForInspector(p);
+              const remoteName =
+                inv?.accepted_person_name?.trim() ||
+                inv?.inviter_name?.trim() ||
+                "";
+              let verdict = "OK";
+              if (!inv) {
+                verdict = "matched invite MISSING";
+              } else if (localAlias) {
+                verdict = "alias active (display=alias)";
+              } else if (!remoteProfileName && !remoteName) {
+                verdict = "remote missing";
+              } else if (
+                remoteName &&
+                remoteProfileName &&
+                normalizeName(remoteName) !== normalizeName(remoteProfileName)
+              ) {
+                verdict = "server NEWER than store (sync pending)";
+              }
+              return (
+                <li
+                  key={p.id}
+                  className="rounded bg-[#1E293B] px-2 py-2 break-all"
+                >
+                  <div className="text-[11px]">
+                    <span className="text-[#94A3B8]">display:</span>{" "}
+                    <span className="font-semibold text-white">
+                      {displayName}
+                    </span>
+                  </div>
+                  <div className="mt-1 grid gap-0.5 text-[10px] text-[#CBD5E1]">
+                    <div>
+                      <span className="text-[#64748B]">person.name:</span>{" "}
+                      {p.name || "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">remoteProfileName:</span>{" "}
+                      {remoteProfileName || "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">localAlias:</span>{" "}
+                      {localAlias || "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">id:</span> {p.id}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">storedUserId:</span>{" "}
+                      {storedId || "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">invite.token:</span>{" "}
+                      {inv?.token ? `${inv.token.slice(0, 12)}...` : "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">invite.inviterUserId:</span>{" "}
+                      {inv?.inviter_user_id ?? "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">invite.inviterName:</span>{" "}
+                      {inv?.inviter_name ?? "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">
+                        invite.acceptedPersonId:
+                      </span>{" "}
+                      {inv?.accepted_person_id ?? "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">
+                        invite.acceptedPersonName:
+                      </span>{" "}
+                      {inv?.accepted_person_name ?? "-"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">invite.status:</span>{" "}
+                      {inv?.status ?? "-"}
+                    </div>
+                  </div>
+                  <div
+                    className={`mt-1 text-[10px] font-semibold ${
+                      verdict === "OK" ? "text-[#34D399]" : "text-[#F59E0B]"
+                    }`}
+                  >
+                    판단: {verdict}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </Section>
 
       <footer className="mt-2 text-[10px] text-[#64748B]">

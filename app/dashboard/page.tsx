@@ -109,6 +109,7 @@ import { useHomeLayoutStorage } from "./_components/home/use-home-layout-storage
 import HomeMoveMenu from "./_components/home-move-menu";
 import type { ConnectableCandidate } from "./_components/home/connectable-candidate-types";
 import { usePeopleStore, type InviteDraft } from "./people/store";
+import { getPersonDisplayName } from "./people/data";
 
 import { setRelationshipActionStarted } from "./people/relationship-status";
 
@@ -1147,7 +1148,8 @@ useEffect(() => {
     for (const person of people) {
       registerAddedPersonToHomeCatalog({
         id: person.id,
-        name: person.name,
+        // Home 타일 표시명: localAlias > remoteProfileName > person.name.
+        name: getPersonDisplayName(person),
       });
     }
 
@@ -2133,7 +2135,7 @@ useEffect(() => {
     }
 
     const confirmed = window.confirm(
-      `${selectedHomePerson.name}님을 홈과 People에서 제거할까요?\n\n초대/신호 기록은 Supabase DB에 남겨둡니다.`,
+      `${getPersonDisplayName(selectedHomePerson)}님을 홈과 People에서 제거할까요?\n\n초대/신호 기록은 Supabase DB에 남겨둡니다.`,
     );
 
     if (!confirmed) {
@@ -2216,7 +2218,7 @@ useEffect(() => {
     setSignalTarget({
       id: receiverUserId,
       personId: targetPerson.id,
-      name: targetPerson.name,
+      name: getPersonDisplayName(targetPerson),
     });
     setSelectedHomePersonId(null);
     setSignalOpen(true);
@@ -2366,7 +2368,7 @@ const isJoined =
       setSignalTarget({
         id: receiverUserId,
         personId: targetPerson.id,
-        name: targetPerson.name,
+        name: getPersonDisplayName(targetPerson),
       });
 
       setSignalOpen(true);
@@ -2863,7 +2865,7 @@ const isJoined =
           selectedHomePerson
             ? {
                 id: selectedHomePerson.id,
-                name: selectedHomePerson.name,
+                name: getPersonDisplayName(selectedHomePerson),
               }
             : null
         }

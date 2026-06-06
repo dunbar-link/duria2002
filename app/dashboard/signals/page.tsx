@@ -9,6 +9,7 @@ import {
 } from "@/lib/signal/read-signals";
 import { supabase } from "@/lib/supabase-client";
 import { usePeopleStore } from "@/app/dashboard/people/store";
+import { getPersonDisplayName } from "@/app/dashboard/people/data";
 
 type LoadStatus = "idle" | "loading" | "success" | "error";
 
@@ -141,8 +142,12 @@ export default function SignalsPage() {
         );
       });
 
-      if (matched?.name?.trim()) {
-        return matched.name;
+      if (matched) {
+        // 표시 우선순위: localAlias > remoteProfileName > person.name.
+        const display = getPersonDisplayName(matched);
+        if (display && display !== "알 수 없음") {
+          return display;
+        }
       }
 
       // 2순위: inviteDrafts 로 senderId 보강. signals 테이블에는 sender_name
