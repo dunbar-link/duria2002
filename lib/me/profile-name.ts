@@ -45,6 +45,39 @@ export function readMeProfileName(): string {
   return "";
 }
 
+/**
+ * 현재 Me 프로필 사진의 public URL 을 읽는다(서버 동기화 snapshot용).
+ * - localStorage `dunbar-link-me-profile-v3`(+legacy)의 `imageUrl` 만 사용한다.
+ * - imageDataUrl(base64)은 절대 반환하지 않는다(서버로 보내면 안 됨).
+ * - 없으면 빈 문자열. 업로드 시 붙은 `?v=` 캐시버스터가 있으면 그대로 포함된다.
+ */
+export function readMeProfileImageUrl(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  for (const key of [
+    PROFILE_STORAGE_KEY,
+    PROFILE_STORAGE_KEY_V2,
+    PROFILE_STORAGE_KEY_V1,
+  ]) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { imageUrl?: unknown };
+      const imageUrl =
+        typeof parsed.imageUrl === "string" ? parsed.imageUrl.trim() : "";
+      if (imageUrl) {
+        return imageUrl;
+      }
+    } catch {
+      // ignore parse errors and fall through to the next key
+    }
+  }
+
+  return "";
+}
+
 export function writeMeProfileNameIfEmpty(name: string): boolean {
   if (typeof window === "undefined") {
     return false;

@@ -8,10 +8,15 @@ import { sendSignal } from "@/lib/signal/send-signal";
 import {
   isIncompleteMeName,
   ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileImageUrl,
   readMeProfileName,
 } from "@/lib/me/profile-name";
 import SignalBottomSheet from "../../_components/home/signal-bottom-sheet";
-import { DashboardPerson, getPersonDisplayName } from "../data";
+import {
+  DashboardPerson,
+  getPersonDisplayName,
+  getPersonDisplayPhoto,
+} from "../data";
 import {
   buildActionDraft,
   buildReasonText,
@@ -419,6 +424,8 @@ export default function PersonDetailClient({ person }: Props) {
         inviterNote: inviteDraft.inviterNote,
         inviterUserId: inviteDraft.inviterUserId,
         inviterName: inviteDraft.inviterName,
+        // 초대 생성 snapshot: 현재 내(inviter) Me 프로필 사진 URL.
+        inviterPhotoUrl: readMeProfileImageUrl(),
         status: "pending",
         createdAt: inviteDraft.createdAt,
       }),
@@ -700,8 +707,18 @@ export default function PersonDetailClient({ person }: Props) {
           </div>
 
           <div className="mt-5 flex items-center gap-3">
-            <div className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-[16px] border-[2.5px] border-[#7E57C2] bg-[#EFE7FA] text-[20px] font-bold text-[#4B2E83]">
+            <div className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[2.5px] border-[#7E57C2] bg-[#EFE7FA] text-[20px] font-bold text-[#4B2E83]">
               {getPersonDisplayName(person).slice(0, 2) || "?"}
+              {getPersonDisplayPhoto(person) ? (
+                <img
+                  src={getPersonDisplayPhoto(person)}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">

@@ -54,6 +54,10 @@ export type DashboardPerson = {
   // 내가 내 화면에서 이 친구를 부르는 별명. 설정 시 remote 이름이
   // 이를 덮어쓰지 않는다. 비어 있으면 remote/원래 이름을 표시한다.
   localAlias?: string;
+  // 연결된 상대가 자기 Me 에 설정한 현재 프로필 사진 public URL(remote truth).
+  // 연결 sync(syncAcceptedInvitesToPeople)로 갱신된다. 상대가 사진을 초기화하면
+  // 비워진다. localPhotoOverride(내가 지정하는 로컬 사진)는 Phase 1 에서 미구현.
+  remoteProfilePhotoUrl?: string;
 };
 
 export type AddDashboardPersonInput = {
@@ -386,6 +390,30 @@ export function getPersonDisplayName(person: PersonNameFields): string {
     getRemoteProfileName(person) ||
     trimmedString(person.name) ||
     "알 수 없음"
+  );
+}
+
+/**
+ * 사진 모델 분리 resolver (이름 모델과 동형).
+ * - remoteProfilePhotoUrl: 상대가 자기 Me 에 설정한 현재 프로필 사진(연결 sync 로 갱신).
+ * - localPhotoOverride: 내가 친구에게 지정하는 로컬 사진. Phase 1 미구현(자리만 둠).
+ * - displayPhoto: localPhotoOverride > remoteProfilePhotoUrl > "".
+ *
+ * 빈 문자열이면 호출부에서 이니셜 fallback 을 그린다.
+ */
+type PersonPhotoFields = {
+  remoteProfilePhotoUrl?: unknown;
+  localPhotoOverride?: unknown;
+};
+
+export function getRemoteProfilePhotoUrl(person: PersonPhotoFields): string {
+  return trimmedString(person.remoteProfilePhotoUrl);
+}
+
+export function getPersonDisplayPhoto(person: PersonPhotoFields): string {
+  return (
+    trimmedString(person.localPhotoOverride) ||
+    getRemoteProfilePhotoUrl(person)
   );
 }
 

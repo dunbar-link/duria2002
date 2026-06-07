@@ -5,6 +5,7 @@ import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
   isIncompleteMeName,
   ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileImageUrl,
   readMeProfileName,
   writeMeProfileNameIfEmpty,
 } from "@/lib/me/profile-name";
@@ -565,9 +566,11 @@ function buildAcceptedInviteDraftFromPerson(
     inviterNote: "",
     inviterUserId: null,
     inviterName: null,
+    inviterPhotoUrl: null,
     acceptedAt: new Date().toISOString(),
     acceptedPersonId,
     acceptedPersonName: name,
+    acceptedPersonPhotoUrl: null,
     status: "accepted",
   };
 }
@@ -899,6 +902,8 @@ useEffect(() => {
               token: pendingToken,
               acceptedPersonId,
               acceptedPersonName,
+              // 수락 snapshot: 현재 내(accepter) Me 프로필 사진 URL.
+              acceptedPersonPhotoUrl: readMeProfileImageUrl(),
               acceptedAt,
             }),
           });
@@ -2458,6 +2463,8 @@ const isJoined =
           inviterNote: draft.inviterNote,
           inviterUserId: draft.inviterUserId,
           inviterName: draft.inviterName,
+          // 초대 생성 snapshot: 현재 내(inviter) Me 프로필 사진 URL.
+          inviterPhotoUrl: readMeProfileImageUrl(),
           status: draft.status,
           createdAt: draft.createdAt,
         }),

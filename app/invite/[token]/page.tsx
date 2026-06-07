@@ -7,6 +7,7 @@ import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
   isIncompleteMeName,
   ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileImageUrl,
   readMeProfileName,
   writeMeProfileNameIfEmpty,
 } from "@/lib/me/profile-name";
@@ -179,6 +180,8 @@ export default function InviteEntryPage() {
             token,
             acceptedPersonId,
             acceptedPersonName: trimmedName,
+            // 수락 snapshot: 현재 내(accepter) Me 프로필 사진 URL.
+            acceptedPersonPhotoUrl: readMeProfileImageUrl(),
             acceptedAt: now,
           }),
         });

@@ -309,6 +309,22 @@ export default function DashboardMePage() {
     });
   }
 
+  // 내 프로필 사진 public URL 을 연결된 dl_invites 행에 전파한다.
+  // 이름의 refresh-name 과 동일 패턴. 빈 문자열이면 서버 사진 컬럼이 클리어된다.
+  // 실패는 silent — 사용자 흐름을 막지 않는다.
+  function syncMyPhotoToServer(photoUrl: string) {
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    void fetch("/api/invites/refresh-photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, photoUrl }),
+    }).catch(() => {
+      // silent fail
+    });
+  }
+
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -322,11 +338,18 @@ export default function DashboardMePage() {
     try {
       const uploadedUrl = await uploadProfileImageToSupabase(file);
       if (uploadTokenRef.current !== token) return;
+      // 매 업로드마다 URL 을 유니크하게(?v=) 만들어 상대 기기의 이미지 캐시를
+      // 즉시 무효화한다. 동일 경로 upsert 라 URL 문자열은 그대로이기 때문.
+      const syncedUrl = `${uploadedUrl}${
+        uploadedUrl.includes("?") ? "&" : "?"
+      }v=${Date.now()}`;
       setProfile((prev) => ({
         ...prev,
-        imageUrl: uploadedUrl,
+        imageUrl: syncedUrl,
         imageDataUrl: previewDataUrl,
       }));
+      // 연결된 상대 기기에 내 사진 URL 전파.
+      syncMyPhotoToServer(syncedUrl);
     } catch (error) {
       if (uploadTokenRef.current !== token) return;
       console.warn("프로필 이미지 Supabase 업로드 실패:", error);
@@ -350,6 +373,8 @@ export default function DashboardMePage() {
     if (inputRef.current) {
       inputRef.current.value = "";
     }
+    // 사진 초기화를 상대 기기에 전파(서버 사진 컬럼을 빈 값으로 클리어).
+    syncMyPhotoToServer("");
   }
 
   if (!hasHydrated || !isLoaded) {
@@ -480,6 +505,10 @@ export default function DashboardMePage() {
               });
             }
           }
+
+          // 저장 시 현재 사진도 재동기화한다. 사진을 먼저 설정한 뒤 나중에
+          // 연결된 경우, 저장 한 번으로 기존 dl_invites 행에 채워 넣을 수 있다.
+          syncMyPhotoToServer(profile.imageUrl);
         }}
         className="mt-2 h-[58px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
       >

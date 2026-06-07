@@ -7,10 +7,16 @@ export async function POST(req: Request) {
       token?: string;
       acceptedPersonId?: string;
       acceptedPersonName?: string;
+      acceptedPersonPhotoUrl?: string;
       acceptedAt?: string;
     };
 
     const { token, acceptedPersonId, acceptedPersonName, acceptedAt } = body;
+    // 수락 snapshot: accepter 의 현재 Me 프로필 사진 public URL(빈 값=null). 선택 필드.
+    const acceptedPersonPhotoUrl =
+      typeof body.acceptedPersonPhotoUrl === "string"
+        ? body.acceptedPersonPhotoUrl.trim() || null
+        : null;
 
     if (!token || !acceptedPersonId || !acceptedPersonName || !acceptedAt) {
       return NextResponse.json({ ok: false }, { status: 400 });
@@ -28,16 +34,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false }, { status: 404 });
     }
 
-    const { error: updateError } = await supabase
+    const baseUpdate = {
+      status: "accepted",
+      accepted_person_id: acceptedPersonId,
+      accepted_person_name: acceptedPersonName,
+      accepted_at: acceptedAt,
+    };
+
+    // 사진 컬럼 포함으로 먼저 update, 실패 시 기본 update 로 폴백한다.
+    // 사진 때문에 수락 자체가 실패하면 안 된다(이름/수락 안정성 우선).
+    let { error: updateError } = await supabase
       .from("dl_invites")
       .update({
-        status: "accepted",
-        accepted_person_id: acceptedPersonId,
-        accepted_person_name: acceptedPersonName,
-        accepted_at: acceptedAt,
+        ...baseUpdate,
+        accepted_person_photo_url: acceptedPersonPhotoUrl,
       })
       .eq("token", token)
       .eq("status", "pending");
+
+    if (updateError) {
+      ({ error: updateError } = await supabase
+        .from("dl_invites")
+        .update(baseUpdate)
+        .eq("token", token)
+        .eq("status", "pending"));
+    }
 
     if (updateError) {
       return NextResponse.json({ ok: false }, { status: 500 });

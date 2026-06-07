@@ -45,9 +45,11 @@ export type InviteDraft = {
   inviterNote: string;
   inviterUserId: string | null;
   inviterName: string | null;
+  inviterPhotoUrl: string | null;
   acceptedAt: string | null;
   acceptedPersonId: string | null;
   acceptedPersonName: string | null;
+  acceptedPersonPhotoUrl: string | null;
   status: InviteDraftStatus;
 };
 
@@ -79,6 +81,8 @@ export type RemoteInviteDraftLike = {
   inviter_user_id?: string | null;
   inviterName?: string | null;
   inviter_name?: string | null;
+  inviterPhotoUrl?: string | null;
+  inviter_photo_url?: string | null;
   acceptedAt?: string | null;
   accepted_at?: string | null;
   acceptedPersonId?: string | null;
@@ -87,6 +91,8 @@ export type RemoteInviteDraftLike = {
   accepted_user_id?: string | null;
   acceptedPersonName?: string | null;
   accepted_person_name?: string | null;
+  acceptedPersonPhotoUrl?: string | null;
+  accepted_person_photo_url?: string | null;
   status?: InviteDraftStatus | string | null;
   createdAt?: string | null;
   created_at?: string | null;
@@ -393,6 +399,10 @@ function normalizeRemoteInviteDraft(
       cleanText(row.inviterUserId) || cleanText(row.inviter_user_id) || null,
     inviterName:
       cleanText(row.inviterName) || cleanText(row.inviter_name) || null,
+    inviterPhotoUrl:
+      cleanText(row.inviterPhotoUrl) ||
+      cleanText(row.inviter_photo_url) ||
+      null,
     acceptedAt: acceptedAt || null,
     acceptedPersonId:
       cleanText(row.acceptedPersonId) ||
@@ -403,6 +413,10 @@ function normalizeRemoteInviteDraft(
     acceptedPersonName:
       cleanText(row.acceptedPersonName) ||
       cleanText(row.accepted_person_name) ||
+      null,
+    acceptedPersonPhotoUrl:
+      cleanText(row.acceptedPersonPhotoUrl) ||
+      cleanText(row.accepted_person_photo_url) ||
       null,
     status: row.status === "accepted" || acceptedAt ? "accepted" : "pending",
   };
@@ -804,9 +818,13 @@ export const usePeopleStore = create<PeopleState>()(
           inviterNote: cleanText(input.inviterNote),
           inviterUserId,
           inviterName,
+          // 사진은 Phase 1 에서 upsert 경로로 박제하지 않는다(이름과 달리).
+          // 연결 후 refresh-photo 가 기존 행을 갱신하는 방식으로 전파된다.
+          inviterPhotoUrl: null,
           acceptedAt: null,
           acceptedPersonId: null,
           acceptedPersonName: null,
+          acceptedPersonPhotoUrl: null,
           status: "pending",
         };
 
@@ -859,11 +877,17 @@ export const usePeopleStore = create<PeopleState>()(
                   : "pending",
               inviterUserId: item.inviterUserId ?? existing.inviterUserId,
               inviterName: item.inviterName ?? existing.inviterName,
+              inviterPhotoUrl:
+                item.inviterPhotoUrl ?? existing.inviterPhotoUrl ?? null,
               acceptedAt: item.acceptedAt ?? existing.acceptedAt,
               acceptedPersonId:
                 item.acceptedPersonId ?? existing.acceptedPersonId,
               acceptedPersonName:
                 item.acceptedPersonName ?? existing.acceptedPersonName,
+              acceptedPersonPhotoUrl:
+                item.acceptedPersonPhotoUrl ??
+                existing.acceptedPersonPhotoUrl ??
+                null,
             });
           }
 
@@ -985,6 +1009,19 @@ export const usePeopleStore = create<PeopleState>()(
                 : "";
             const remoteName = acceptedName || inviterName;
 
+            // 상대의 현재 remote 프로필 사진: 이름과 동일한 방향(acceptedPerson
+            // 우선, 없으면 inviter)으로 고른다. 본인(deviceUserId)이면 적용 안 함.
+            const acceptedPhoto =
+              acceptedInvite &&
+              acceptedInvite.acceptedPersonId !== deviceUserId
+                ? cleanText(acceptedInvite.acceptedPersonPhotoUrl)
+                : "";
+            const inviterPhoto =
+              inviterInvite && inviterInvite.inviterUserId !== deviceUserId
+                ? cleanText(inviterInvite.inviterPhotoUrl)
+                : "";
+            const remotePhoto = acceptedPhoto || inviterPhoto;
+
             const counterpartUserId =
               (acceptedInvite?.acceptedPersonId ??
                 inviterInvite?.inviterUserId ??
@@ -1002,6 +1039,9 @@ export const usePeopleStore = create<PeopleState>()(
               name: remoteName || person.name,
               remoteProfileName:
                 remoteName || person.remoteProfileName || undefined,
+              // 사진은 이름과 달리 "비면 비운다" 정책(상대의 사진 초기화 전파).
+              // remotePhoto 가 빈 값이면 기존 사진을 유지하지 않고 제거한다.
+              remoteProfilePhotoUrl: remotePhoto || undefined,
               isJoined: true,
               userId: counterpartUserId,
               dlUserId: counterpartUserId,
@@ -1029,11 +1069,17 @@ export const usePeopleStore = create<PeopleState>()(
               status: "accepted",
               inviterUserId: item.inviterUserId ?? existing?.inviterUserId ?? null,
               inviterName: item.inviterName ?? existing?.inviterName ?? null,
+              inviterPhotoUrl:
+                item.inviterPhotoUrl ?? existing?.inviterPhotoUrl ?? null,
               acceptedAt: item.acceptedAt ?? existing?.acceptedAt ?? now,
               acceptedPersonId:
                 item.acceptedPersonId ?? existing?.acceptedPersonId ?? null,
               acceptedPersonName:
                 item.acceptedPersonName ?? existing?.acceptedPersonName ?? null,
+              acceptedPersonPhotoUrl:
+                item.acceptedPersonPhotoUrl ??
+                existing?.acceptedPersonPhotoUrl ??
+                null,
             });
           }
 
@@ -1097,6 +1143,8 @@ export const usePeopleStore = create<PeopleState>()(
                 dlUserId: acceptedUserId || undefined,
                 acceptedPersonId: acceptedUserId || undefined,
                 remoteProfileName: acceptedName || undefined,
+                remoteProfilePhotoUrl:
+                  cleanText(item.acceptedPersonPhotoUrl) || undefined,
                 lastContactAt: item.acceptedAt ?? now,
                 lastContactedAt: item.acceptedAt ?? now,
               } as DashboardPerson;
@@ -1157,6 +1205,8 @@ export const usePeopleStore = create<PeopleState>()(
                 dlUserId: inviterUserId || undefined,
                 acceptedPersonId: inviterUserId || undefined,
                 remoteProfileName: inviterName || undefined,
+                remoteProfilePhotoUrl:
+                  cleanText(item.inviterPhotoUrl) || undefined,
                 lastContactAt: item.acceptedAt ?? now,
                 lastContactedAt: item.acceptedAt ?? now,
               } as DashboardPerson;

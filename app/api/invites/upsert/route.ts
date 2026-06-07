@@ -14,6 +14,7 @@ type InviteUpsertBody = {
   inviterNote?: string;
   inviterUserId?: string | null;
   inviterName?: string | null;
+  inviterPhotoUrl?: string | null;
   status?: string;
   createdAt?: string;
 };
@@ -129,25 +130,39 @@ export async function POST(request: Request) {
 
     const inviterUserId = cleanText(body.inviterUserId) || null;
     const inviterName = cleanText(body.inviterName) || null;
+    // 초대 생성 snapshot: inviter 의 현재 Me 프로필 사진 public URL(빈 값=null).
+    const inviterPhotoUrl = cleanText(body.inviterPhotoUrl) || null;
 
-    const { error } = await supabase.from("dl_invites").upsert(
-      {
-        token,
-        invite_path: invitePath,
-        invitee_name: inviteeName,
-        invitee_phone: safeInviteePhone,
-        source_person_id: sourcePersonId,
-        tier: typeof body.tier === "number" ? body.tier : 50,
-        relationship_type: relationshipType,
-        relationship_label: relationshipLabel,
-        inviter_note: cleanText(body.inviterNote),
-        inviter_user_id: inviterUserId,
-        inviter_name: inviterName,
-        status: requestedStatus,
-        created_at: createdAt,
-      },
-      { onConflict: "token" },
-    );
+    const basePayload = {
+      token,
+      invite_path: invitePath,
+      invitee_name: inviteeName,
+      invitee_phone: safeInviteePhone,
+      source_person_id: sourcePersonId,
+      tier: typeof body.tier === "number" ? body.tier : 50,
+      relationship_type: relationshipType,
+      relationship_label: relationshipLabel,
+      inviter_note: cleanText(body.inviterNote),
+      inviter_user_id: inviterUserId,
+      inviter_name: inviterName,
+      status: requestedStatus,
+      created_at: createdAt,
+    };
+
+    // 사진 컬럼 포함으로 먼저 upsert. 사진 컬럼이 없는 등으로 실패하면 기본
+    // payload 로 폴백해 초대 생성 자체는 반드시 성공시킨다(이름 흐름 보호).
+    let { error } = await supabase
+      .from("dl_invites")
+      .upsert(
+        { ...basePayload, inviter_photo_url: inviterPhotoUrl },
+        { onConflict: "token" },
+      );
+
+    if (error) {
+      ({ error } = await supabase
+        .from("dl_invites")
+        .upsert(basePayload, { onConflict: "token" }));
+    }
 
     if (error) {
       console.error("초대 저장 실패:", error.message);

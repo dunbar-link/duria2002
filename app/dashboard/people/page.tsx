@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { KeyboardEvent, MouseEvent, useEffect, useMemo, useState } from "react";
 import type { ContactChannel, DashboardPerson } from "./data";
-import { getDashboardTierLabel, getPersonDisplayName } from "./data";
+import {
+  getDashboardTierLabel,
+  getPersonDisplayName,
+  getPersonDisplayPhoto,
+} from "./data";
 import { usePeopleStore } from "./store";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
@@ -1237,6 +1241,10 @@ export default function DashboardPeoplePage() {
               // 분기에 그대로 사용한다.
               const accepted = isAcceptedPerson(person);
               const borderStyle = accepted ? "2.5px solid" : "1.5px dashed";
+              // 연결 상대의 최신 remote 프로필 사진(없으면 빈 값 → 이니셜).
+              const displayPhoto = getPersonDisplayPhoto(
+                person.raw as DashboardPerson,
+              );
 
               return (
                 <div
@@ -1247,7 +1255,7 @@ export default function DashboardPeoplePage() {
                     <button
                       type="button"
                       onClick={() => openDetail(person.id)}
-                      className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[14px] text-[17px] font-bold shadow-[0_6px_14px_rgba(15,23,42,0.04)] active:scale-95"
+                      className="relative flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] text-[17px] font-bold shadow-[0_6px_14px_rgba(15,23,42,0.04)] active:scale-95"
                       style={{
                         background: tierStyle.bg,
                         border: `${borderStyle} ${tierStyle.text}`,
@@ -1256,6 +1264,16 @@ export default function DashboardPeoplePage() {
                       aria-label={`${person.name} 상세 보기`}
                     >
                       {getInitials(person.name)}
+                      {displayPhoto ? (
+                        <img
+                          src={displayPhoto}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : null}
                     </button>
 
                     <div className="min-w-0 flex-1">

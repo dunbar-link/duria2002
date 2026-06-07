@@ -8,6 +8,7 @@ import { usePeopleStore } from "../store";
 import {
   isIncompleteMeName,
   ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileImageUrl,
   readMeProfileName,
 } from "@/lib/me/profile-name";
 
@@ -268,6 +269,8 @@ ${latestInviteUrl}`;
             inviterNote: null,
             inviterUserId: created.inviterUserId,
             inviterName: created.inviterName,
+            // 초대 생성 snapshot: 현재 내(inviter) Me 프로필 사진 URL.
+            inviterPhotoUrl: readMeProfileImageUrl(),
             status: "pending",
           }),
         });

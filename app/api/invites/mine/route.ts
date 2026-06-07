@@ -52,20 +52,35 @@ export async function GET(req: Request) {
 
     const supabase = createAdminClient();
 
-    let query = supabase
-      .from("dl_invites")
-      .select(
-        "token, invite_path, invitee_name, invitee_phone, source_person_id, tier, relationship_type, relationship_label, inviter_note, inviter_user_id, inviter_name, status, accepted_person_id, accepted_person_name, accepted_at, created_at",
-      )
-      .or(`inviter_user_id.eq.${userId},accepted_person_id.eq.${userId}`)
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    // 이름 동기화에 필요한 기본 컬럼. 절대 깨지면 안 된다.
+    const BASE_COLUMNS =
+      "token, invite_path, invitee_name, invitee_phone, source_person_id, tier, relationship_type, relationship_label, inviter_note, inviter_user_id, inviter_name, status, accepted_person_id, accepted_person_name, accepted_at, created_at";
+    // 프로필 사진 cross-device sync용 추가 컬럼(마이그레이션 후 존재).
+    const PHOTO_COLUMNS = "inviter_photo_url, accepted_person_photo_url";
 
-    if (statusParam) {
-      query = query.eq("status", statusParam);
+    const runQuery = (columns: string) => {
+      let query = supabase
+        .from("dl_invites")
+        .select(columns)
+        .or(`inviter_user_id.eq.${userId},accepted_person_id.eq.${userId}`)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (statusParam) {
+        query = query.eq("status", statusParam);
+      }
+
+      return query;
+    };
+
+    // 사진 컬럼 포함으로 먼저 시도하고, (마이그레이션 미적용 등으로) 실패하면
+    // 기본 컬럼만으로 폴백한다. 이렇게 해야 사진 컬럼이 아직 없어도 기존
+    // 이름 동기화가 절대 깨지지 않는다.
+    let { data, error } = await runQuery(`${BASE_COLUMNS}, ${PHOTO_COLUMNS}`);
+
+    if (error) {
+      ({ data, error } = await runQuery(BASE_COLUMNS));
     }
-
-    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json(

@@ -12,7 +12,7 @@ import { cn, getEntityLabel } from "./home-page-utils";
 import { personCatalog } from "./home-page-types";
 import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
-import { getPersonDisplayName } from "../../people/data";
+import { getPersonDisplayName, getPersonDisplayPhoto } from "../../people/data";
 import { getLayerColor } from "./layer-color";
 import { useLongPress } from "../use-long-press";
 
@@ -375,44 +375,22 @@ export function PersonFace({
       : `1.5px dashed ${layerColor.border}`;
   const faceText = isMe ? SELF_PURPLE_TEXT : layerColor.text;
 
-  if (effectiveImageUrl) {
-    return (
-      <img
-        src={effectiveImageUrl}
-        alt=""
-        className="object-cover shadow-[0_6px_14px_rgba(15,23,42,0.05)]"
-        style={{
-          width: tileSize,
-          height: tileSize,
-          borderRadius: 14,
-          border: faceBorder,
-        }}
-      />
-    );
-  }
-
-  if (avatarEmoji) {
-    return (
-      <div
-        className="flex items-center justify-center shadow-[0_6px_14px_rgba(15,23,42,0.05)]"
-        style={{
-          width: tileSize,
-          height: tileSize,
-          borderRadius: 14,
-          background: isMe ? SELF_PURPLE_BG : layerColor.bg,
-          border: faceBorder,
-          color: isMe ? SELF_PURPLE_TEXT : layerColor.text,
-          fontSize: 28,
-        }}
-      >
-        <span className="leading-none">{avatarEmoji}</span>
-      </div>
-    );
-  }
+  // 베이스(이모지 또는 이니셜)를 항상 그리고, 사진이 있으면 그 위에 덮는다.
+  // 사진 URL 이 깨지면(onError) 이미지를 숨겨 베이스(이니셜)로 폴백한다 —
+  // per-item state 없이 동작. isMe 타일의 localStorage 사진 경로는 그대로 유지.
+  const baseContent = avatarEmoji ? (
+    <span className="leading-none" style={{ fontSize: 28 }}>
+      {avatarEmoji}
+    </span>
+  ) : (
+    <span className="text-[18px] font-semibold leading-none tracking-[-0.02em]">
+      {isMe && meName ? meName.slice(0, 2) : initials}
+    </span>
+  );
 
   return (
     <div
-      className="flex items-center justify-center font-semibold shadow-[0_6px_14px_rgba(15,23,42,0.05)]"
+      className="relative flex items-center justify-center overflow-hidden shadow-[0_6px_14px_rgba(15,23,42,0.05)]"
       style={{
         width: tileSize,
         height: tileSize,
@@ -422,9 +400,17 @@ export function PersonFace({
         color: faceText,
       }}
     >
-      <span className="text-[18px] leading-none tracking-[-0.02em]">
-        {isMe && meName ? meName.slice(0, 2) : initials}
-      </span>
+      {baseContent}
+      {effectiveImageUrl ? (
+        <img
+          src={effectiveImageUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -514,6 +500,7 @@ export function BaseEntityVisual({
   tintClass,
   layerId,
   isConnected,
+  liveImageUrl,
   tileSize = HOME_TILE_WIDTH,
 }: {
   entityId: string;
@@ -521,6 +508,9 @@ export function BaseEntityVisual({
   tintClass: string;
   layerId?: string;
   isConnected?: boolean;
+  // live people store 에서 계산한 연결 상대의 remote 프로필 사진(없으면 빈 값).
+  // 정적 personCatalog 의 imageUrl 보다 우선한다(me 타일은 PersonFace 가 별도 처리).
+  liveImageUrl?: string;
   tileSize?: number;
 }) {
   const folder = folders[entityId];
@@ -563,7 +553,7 @@ export function BaseEntityVisual({
     <PersonFace
       initials={person.initials}
       avatarEmoji={person.avatarEmoji}
-      imageUrl={person.imageUrl}
+      imageUrl={liveImageUrl || person.imageUrl}
       isMe={person.isMe}
       isConnected={isConnected}
       tintClass={tintClass}
@@ -711,6 +701,10 @@ export function PersonTile({
   const liveDisplayName = livePersonForLabel
     ? getPersonDisplayName(livePersonForLabel)
     : "";
+  // 연결 상대의 최신 remote 프로필 사진(없으면 빈 값 → 이니셜 폴백).
+  const liveImageUrl = livePersonForLabel
+    ? getPersonDisplayPhoto(livePersonForLabel)
+    : "";
   const tileLabel =
     entityId === "family-me" && meTileLabel
       ? meTileLabel
@@ -811,6 +805,7 @@ export function PersonTile({
           tintClass={tintClass}
           layerId={layerId}
           isConnected={isConnected}
+          liveImageUrl={liveImageUrl}
           tileSize={tileWidth - 4}
         />
 
