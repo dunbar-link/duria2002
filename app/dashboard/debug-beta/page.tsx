@@ -57,7 +57,23 @@ type LastRefreshPhotoResult = {
   errorMessage?: string;
 };
 
+type LastPhotoUploadResult = {
+  at?: string;
+  ok?: boolean;
+  source?: string;
+  fileNamePresent?: boolean;
+  fileType?: string;
+  fileSize?: number;
+  bucket?: string;
+  pathPresent?: boolean;
+  publicUrlPresent?: boolean;
+  publicUrlHost?: string;
+  publicUrlLength?: number;
+  errorMessage?: string;
+};
+
 const LAST_REFRESH_PHOTO_RESULT_KEY = "dunbar-link-last-refresh-photo-result";
+const LAST_PHOTO_UPLOAD_RESULT_KEY = "dunbar-link-last-photo-upload-result";
 const ME_PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 
 const LAYER_DEFS = [
@@ -163,6 +179,8 @@ export default function DashboardDebugBetaPage() {
   }>({ present: false, length: 0, host: "" });
   const [lastRefreshPhoto, setLastRefreshPhoto] =
     useState<LastRefreshPhotoResult | null>(null);
+  const [lastPhotoUpload, setLastPhotoUpload] =
+    useState<LastPhotoUploadResult | null>(null);
 
   useEffect(() => {
     setHome(readHomeLayoutFromStorage());
@@ -192,6 +210,14 @@ export default function DashboardDebugBetaPage() {
       setLastRefreshPhoto(raw ? (JSON.parse(raw) as LastRefreshPhotoResult) : null);
     } catch {
       setLastRefreshPhoto(null);
+    }
+
+    // 마지막 사진 업로드(Storage) 결과(me page 가 남긴 진단 기록).
+    try {
+      const raw = window.localStorage.getItem(LAST_PHOTO_UPLOAD_RESULT_KEY);
+      setLastPhotoUpload(raw ? (JSON.parse(raw) as LastPhotoUploadResult) : null);
+    } catch {
+      setLastPhotoUpload(null);
     }
   }, []);
 
@@ -910,6 +936,76 @@ export default function DashboardDebugBetaPage() {
                 <div className="text-[#F87171]">
                   <span className="text-[#64748B]">errorMessage:</span>{" "}
                   {lastRefreshPhoto.errorMessage}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div className="mb-2 rounded bg-[#1E293B] px-2 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8]">
+            last photo upload result (Storage)
+          </p>
+          {!lastPhotoUpload ? (
+            <p className="mt-1 text-[#64748B]">
+              기록 없음 (아직 이 기기에서 사진 업로드를 안 했거나 다른 기기)
+            </p>
+          ) : (
+            <div className="mt-1 grid gap-0.5 text-[10px] text-[#CBD5E1]">
+              <div>
+                <span className="text-[#64748B]">at:</span>{" "}
+                {lastPhotoUpload.at ?? "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">ok:</span>{" "}
+                <span
+                  className={
+                    lastPhotoUpload.ok ? "text-[#34D399]" : "text-[#F87171]"
+                  }
+                >
+                  {String(lastPhotoUpload.ok ?? "-")}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748B]">fileType:</span>{" "}
+                {lastPhotoUpload.fileType || "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">fileSize:</span>{" "}
+                {lastPhotoUpload.fileSize ?? "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">bucket:</span>{" "}
+                {lastPhotoUpload.bucket || "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">pathPresent:</span>{" "}
+                {String(lastPhotoUpload.pathPresent ?? "-")}
+              </div>
+              <div>
+                <span className="text-[#64748B]">publicUrlPresent:</span>{" "}
+                <span
+                  className={
+                    lastPhotoUpload.publicUrlPresent
+                      ? "text-[#34D399]"
+                      : "text-[#F59E0B]"
+                  }
+                >
+                  {String(lastPhotoUpload.publicUrlPresent ?? "-")}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748B]">publicUrlHost:</span>{" "}
+                {lastPhotoUpload.publicUrlHost || "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">publicUrlLength:</span>{" "}
+                {lastPhotoUpload.publicUrlLength ?? "-"}
+              </div>
+              {lastPhotoUpload.errorMessage ? (
+                <div className="text-[#F87171]">
+                  <span className="text-[#64748B]">errorMessage:</span>{" "}
+                  {lastPhotoUpload.errorMessage}
                 </div>
               ) : null}
             </div>

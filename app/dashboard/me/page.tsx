@@ -12,6 +12,8 @@ const LEGACY_PROFILE_STORAGE_KEY_V1 = "dunbar-link-me-profile-v1";
 const PROFILE_UPDATED_EVENT = "dunbar-link-me-profile-updated";
 // refresh-photo 호출 결과를 debug-beta Photo Sync Inspector 가 읽도록 남기는 키.
 const LAST_REFRESH_PHOTO_RESULT_KEY = "dunbar-link-last-refresh-photo-result";
+// Storage 사진 업로드 결과를 debug-beta 가 읽도록 남기는 키.
+const LAST_PHOTO_UPLOAD_RESULT_KEY = "dunbar-link-last-photo-upload-result";
 
 const PROFILE_BG = "#EFE7FA";
 const PROFILE_TEXT = "#4B2E83";
@@ -198,6 +200,11 @@ export default function DashboardMePage() {
   const uploadTokenRef = useRef(0);
   const [profile, setProfile] = useState<MeProfile>(defaultProfile);
   const [isLoaded, setIsLoaded] = useState(false);
+  // 사진 업로드/저장 동작에 대한 짧은 안내(성공/실패). 잠시 후 자동으로 사라지고
+  // 그 아래의 "지속 상태 문구"로 복귀한다. alert/모달 없음.
+  const [photoNotice, setPhotoNotice] = useState<
+    { tone: "success" | "error" | "neutral"; text: string } | null
+  >(null);
 
   useEffect(() => {
     try {
@@ -252,6 +259,13 @@ export default function DashboardMePage() {
 
     return () => window.clearTimeout(handle);
   }, [profile.name, isLoaded]);
+
+  // 사진 안내 문구는 잠시 후 자동으로 지운다 → 지속 상태 문구로 복귀.
+  useEffect(() => {
+    if (!photoNotice) return;
+    const t = window.setTimeout(() => setPhotoNotice(null), 2600);
+    return () => window.clearTimeout(t);
+  }, [photoNotice]);
 
   const acceptedInviteCount = useMemo(() => {
     return inviteDrafts.filter((draft) => draft.status === "accepted").length;
@@ -372,6 +386,49 @@ export default function DashboardMePage() {
     })();
   }
 
+  // Storage 업로드 결과(성공/실패)를 debug-beta 가 읽도록 localStorage 에 남긴다.
+  // full URL/base64/파일명 은 저장하지 않는다(host/length/유무/타입/크기만).
+  // 이 debug 저장 실패가 업로드 흐름을 막으면 안 된다.
+  function recordPhotoUploadResult(input: {
+    ok: boolean;
+    file: File | null;
+    publicUrl: string;
+    errorMessage: string;
+  }) {
+    let publicUrlHost = "";
+    if (input.publicUrl) {
+      try {
+        publicUrlHost = new URL(input.publicUrl).host;
+      } catch {
+        publicUrlHost = "";
+      }
+    }
+
+    const debug = {
+      at: new Date().toISOString(),
+      ok: input.ok,
+      source: "image-change",
+      fileNamePresent: Boolean(input.file?.name),
+      fileType: input.file?.type ?? "",
+      fileSize: input.file?.size ?? 0,
+      bucket: PROFILE_IMAGE_BUCKET,
+      pathPresent: Boolean(getCurrentUserId()),
+      publicUrlPresent: Boolean(input.publicUrl),
+      publicUrlHost,
+      publicUrlLength: input.publicUrl.length,
+      errorMessage: input.errorMessage,
+    };
+
+    try {
+      window.localStorage.setItem(
+        LAST_PHOTO_UPLOAD_RESULT_KEY,
+        JSON.stringify(debug),
+      );
+    } catch {
+      // ignore debug persist failure
+    }
+  }
+
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -395,12 +452,32 @@ export default function DashboardMePage() {
         imageUrl: syncedUrl,
         imageDataUrl: previewDataUrl,
       }));
+      recordPhotoUploadResult({
+        ok: true,
+        file,
+        publicUrl: syncedUrl,
+        errorMessage: "",
+      });
+      setPhotoNotice({ tone: "success", text: "사진이 저장됐어요" });
       // 연결된 상대 기기에 내 사진 URL 전파.
       syncMyPhotoToServer(syncedUrl, "upload");
     } catch (error) {
       if (uploadTokenRef.current !== token) return;
+      // silent 실패 제거: 실제 오류 메시지를 debug 에 남기고 화면에도 안내한다.
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.warn("프로필 이미지 Supabase 업로드 실패:", error);
       setProfile((prev) => ({ ...prev, imageUrl: "", imageDataUrl: previewDataUrl }));
+      recordPhotoUploadResult({
+        ok: false,
+        file,
+        publicUrl: "",
+        errorMessage,
+      });
+      setPhotoNotice({
+        tone: "error",
+        text: "사진 저장에 실패했어요. 다시 선택해 주세요",
+      });
     }
   }
 
@@ -481,6 +558,28 @@ export default function DashboardMePage() {
 
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
         </div>
+
+        {photoNotice ? (
+          <p
+            className={`mt-3 text-[12px] font-semibold ${
+              photoNotice.tone === "success"
+                ? "text-[#079863]"
+                : photoNotice.tone === "error"
+                  ? "text-[#D94848]"
+                  : "text-[#8D99AE]"
+            }`}
+          >
+            {photoNotice.text}
+          </p>
+        ) : (
+          <p className="mt-3 text-[12px] font-medium text-[#8D99AE]">
+            {profile.imageUrl
+              ? "사진 저장됨 · 다른 기기에도 표시 가능"
+              : profile.imageDataUrl
+                ? "이 기기에만 임시 표시 중 · 사진을 다시 선택하면 다른 기기에도 보여요"
+                : "프로필 사진을 추가해 보세요"}
+          </p>
+        )}
       </section>
 
       <section className="mt-3 grid grid-cols-3 gap-2">
@@ -529,6 +628,13 @@ export default function DashboardMePage() {
       <p className="mt-3 text-center text-[11px] font-medium text-[#8D99AE]">
         입력하는 동안 자동으로 저장돼요
       </p>
+      <p className="mt-1 text-center text-[12px] font-semibold text-[#4B2E83]">
+        {profile.imageUrl
+          ? "저장하면 이름·사진이 연결된 사람에게 반영돼요"
+          : profile.imageDataUrl
+            ? "사진을 다시 선택하면 연결된 사람에게도 보여요"
+            : "저장하면 이름이 연결된 사람에게 반영돼요"}
+      </p>
 
       <button
         type="button"
@@ -557,9 +663,23 @@ export default function DashboardMePage() {
           // 연결된 경우, 저장 한 번으로 기존 dl_invites 행에 채워 넣을 수 있다.
           // state 의 imageUrl 이 비어 있어도 localStorage 에 public URL 이 있으면
           // 그것으로 fallback 한다(public URL 만; imageDataUrl/base64 는 제외).
-          syncMyPhotoToServer(profile.imageUrl || readMeProfileImageUrl(), "save");
+          const photoToSync = profile.imageUrl || readMeProfileImageUrl();
+          syncMyPhotoToServer(photoToSync, "save");
+          if (photoToSync) {
+            setPhotoNotice({
+              tone: "success",
+              text: "저장했어요 · 사진도 연결된 사람에게 반영돼요",
+            });
+          } else if (profile.imageDataUrl) {
+            setPhotoNotice({
+              tone: "neutral",
+              text: "사진을 다시 선택하면 다른 기기에도 보여요",
+            });
+          } else {
+            setPhotoNotice({ tone: "success", text: "저장했어요" });
+          }
         }}
-        className="mt-2 h-[58px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
+        className="mt-2 h-[60px] rounded-[18px] bg-[#079863] text-[16px] font-bold text-white shadow-md ring-1 ring-[#057A50] active:scale-95"
       >
         저장하기
       </button>
