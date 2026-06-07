@@ -54,6 +54,7 @@ function showSignalNotification() {
 
 import {
   markSignalsReadFromSender,
+  readUnreadReceivedSenderIds,
   readUnreadSignalCount,
 } from "@/lib/signal/read-signals";
 import Link from "next/link";
@@ -1078,6 +1079,31 @@ useEffect(() => {
       const userId = getCurrentUserId();
       const count = await readUnreadSignalCount(userId);
       setSignalCount(count);
+
+      // Home mount-time backfill: 앱이 닫힌 사이 받은 미확인(received & !is_read)
+      // 신호를 sender별 파란점으로 복원한다. realtime INSERT 경로는 그대로 두고,
+      // 서버 signals 테이블(영속 read-state)을 진실원으로 보강한다.
+      // - 조회 실패 시 헬퍼가 [] 반환 → 기존 blue state(=localStorage) 유지(앱 안 깨짐).
+      // - 기존 state(=localStorage 반영분)와 union 병합, 변화가 있을 때만 write +
+      //   state 갱신(불필요한 이벤트/렌더 방지). 읽은 신호는 is_read=true 라 여기에
+      //   안 잡혀 새로고침 후 파란점이 다시 생기지 않는다.
+      if (!userId) {
+        return;
+      }
+
+      const unreadSenderIds = await readUnreadReceivedSenderIds(userId);
+      if (unreadSenderIds.length === 0) {
+        return;
+      }
+
+      setBlueSignalSenderIds((current) => {
+        const merged = Array.from(new Set([...current, ...unreadSenderIds]));
+        if (merged.length === current.length) {
+          return current;
+        }
+        writeBlueSignalSenderIds(merged);
+        return merged;
+      });
     }
 
     void loadSignalCount();
@@ -2382,7 +2408,13 @@ const isJoined =
 
 
     // 🔵 파란점: 받은 신호가 있으면 클릭 즉시 읽음 처리 후 바로 답장 신호를 연다.
-    if (blueSignalSenderIds.includes(targetPerson.id) && receiverUserId) {
+    // blue 목록/타일 표시는 "상대 userId(=signals.sender_id)" 기준이다. 과거엔
+    // person.id 로만 게이트해 person.id != userId 인 연결에서 탭으로 파란점이 안
+    // 꺼졌다. receiverUserId(상대 userId) 우선 매칭 + person.id 는 하위호환 fallback.
+    const hasBlueSignalForTarget =
+      (receiverUserId && blueSignalSenderIds.includes(receiverUserId)) ||
+      blueSignalSenderIds.includes(targetPerson.id);
+    if (hasBlueSignalForTarget && receiverUserId) {
       // me 이름이 미완성이면 답장 신호 시트를 열지 않고(파란점도 유지) 이름
       // 입력을 안내한다.
       if (isIncompleteMeName(readMeProfileName())) {

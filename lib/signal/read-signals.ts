@@ -89,3 +89,37 @@ export async function markSignalsReadFromSender(
 
   return true;
 }
+
+/**
+ * 현재 사용자가 받은(받는사람=me) 미확인(is_read=false) 신호들의 sender_id 목록을
+ * 반환한다. Home mount-time 파란점 backfill 전용(앱이 닫힌 사이 받은 신호 복원).
+ * - 빈 값/자기 자신(sender==me) 제거 + unique 처리.
+ * - 조회 실패 시 [] 반환(앱을 깨지 않고, 호출부는 기존 blue state 를 유지).
+ */
+export async function readUnreadReceivedSenderIds(userId: string) {
+  const cleanId = cleanUserId(userId);
+
+  if (!cleanId || cleanId === "me") {
+    return [] as string[];
+  }
+
+  const { data, error } = await supabase
+    .from("signals")
+    .select("sender_id")
+    .eq("receiver_id", cleanId)
+    .eq("is_read", false);
+
+  if (error) {
+    console.warn("받은 미확인 신호 sender 조회 실패:", error.message);
+    return [] as string[];
+  }
+
+  const senderIds = (data ?? [])
+    .map((row) => {
+      const value = (row as { sender_id?: unknown }).sender_id;
+      return typeof value === "string" ? value.trim() : "";
+    })
+    .filter((value) => value.length > 0 && value !== cleanId);
+
+  return Array.from(new Set(senderIds));
+}
