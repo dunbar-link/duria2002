@@ -50,15 +50,20 @@ export async function POST(req: Request) {
 
     const supabase = createAdminClient();
 
+    // .select("token") 로 업데이트된(=WHERE 매칭) row 들을 돌려받아 count 한다.
+    // count 가 0 이면 userId 가 어떤 row 의 inviter_user_id/accepted_person_id 와도
+    // 매칭되지 않았다는 뜻(진단용). 동작 자체는 기존과 동일.
     const inviterUpdate = await supabase
       .from("dl_invites")
       .update({ inviter_photo_url: photoValue })
-      .eq("inviter_user_id", userId);
+      .eq("inviter_user_id", userId)
+      .select("token");
 
     const acceptedUpdate = await supabase
       .from("dl_invites")
       .update({ accepted_person_photo_url: photoValue })
-      .eq("accepted_person_id", userId);
+      .eq("accepted_person_id", userId)
+      .select("token");
 
     if (inviterUpdate.error || acceptedUpdate.error) {
       console.error(
@@ -66,10 +71,37 @@ export async function POST(req: Request) {
         inviterUpdate.error?.message ?? "",
         acceptedUpdate.error?.message ?? "",
       );
-      return NextResponse.json({ ok: false }, { status: 500 });
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            inviterUpdate.error?.message ||
+            acceptedUpdate.error?.message ||
+            "update error",
+        },
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({ ok: true });
+    // URL 자체는 노출하지 않는다. host/length 정도만 진단에 제공.
+    let photoUrlHost = "";
+    if (rawPhotoUrl) {
+      try {
+        photoUrlHost = new URL(rawPhotoUrl).host;
+      } catch {
+        photoUrlHost = "";
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      hasPhotoUrl: Boolean(photoValue),
+      normalizedPhotoUrl: photoValue ? "present" : "empty",
+      photoUrlLength: rawPhotoUrl.length,
+      photoUrlHost,
+      updatedAsInviterCount: inviterUpdate.data?.length ?? 0,
+      updatedAsAcceptedCount: acceptedUpdate.data?.length ?? 0,
+    });
   } catch (err) {
     console.error("[refresh-photo] 예외:", err);
     return NextResponse.json({ ok: false }, { status: 500 });

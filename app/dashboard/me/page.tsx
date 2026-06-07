@@ -3,13 +3,15 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { getCurrentUserId } from "@/lib/auth/current-user";
-import { isIncompleteMeName } from "@/lib/me/profile-name";
+import { isIncompleteMeName, readMeProfileImageUrl } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../people/store";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const LEGACY_PROFILE_STORAGE_KEY_V2 = "dunbar-link-me-profile-v2";
 const LEGACY_PROFILE_STORAGE_KEY_V1 = "dunbar-link-me-profile-v1";
 const PROFILE_UPDATED_EVENT = "dunbar-link-me-profile-updated";
+// refresh-photo 호출 결과를 debug-beta Photo Sync Inspector 가 읽도록 남기는 키.
+const LAST_REFRESH_PHOTO_RESULT_KEY = "dunbar-link-last-refresh-photo-result";
 
 const PROFILE_BG = "#EFE7FA";
 const PROFILE_TEXT = "#4B2E83";
@@ -312,17 +314,62 @@ export default function DashboardMePage() {
   // 내 프로필 사진 public URL 을 연결된 dl_invites 행에 전파한다.
   // 이름의 refresh-name 과 동일 패턴. 빈 문자열이면 서버 사진 컬럼이 클리어된다.
   // 실패는 silent — 사용자 흐름을 막지 않는다.
-  function syncMyPhotoToServer(photoUrl: string) {
+  // 결과(진단 정보)는 localStorage 에 남겨 debug-beta Photo Sync Inspector 가
+  // 읽는다. full URL/base64 는 저장하지 않는다(length/host/count 만).
+  function syncMyPhotoToServer(photoUrl: string, source: "upload" | "save" | "reset") {
     const userId = getCurrentUserId();
     if (!userId) return;
 
-    void fetch("/api/invites/refresh-photo", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, photoUrl }),
-    }).catch(() => {
-      // silent fail
-    });
+    const trimmed = typeof photoUrl === "string" ? photoUrl.trim() : "";
+
+    void (async () => {
+      const debug: Record<string, unknown> = {
+        at: new Date().toISOString(),
+        source,
+        userId,
+        hasPhotoUrl: Boolean(trimmed),
+        photoUrlLength: trimmed.length,
+        ok: false,
+        status: 0,
+        updatedAsInviterCount: null,
+        updatedAsAcceptedCount: null,
+        errorMessage: "",
+      };
+
+      try {
+        const res = await fetch("/api/invites/refresh-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, photoUrl: trimmed }),
+        });
+        debug.status = res.status;
+
+        const payload = (await res.json().catch(() => null)) as
+          | Record<string, unknown>
+          | null;
+
+        if (payload && typeof payload === "object") {
+          debug.ok = Boolean(payload.ok);
+          debug.updatedAsInviterCount = payload.updatedAsInviterCount ?? null;
+          debug.updatedAsAcceptedCount = payload.updatedAsAcceptedCount ?? null;
+          if (typeof payload.message === "string") {
+            debug.errorMessage = payload.message;
+          }
+        }
+      } catch (err) {
+        debug.errorMessage = err instanceof Error ? err.message : "fetch failed";
+      }
+
+      // debug 저장 실패가 Me 저장 흐름을 막으면 안 된다.
+      try {
+        window.localStorage.setItem(
+          LAST_REFRESH_PHOTO_RESULT_KEY,
+          JSON.stringify(debug),
+        );
+      } catch {
+        // ignore debug persist failure
+      }
+    })();
   }
 
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -349,7 +396,7 @@ export default function DashboardMePage() {
         imageDataUrl: previewDataUrl,
       }));
       // 연결된 상대 기기에 내 사진 URL 전파.
-      syncMyPhotoToServer(syncedUrl);
+      syncMyPhotoToServer(syncedUrl, "upload");
     } catch (error) {
       if (uploadTokenRef.current !== token) return;
       console.warn("프로필 이미지 Supabase 업로드 실패:", error);
@@ -374,7 +421,7 @@ export default function DashboardMePage() {
       inputRef.current.value = "";
     }
     // 사진 초기화를 상대 기기에 전파(서버 사진 컬럼을 빈 값으로 클리어).
-    syncMyPhotoToServer("");
+    syncMyPhotoToServer("", "reset");
   }
 
   if (!hasHydrated || !isLoaded) {
@@ -508,7 +555,9 @@ export default function DashboardMePage() {
 
           // 저장 시 현재 사진도 재동기화한다. 사진을 먼저 설정한 뒤 나중에
           // 연결된 경우, 저장 한 번으로 기존 dl_invites 행에 채워 넣을 수 있다.
-          syncMyPhotoToServer(profile.imageUrl);
+          // state 의 imageUrl 이 비어 있어도 localStorage 에 public URL 이 있으면
+          // 그것으로 fallback 한다(public URL 만; imageDataUrl/base64 는 제외).
+          syncMyPhotoToServer(profile.imageUrl || readMeProfileImageUrl(), "save");
         }}
         className="mt-2 h-[58px] rounded-[18px] bg-[#079863] text-[15px] font-bold text-white shadow-sm active:scale-95"
       >

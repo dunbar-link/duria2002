@@ -39,7 +39,26 @@ type RemoteInviteRow = {
   source_person_id: string | null;
   tier: number;
   created_at: string | null;
+  // Photo Sync Inspector 용(서버 /api/invites/mine 가 내려주는 사진 컬럼).
+  inviter_photo_url?: string | null;
+  accepted_person_photo_url?: string | null;
 };
+
+type LastRefreshPhotoResult = {
+  at?: string;
+  source?: string;
+  userId?: string;
+  hasPhotoUrl?: boolean;
+  photoUrlLength?: number;
+  ok?: boolean;
+  status?: number;
+  updatedAsInviterCount?: number | null;
+  updatedAsAcceptedCount?: number | null;
+  errorMessage?: string;
+};
+
+const LAST_REFRESH_PHOTO_RESULT_KEY = "dunbar-link-last-refresh-photo-result";
+const ME_PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 
 const LAYER_DEFS = [
   { id: "family", label: "가족", min: 0, max: 1 },
@@ -137,10 +156,43 @@ export default function DashboardDebugBetaPage() {
   const [remoteInvites, setRemoteInvites] = useState<RemoteInviteRow[]>([]);
   const [remoteError, setRemoteError] = useState<string>("");
   const [myUserId, setMyUserId] = useState<string>("");
+  const [meImageUrl, setMeImageUrl] = useState<{
+    present: boolean;
+    length: number;
+    host: string;
+  }>({ present: false, length: 0, host: "" });
+  const [lastRefreshPhoto, setLastRefreshPhoto] =
+    useState<LastRefreshPhotoResult | null>(null);
 
   useEffect(() => {
     setHome(readHomeLayoutFromStorage());
     setMyUserId(getCurrentUserId());
+
+    // Photo Sync Inspector: local Me imageUrl(public URL) 상태 — 전체 URL 은
+    // 출력하지 않고 존재/length/host 만 본다(base64 imageDataUrl 은 무시).
+    try {
+      const raw = window.localStorage.getItem(ME_PROFILE_STORAGE_KEY);
+      const parsed = raw ? (JSON.parse(raw) as { imageUrl?: unknown }) : null;
+      const url =
+        typeof parsed?.imageUrl === "string" ? parsed.imageUrl.trim() : "";
+      let host = "";
+      try {
+        host = url ? new URL(url).host : "";
+      } catch {
+        host = "";
+      }
+      setMeImageUrl({ present: Boolean(url), length: url.length, host });
+    } catch {
+      setMeImageUrl({ present: false, length: 0, host: "" });
+    }
+
+    // 마지막 refresh-photo 호출 결과(me page 가 남긴 진단 기록).
+    try {
+      const raw = window.localStorage.getItem(LAST_REFRESH_PHOTO_RESULT_KEY);
+      setLastRefreshPhoto(raw ? (JSON.parse(raw) as LastRefreshPhotoResult) : null);
+    } catch {
+      setLastRefreshPhoto(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -755,6 +807,206 @@ export default function DashboardDebugBetaPage() {
                   <div
                     className={`mt-1 text-[10px] font-semibold ${
                       verdict === "OK" ? "text-[#34D399]" : "text-[#F59E0B]"
+                    }`}
+                  >
+                    판단: {verdict}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Section>
+
+      <Section title="섹션 9. Photo Sync Inspector (프로필 사진 동기화 진단)">
+        <p className="mb-2 text-[10px] leading-relaxed text-[#94A3B8]">
+          remoteProfilePhotoUrl = 상대가 올린 실제 사진 / invite.* = 서버
+          /api/invites/mine 의 사진 컬럼. 전체 URL·base64 는 표시하지 않음(존재/length/host 만).
+          read-only. 변경/저장 없음.
+        </p>
+
+        <div className="mb-2">
+          <KV k="myUserId(getCurrentUserId)" v={myUserId || "-"} />
+          <KV
+            k="local Me imageUrl"
+            v={meImageUrl.present ? `있음 (len ${meImageUrl.length})` : "없음"}
+          />
+          <KV k="local Me imageUrl host" v={meImageUrl.host || "-"} />
+        </div>
+
+        <div className="mb-2 rounded bg-[#1E293B] px-2 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8]">
+            last refresh-photo result
+          </p>
+          {!lastRefreshPhoto ? (
+            <p className="mt-1 text-[#64748B]">
+              기록 없음 (아직 Me 사진 업로드/저장/초기화를 안 했거나 다른 기기)
+            </p>
+          ) : (
+            <div className="mt-1 grid gap-0.5 text-[10px] text-[#CBD5E1]">
+              <div>
+                <span className="text-[#64748B]">at:</span>{" "}
+                {lastRefreshPhoto.at ?? "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">source:</span>{" "}
+                {lastRefreshPhoto.source ?? "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">ok:</span>{" "}
+                <span
+                  className={
+                    lastRefreshPhoto.ok ? "text-[#34D399]" : "text-[#F87171]"
+                  }
+                >
+                  {String(lastRefreshPhoto.ok ?? "-")}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748B]">status:</span>{" "}
+                {lastRefreshPhoto.status ?? "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">hasPhotoUrl:</span>{" "}
+                <span
+                  className={
+                    lastRefreshPhoto.hasPhotoUrl
+                      ? "text-[#34D399]"
+                      : "text-[#F59E0B]"
+                  }
+                >
+                  {String(lastRefreshPhoto.hasPhotoUrl ?? "-")}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748B]">photoUrlLength:</span>{" "}
+                {lastRefreshPhoto.photoUrlLength ?? "-"}
+              </div>
+              <div>
+                <span className="text-[#64748B]">updatedAsInviterCount:</span>{" "}
+                <span
+                  className={
+                    (lastRefreshPhoto.updatedAsInviterCount ?? 0) > 0
+                      ? "text-[#34D399]"
+                      : "text-[#F59E0B]"
+                  }
+                >
+                  {lastRefreshPhoto.updatedAsInviterCount ?? "-"}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748B]">updatedAsAcceptedCount:</span>{" "}
+                <span
+                  className={
+                    (lastRefreshPhoto.updatedAsAcceptedCount ?? 0) > 0
+                      ? "text-[#34D399]"
+                      : "text-[#F59E0B]"
+                  }
+                >
+                  {lastRefreshPhoto.updatedAsAcceptedCount ?? "-"}
+                </span>
+              </div>
+              {lastRefreshPhoto.errorMessage ? (
+                <div className="text-[#F87171]">
+                  <span className="text-[#64748B]">errorMessage:</span>{" "}
+                  {lastRefreshPhoto.errorMessage}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8]">
+          connected person 별 사진 상태
+        </p>
+        {classified.accepted.length === 0 ? (
+          <p className="text-[#64748B]">accepted person 없음</p>
+        ) : (
+          <ul className="space-y-2">
+            {classified.accepted.map((p) => {
+              const r = p as Record<string, unknown>;
+              const remoteProfilePhotoUrl =
+                typeof r.remoteProfilePhotoUrl === "string"
+                  ? r.remoteProfilePhotoUrl.trim()
+                  : "";
+              const inv = findRemoteInviteForInspector(p);
+              const inviterPhotoPresent = Boolean(inv?.inviter_photo_url);
+              const acceptedPhotoPresent = Boolean(
+                inv?.accepted_person_photo_url,
+              );
+              const iAmInviter = Boolean(
+                inv && myUserId && inv.inviter_user_id === myUserId,
+              );
+              const iAmAccepter = Boolean(
+                inv && myUserId && inv.accepted_person_id === myUserId,
+              );
+              const counterpartPhotoPresent = iAmInviter
+                ? acceptedPhotoPresent
+                : iAmAccepter
+                  ? inviterPhotoPresent
+                  : false;
+              const counterpartPhotoField = iAmInviter
+                ? "acceptedPersonPhotoUrl"
+                : iAmAccepter
+                  ? "inviterPhotoUrl"
+                  : "-";
+              const role = !inv
+                ? "matched invite MISSING"
+                : iAmInviter
+                  ? "나=inviter"
+                  : iAmAccepter
+                    ? "나=accepter"
+                    : "role 불명";
+              const verdict = !inv
+                ? "invite MISSING"
+                : counterpartPhotoPresent
+                  ? "OK (counterpart photo present)"
+                  : "counterpart photo 없음";
+              return (
+                <li
+                  key={p.id}
+                  className="rounded bg-[#1E293B] px-2 py-2 break-all"
+                >
+                  <div className="text-[11px]">
+                    <span className="text-[#94A3B8]">display:</span>{" "}
+                    <span className="font-semibold text-white">
+                      {getPersonDisplayName(p)}
+                    </span>
+                  </div>
+                  <div className="mt-1 grid gap-0.5 text-[10px] text-[#CBD5E1]">
+                    <div>
+                      <span className="text-[#64748B]">
+                        person.remoteProfilePhotoUrl:
+                      </span>{" "}
+                      {remoteProfilePhotoUrl
+                        ? `있음 (len ${remoteProfilePhotoUrl.length})`
+                        : "없음"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">invite.inviterPhotoUrl:</span>{" "}
+                      {inviterPhotoPresent ? "있음" : "없음"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">
+                        invite.acceptedPersonPhotoUrl:
+                      </span>{" "}
+                      {acceptedPhotoPresent ? "있음" : "없음"}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">role:</span> {role}
+                    </div>
+                    <div>
+                      <span className="text-[#64748B]">
+                        counterpartPhoto({counterpartPhotoField}):
+                      </span>{" "}
+                      {counterpartPhotoPresent ? "있음" : "없음"}
+                    </div>
+                  </div>
+                  <div
+                    className={`mt-1 text-[10px] font-semibold ${
+                      verdict.startsWith("OK")
+                        ? "text-[#34D399]"
+                        : "text-[#F59E0B]"
                     }`}
                   >
                     판단: {verdict}
