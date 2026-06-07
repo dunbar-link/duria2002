@@ -1126,7 +1126,7 @@ export function RightMetaColumn({
   const metaText = layerColor.text;
 
   return (
-    <div className="relative h-[58px] w-[64px] shrink-0">
+    <div className="relative h-[68px] w-[64px] shrink-0">
       <div className="absolute right-0 top-0 flex items-center gap-[5px] whitespace-nowrap">
         <span
           className="text-[12px] font-semibold leading-none tracking-[-0.01em]"

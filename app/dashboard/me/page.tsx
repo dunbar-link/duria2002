@@ -628,9 +628,9 @@ export default function DashboardMePage() {
       <p className="mt-3 text-center text-[11px] font-medium text-[#8D99AE]">
         입력하는 동안 자동으로 저장돼요
       </p>
-      <p className="mt-1 text-center text-[12px] font-semibold text-[#4B2E83]">
+      <p className="mt-1 text-center text-[13px] font-semibold leading-[1.5] text-[#4B2E83]">
         {profile.imageUrl
-          ? "저장하면 이름·사진이 연결된 사람에게 반영돼요"
+          ? "저장하면 이름과 사진이 연결된 사람에게 반영돼요"
           : profile.imageDataUrl
             ? "사진을 다시 선택하면 연결된 사람에게도 보여요"
             : "저장하면 이름이 연결된 사람에게 반영돼요"}
@@ -679,7 +679,7 @@ export default function DashboardMePage() {
             setPhotoNotice({ tone: "success", text: "저장했어요" });
           }
         }}
-        className="mt-2 h-[60px] rounded-[18px] bg-[#079863] text-[16px] font-bold text-white shadow-md ring-1 ring-[#057A50] active:scale-95"
+        className="mt-3 h-[68px] w-full rounded-[20px] bg-[#079863] text-[17px] font-bold text-white shadow-lg ring-1 ring-[#057A50] active:scale-[0.98]"
       >
         저장하기
       </button>

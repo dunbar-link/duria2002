@@ -560,14 +560,8 @@ export default function DashboardPeoplePage() {
     return remoteInvites.filter((item) => item.status === "pending");
   }, [remoteInvites]);
 
-  const latestAcceptedInvite = acceptedInvites[0] ?? null;
-  const latestRemoteAcceptedInvite = remoteAcceptedInvites[0] ?? null;
   const latestPendingInvite = pendingInvites[0] ?? null;
   const latestRemotePendingInvite = remotePendingInvites[0] ?? null;
-
-  const latestAcceptedPersonId = latestAcceptedInvite?.acceptedPersonId ?? null;
-  const latestRemoteAcceptedPersonName =
-    latestRemoteAcceptedInvite?.accepted_person_name ?? null;
 
   const pendingInviteMapByPersonId = useMemo(() => {
     return pendingInvites.reduce<Record<string, (typeof pendingInvites)[number]>>(
@@ -1221,11 +1215,6 @@ export default function DashboardPeoplePage() {
               const isPendingInstall = Boolean(
                 pendingInviteDraft || findPendingForPerson(person),
               );
-              const isNewestAccepted =
-                !isPendingInstall &&
-                (latestAcceptedPersonId === person.id ||
-                  normalizeName(latestRemoteAcceptedPersonName) === normalizeName(person.name));
-
               const isContactPickerOpen =
                 !isPendingInstall &&
                 person.ctaKind === "contact" &&
@@ -1281,9 +1270,6 @@ export default function DashboardPeoplePage() {
                         <h2 className="truncate text-[17px] font-bold tracking-[-0.03em] text-[#0F172A]">
                           {person.name}
                         </h2>
-                        {isNewestAccepted ? (
-                          <span className="h-[9px] w-[9px] rounded-full bg-[#E24B4A] ring-2 ring-white" />
-                        ) : null}
                       </div>
 
                       <div className="mt-1 flex items-center gap-2">

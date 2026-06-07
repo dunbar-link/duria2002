@@ -31,7 +31,7 @@ function isActive(pathname: string, href: string) {
 function TabIcon({ type }: { type: TabItem["icon"] }) {
   if (type === "home") {
     return (
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M3.5 10.7L12 3.8l8.5 6.9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M5.8 9.6V20h12.4V9.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M9.4 20v-6.2h5.2V20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -41,7 +41,7 @@ function TabIcon({ type }: { type: TabItem["icon"] }) {
 
   if (type === "people") {
     return (
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M12 12.2a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         <path d="M4.8 20.2c.9-3.7 3.4-5.7 7.2-5.7s6.3 2 7.2 5.7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       </svg>
@@ -64,8 +64,8 @@ export default function DashboardLayout({ children }: Props) {
       <div className="mx-auto flex h-[100dvh] w-full max-w-md flex-col overflow-hidden bg-[#FAFAF8] shadow-[0_10px_30px_rgba(44,44,42,0.08)]">
         <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
 
-        <div className="shrink-0 bg-[#F5F3EE] px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-3">
-          <nav className="rounded-[34px] bg-[#2C2C2A] px-3 py-3 shadow-[0_14px_32px_rgba(44,44,42,0.18)]">
+        <div className="shrink-0 bg-[#F5F3EE] px-4 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2">
+          <nav className="rounded-[30px] bg-[#2C2C2A] px-3 py-2 shadow-[0_12px_28px_rgba(44,44,42,0.16)]">
             <div className="grid grid-cols-3 gap-3">
               {tabs.map((tab) => {
                 const active = isActive(pathname, tab.href);
@@ -75,14 +75,14 @@ export default function DashboardLayout({ children }: Props) {
                     key={tab.href}
                     href={tab.href}
                     className={[
-                      "flex h-[74px] flex-col items-center justify-center rounded-[26px] text-center transition active:scale-[0.98]",
+                      "flex h-[60px] flex-col items-center justify-center rounded-[22px] text-center transition active:scale-[0.98]",
                       active
                         ? "bg-[#444441] text-[#F1EFE8]"
                         : "bg-transparent text-[#A8A59D] hover:text-[#F1EFE8]",
                     ].join(" ")}
                   >
                     <span className="leading-none"><TabIcon type={tab.icon} /></span>
-                    <span className="mt-2 text-[14px] font-semibold tracking-[-0.02em]">
+                    <span className="mt-1.5 text-[13px] font-semibold tracking-[-0.02em]">
                       {tab.label}
                     </span>
                   </Link>

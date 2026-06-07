@@ -431,6 +431,26 @@ export default function HomeRecommendationList({
 
       
 
+      {peopleStoreHydrated && activeCount === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-[6px] rounded-[16px] border border-dashed border-slate-200 bg-white/55 px-[12px] py-[16px] text-center">
+          <p className="text-[12px] font-medium text-slate-500">
+            아직 추천할 사람이 없어요
+          </p>
+          <p className="text-[11px] leading-[1.5] text-slate-400">
+            초대로 연결된 사람이 생기면 여기에서 홈에 바로 추가할 수 있어요.
+          </p>
+          {showSearchButton ? (
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              className="mt-[2px] rounded-full border border-slate-200 bg-white px-[12px] py-[6px] text-[11px] font-medium text-slate-500 shadow-[0_3px_10px_rgba(15,23,42,0.05)] active:scale-[0.97]"
+            >
+              사람 검색
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <style jsx>{`
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
