@@ -59,6 +59,12 @@ export default function HomeRecommendationSheet({
   // Close → keep mounted for one transition cycle so the slide-out plays.
   useEffect(() => {
     if (open) {
+      // 이미 보이는 상태면 다시 "entering"으로 리셋하지 않는다.
+      // (deps에 visibility가 있어, 리셋하면 visible↔entering 진동이 생겨
+      //  시트가 떠도 즉시 사라져 "안 열리는" 것처럼 보였다.)
+      if (visibility === "visible") {
+        return;
+      }
       setVisibility("entering");
       const id = requestAnimationFrame(() => setVisibility("visible"));
       return () => cancelAnimationFrame(id);

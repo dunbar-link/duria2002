@@ -214,11 +214,12 @@ export function useHomeDragDrop({
         const involvesMe =
           dragState.entityId === "family-me" || targetEntityId === "family-me";
         const sourceIsFolder = Boolean(folders[dragState.entityId]);
-        const targetIsFolder = Boolean(
-          targetEntityId && folders[targetEntityId]
-        );
 
-        if (involvesMe || sourceIsFolder || targetIsFolder) {
+        // 사람을 "기존 폴더" 중앙에 떨어뜨리면 폴더에 추가(combine)되어야 한다.
+        // 과거엔 target 이 폴더면 move 로 우회시켜, 폴더 생성(2명) 이후 3번째부터
+        // 폴더에 안 들어갔다. me 또는 folder-소스(폴더 중첩 방지)만 move 로 보내고,
+        // person → folder 는 combineEntityIntoTarget(기존에 폴더 insert 지원)으로 둔다.
+        if (involvesMe || sourceIsFolder) {
           setLayoutState((current) =>
             moveEntityToTarget(
               current,
