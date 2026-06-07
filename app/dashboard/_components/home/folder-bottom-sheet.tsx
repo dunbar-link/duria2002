@@ -42,10 +42,12 @@ type PersonRuntimeFlags = {
 };
 
 
-function isPersonActionNeeded(
+// 폴더 내부 멤버 타일 오른쪽 빨간 배지 전용 조건. Home 타일과 동일하게
+// "아직 연결되지 않은 사람(미가입/초대중/연결 전, isJoined !== true)"에게만 표시한다.
+// 연결 완료자는 cadence 가 due 여도 빨간점을 켜지 않는다(store 의 cadence 계산은 보존).
+function isUnjoinedBadgeNeeded(
   entityId: string,
   people: DashboardPerson[],
-  getRecommendedAction: (person: DashboardPerson) => string,
 ) {
   const person = people.find((item) => item.id === entityId);
 
@@ -53,18 +55,13 @@ function isPersonActionNeeded(
     return false;
   }
 
-  if (!((person as DashboardPerson & PersonRuntimeFlags).isJoined === true || (person as DashboardPerson & PersonRuntimeFlags).joined === true || (person as DashboardPerson & PersonRuntimeFlags).status === "joined" || (person as DashboardPerson & PersonRuntimeFlags).connectionStatus === "joined")) {
-    return true;
-  }
-
-  return getRecommendedAction(person) !== "maintain";
+  return (person as DashboardPerson & PersonRuntimeFlags).isJoined !== true;
 }
 
-function hasUrgentInFolder(
+function hasUnjoinedInFolder(
   folder: FolderEntity,
   folders: FolderMap,
   people: DashboardPerson[],
-  getRecommendedAction: (person: DashboardPerson) => string,
 ): boolean {
   return folder.memberIds.some((memberId) => {
     if (!memberId || typeof memberId !== "string") return false;
@@ -72,15 +69,10 @@ function hasUrgentInFolder(
     const nestedFolder = folders[memberId];
 
     if (nestedFolder) {
-      return hasUrgentInFolder(
-        nestedFolder,
-        folders,
-        people,
-        getRecommendedAction,
-      );
+      return hasUnjoinedInFolder(nestedFolder, folders, people);
     }
 
-    return isPersonActionNeeded(memberId, people, getRecommendedAction);
+    return isUnjoinedBadgeNeeded(memberId, people);
   });
 }
 
@@ -172,7 +164,6 @@ function FolderMemberTile({
   onLongPressDragStart,
   onPersonClick,
   people,
-  getRecommendedAction,
 }: {
   entityId: string;
   folders: FolderMap;
@@ -193,14 +184,13 @@ function FolderMemberTile({
   ) => void;
   onPersonClick?: (entityId: string) => void;
   people: DashboardPerson[];
-  getRecommendedAction: (person: DashboardPerson) => string;
 }) {
   const folder = folders[entityId];
   const person = folder ? null : personCatalog[entityId];
 
   const showUrgentBadge = folder
-    ? hasUrgentInFolder(folder, folders, people, getRecommendedAction)
-    : isPersonActionNeeded(entityId, people, getRecommendedAction);
+    ? hasUnjoinedInFolder(folder, folders, people)
+    : isUnjoinedBadgeNeeded(entityId, people);
 
   const { bind, wasLongPressedRef, cancelLongPress } = useLongPress({
     onLongPress: (point) => {
@@ -344,9 +334,6 @@ export default function FolderBottomSheet({
   const people = usePeopleStore((state) => state.people);
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
   const markContacted = usePeopleStore((state) => state.markContacted);
-  const getRecommendedAction = usePeopleStore(
-    (state) => state.getRecommendedAction,
-  );
 
   const [nameInput, setNameInput] = useState(folder.customName ?? "");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -653,7 +640,6 @@ export default function FolderBottomSheet({
                   onLongPressDragStart={onLongPressDragStart}
                   onPersonClick={onPersonClick}
                   people={people}
-                  getRecommendedAction={getRecommendedAction}
                 />
               );
             })}

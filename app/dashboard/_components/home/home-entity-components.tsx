@@ -134,10 +134,14 @@ function hasBlueSignalInFolder(
   });
 }
 
-function isPersonActionNeeded(
+// Home 타일 오른쪽 위 빨간 배지(UrgentBadge) 전용 조건.
+// "아직 연결되지 않은 사람(미가입/초대중/연결 전)"에게만 표시한다.
+// 연결 완료(isJoined=true)된 사람은 cadence 가 due 여도 여기서 빨간점을 켜지 않는다
+// (cadence 기반 챙김 표시는 People/상세 책임이며, store 의 getRecommendedAction 계산은
+//  그대로 보존한다 — 단지 Home 타일 빨간점에 더는 쓰지 않을 뿐).
+function isUnjoinedBadgeNeeded(
   entityId: string,
   people: DashboardPerson[],
-  getRecommendedAction: (person: DashboardPerson) => string,
 ) {
   const person = people.find((item) => item.id === entityId);
 
@@ -145,18 +149,13 @@ function isPersonActionNeeded(
     return false;
   }
 
-  if (!(person as any).isJoined) {
-    return true;
-  }
-
-  return getRecommendedAction(person) !== "maintain";
+  return (person as any).isJoined !== true;
 }
 
-function hasUrgentInFolder(
+function hasUnjoinedInFolder(
   folder: FolderEntity,
   folders: FolderMap,
   people: DashboardPerson[],
-  getRecommendedAction: (person: DashboardPerson) => string,
 ): boolean {
   return folder.memberIds.some((memberId) => {
     if (!memberId || typeof memberId !== "string") {
@@ -166,15 +165,10 @@ function hasUrgentInFolder(
     const nestedFolder = folders[memberId];
 
     if (nestedFolder) {
-      return hasUrgentInFolder(
-        nestedFolder,
-        folders,
-        people,
-        getRecommendedAction,
-      );
+      return hasUnjoinedInFolder(nestedFolder, folders, people);
     }
 
-    return isPersonActionNeeded(memberId, people, getRecommendedAction);
+    return isUnjoinedBadgeNeeded(memberId, people);
   });
 }
 
@@ -633,9 +627,6 @@ export function PersonTile({
   const folder = folders[entityId];
   const person = folder ? null : personCatalog[entityId];
   const people = usePeopleStore((state) => state.people);
-  const getRecommendedAction = usePeopleStore(
-    (state) => state.getRecommendedAction,
-  );
   const [blueSignalSenderIds, setBlueSignalSenderIds] = useState<Set<string>>(
     () => readBlueSignalSenderIds(),
   );
@@ -677,8 +668,8 @@ export function PersonTile({
   }, [entityId]);
 
   const showUrgentBadge = folder
-    ? hasUrgentInFolder(folder, folders, people, getRecommendedAction)
-    : isPersonActionNeeded(entityId, people, getRecommendedAction);
+    ? hasUnjoinedInFolder(folder, folders, people)
+    : isUnjoinedBadgeNeeded(entityId, people);
 
   const showBlueSignalBadge = folder
     ? hasBlueSignalInFolder(folder, folders, people, blueSignalSenderIds)
