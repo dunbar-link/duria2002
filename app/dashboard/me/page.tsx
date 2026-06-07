@@ -679,7 +679,7 @@ export default function DashboardMePage() {
             setPhotoNotice({ tone: "success", text: "저장했어요" });
           }
         }}
-        className="mt-4 min-h-[80px] w-full rounded-[22px] bg-[#079863] py-[20px] text-[18px] font-bold text-white shadow-lg ring-1 ring-[#057A50] active:scale-[0.98]"
+        className="mt-4 min-h-[66px] w-full rounded-[18px] bg-[#079863] py-[14px] text-[17px] font-bold text-white shadow-md ring-1 ring-[#057A50] active:scale-[0.98]"
       >
         저장하기
       </button>

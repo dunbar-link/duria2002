@@ -17,7 +17,6 @@ import type {
 } from "./home-page-types";
 import {
   SHEET_GRID_COLUMN_COUNT,
-  SHEET_GRID_GAP_X,
   SHEET_TILE_WIDTH,
 } from "./home-page-types";
 import {
@@ -32,6 +31,10 @@ import { personCatalog } from "./home-page-types";
 import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
 import SignalBottomSheet from "./signal-bottom-sheet";
+
+// 폴더 "내부 구성원" 그리드 전용 타일 폭. 공유 SHEET_TILE_WIDTH(60)보다 작게 잡아
+// 좁은 폰에서도 5칸이 카드 밖으로 삐져나오지 않게 한다(레이어 더보기 시트는 그대로 유지).
+const MEMBER_TILE_WIDTH = 50;
 
 type PersonRuntimeFlags = {
   isMe?: boolean;
@@ -585,11 +588,13 @@ export default function FolderBottomSheet({
           </div>
 
           <div
-            className="grid justify-start gap-y-[14px]"
+            className="grid w-full justify-items-center gap-y-[14px]"
             style={{
-              gridTemplateColumns: `repeat(${SHEET_GRID_COLUMN_COUNT}, ${SHEET_TILE_WIDTH}px)`,
-              columnGap: `${SHEET_GRID_GAP_X}px`,
-              width: "fit-content",
+              // 고정 px(5×60=340) 대신 카드 폭을 5등분(minmax(0,1fr))해 항상 카드 안에
+              // 들어오게 한다. 타일은 MEMBER_TILE_WIDTH(50)로 셀 안에 중앙 정렬되어
+              // 마지막 아이콘/빨간 점이 카드 밖으로 삐져나오지 않는다.
+              gridTemplateColumns: `repeat(${SHEET_GRID_COLUMN_COUNT}, minmax(0, 1fr))`,
+              columnGap: "8px",
             }}
           >
             {gridIds.map((entityId, index) => {
@@ -604,7 +609,7 @@ export default function FolderBottomSheet({
                     tintClass="bg-slate-100"
                     isDropTarget={isDropTarget}
                     isDragActive={isDragActive}
-                    tileWidth={SHEET_TILE_WIDTH}
+                    tileWidth={MEMBER_TILE_WIDTH}
                     onDragOver={(event) => {
                       event.stopPropagation();
                       onDragOver(index, event, false);
@@ -624,7 +629,7 @@ export default function FolderBottomSheet({
                   folders={folders}
                   tintClass="bg-slate-100"
                   index={index}
-                  tileWidth={SHEET_TILE_WIDTH}
+                  tileWidth={MEMBER_TILE_WIDTH}
                   isDragging={
                     folderDragState?.folderId === folder.id &&
                     folderDragState.entityId === entityId &&
