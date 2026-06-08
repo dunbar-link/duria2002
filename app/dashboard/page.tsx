@@ -55,7 +55,6 @@ function showSignalNotification() {
 import {
   markSignalsReadFromSender,
   readUnreadReceivedSenderIds,
-  readUnreadSignalCount,
 } from "@/lib/signal/read-signals";
 import Link from "next/link";
 import { sendSignal } from "@/lib/signal/send-signal";
@@ -111,7 +110,7 @@ import { useHomeLayoutStorage } from "./_components/home/use-home-layout-storage
 import HomeMoveMenu from "./_components/home-move-menu";
 import type { ConnectableCandidate } from "./_components/home/connectable-candidate-types";
 import { usePeopleStore, type InviteDraft } from "./people/store";
-import { getPersonDisplayName } from "./people/data";
+import { getPersonDisplayName, isConnectedSignalUserId } from "./people/data";
 
 import { setRelationshipActionStarted } from "./people/relationship-status";
 
@@ -980,13 +979,25 @@ useEffect(() => {
     name: string;
   } | null>(null);
 
-  const [signalCount, setSignalCount] = useState(0);
+  // 받은 미확인 신호의 sender userId 목록(서버 기준). 신호함 배지는 이 중
+  // "현재 연결된 sender" 가 하나라도 있을 때만 켜진다(파생 hasUnreadSignal).
+  const [unreadSenderIds, setUnreadSenderIds] = useState<string[]>([]);
 
   const [notificationEnabled, setNotificationEnabled] = useState(false);
   const [blueSignalSenderIds, setBlueSignalSenderIds] = useState<string[]>([]);
   const [redActionDismissedMap, setRedActionDismissedMap] = useState<
     Record<string, string>
   >({});
+
+  // 연결을 삭제한 sender 의 미확인 신호는 배지에 반영하지 않는다. people 가
+  // 비동기 rehydrate 되므로 파생값으로 두어 people 로딩 후 재계산되게 한다.
+  const hasUnreadSignal = useMemo(
+    () =>
+      unreadSenderIds.some((senderId) =>
+        isConnectedSignalUserId(senderId, people, inviteDrafts),
+      ),
+    [unreadSenderIds, people, inviteDrafts],
+  );
 
   useEffect(() => {
     if (!canUseBrowserNotification()) {
@@ -1077,27 +1088,27 @@ useEffect(() => {
   useEffect(() => {
     async function loadSignalCount() {
       const userId = getCurrentUserId();
-      const count = await readUnreadSignalCount(userId);
-      setSignalCount(count);
-
-      // Home mount-time backfill: 앱이 닫힌 사이 받은 미확인(received & !is_read)
-      // 신호를 sender별 파란점으로 복원한다. realtime INSERT 경로는 그대로 두고,
-      // 서버 signals 테이블(영속 read-state)을 진실원으로 보강한다.
-      // - 조회 실패 시 헬퍼가 [] 반환 → 기존 blue state(=localStorage) 유지(앱 안 깨짐).
-      // - 기존 state(=localStorage 반영분)와 union 병합, 변화가 있을 때만 write +
-      //   state 갱신(불필요한 이벤트/렌더 방지). 읽은 신호는 is_read=true 라 여기에
-      //   안 잡혀 새로고침 후 파란점이 다시 생기지 않는다.
       if (!userId) {
         return;
       }
 
-      const unreadSenderIds = await readUnreadReceivedSenderIds(userId);
-      if (unreadSenderIds.length === 0) {
+      // Home mount-time backfill: 앱이 닫힌 사이 받은 미확인(received & !is_read)
+      // 신호를 (1) 신호함 배지용 sender 목록과 (2) sender별 파란점으로 복원한다.
+      // realtime INSERT 경로는 그대로 두고, 서버 signals 테이블(영속 read-state)을
+      // 진실원으로 보강한다.
+      // - 조회 실패 시 헬퍼가 [] 반환 → 기존 blue state(=localStorage) 유지(앱 안 깨짐).
+      // - 기존 state(=localStorage 반영분)와 union 병합, 변화가 있을 때만 write +
+      //   state 갱신(불필요한 이벤트/렌더 방지). 읽은 신호는 is_read=true 라 여기에
+      //   안 잡혀 새로고침 후 파란점이 다시 생기지 않는다.
+      const senderIds = await readUnreadReceivedSenderIds(userId);
+      setUnreadSenderIds(senderIds);
+
+      if (senderIds.length === 0) {
         return;
       }
 
       setBlueSignalSenderIds((current) => {
-        const merged = Array.from(new Set([...current, ...unreadSenderIds]));
+        const merged = Array.from(new Set([...current, ...senderIds]));
         if (merged.length === current.length) {
           return current;
         }
@@ -1125,42 +1136,30 @@ useEffect(() => {
         (payload) => {
           console.log("📩 새로운 신호 도착:", payload);
 
-          readUnreadSignalCount(userId).then((count) => {
-            setSignalCount(count);
+          // 받은 미확인 신호 sender 목록을 갱신한다(배지는 연결된 sender만 반영).
+          readUnreadReceivedSenderIds(userId).then((senderIds) => {
+            setUnreadSenderIds(senderIds);
           });
 
           const row = payload.new as Record<string, unknown>;
           const senderId =
             typeof row.sender_id === "string" ? row.sender_id.trim() : "";
 
-          if (senderId && senderId !== userId) {
-            const matchedPerson = people.find((person) => {
-              const personRecord = person as Record<string, unknown>;
-              const latestInviteDraft =
-                inviteDrafts
-                  .filter((item) => item.sourcePersonId === person.id)
-                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ??
-                null;
-
-              return (
-                person.id === senderId ||
-                personRecord.userId === senderId ||
-                personRecord.dlUserId === senderId ||
-                personRecord.acceptedPersonId === senderId ||
-                latestInviteDraft?.acceptedPersonId === senderId
-              );
-            });
-
-            const blueId = senderId;
-
+          // 연결이 끊긴(=내 people/inviteDrafts 에 없는) sender 의 신호는
+          // 파란점/알림에 반영하지 않는다. 연결된 sender 일 때만 처리한다.
+          if (
+            senderId &&
+            senderId !== userId &&
+            isConnectedSignalUserId(senderId, people, inviteDrafts)
+          ) {
             setBlueSignalSenderIds((current) => {
-              const next = Array.from(new Set([...current, blueId]));
+              const next = Array.from(new Set([...current, senderId]));
               writeBlueSignalSenderIds(next);
               return next;
             });
-          }
 
-          showSignalNotification();
+            showSignalNotification();
+          }
         },
       )
       .on(
@@ -1172,8 +1171,8 @@ useEffect(() => {
           filter: `receiver_id=eq.${userId}`,
         },
         () => {
-          readUnreadSignalCount(userId).then((count) => {
-            setSignalCount(count);
+          readUnreadReceivedSenderIds(userId).then((senderIds) => {
+            setUnreadSenderIds(senderIds);
           });
         },
       )
@@ -2442,8 +2441,8 @@ const isJoined =
       });
 
       void markSignalsReadFromSender(currentUserId, receiverUserId).then(() => {
-        void readUnreadSignalCount(currentUserId).then((count) => {
-          setSignalCount(count);
+        void readUnreadReceivedSenderIds(currentUserId).then((senderIds) => {
+          setUnreadSenderIds(senderIds);
         });
       });
 
@@ -2693,7 +2692,7 @@ const isJoined =
                 aria-label="신호함 열기"
               >
                 💬
-                {signalCount > 0 ? (
+                {hasUnreadSignal ? (
                   <span className="absolute right-[2px] top-[2px] h-[10px] w-[10px] rounded-full bg-red-500 ring-2 ring-white" />
                 ) : null}
               </Link>

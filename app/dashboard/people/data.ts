@@ -394,6 +394,53 @@ export function getPersonDisplayName(person: PersonNameFields): string {
 }
 
 /**
+ * 신호의 상대 userId 가 "현재 연결된 사람"으로 resolve 되는지 판정한다.
+ * - people store(person.id/userId/dlUserId/acceptedPersonId) 또는
+ *   inviteDrafts(inviterUserId/acceptedPersonId)에 매핑되면 연결된 것으로 본다.
+ * - 어디에도 매핑되지 않으면(=연결을 삭제했거나 미연결 sender) false 를 반환한다.
+ *
+ * 신호함의 "받은 신호" 노출 / 미확인 카운트 / 파란점에서 "연결이 끊긴 sender" 의
+ * 신호를 제외하는 게이트 전용 함수다. 이름 fallback("알 수 없음")과 분리한다.
+ * (store 타입을 직접 import 하면 store→data 순환이 생기므로 구조적 타입만 받는다.)
+ */
+export function isConnectedSignalUserId(
+  userId: string,
+  people: ReadonlyArray<{
+    id?: unknown;
+    userId?: unknown;
+    dlUserId?: unknown;
+    acceptedPersonId?: unknown;
+  }>,
+  inviteDrafts: ReadonlyArray<{
+    inviterUserId?: string | null;
+    acceptedPersonId?: string | null;
+  }>,
+): boolean {
+  const cleanId = trimmedString(userId);
+  if (!cleanId) {
+    return false;
+  }
+
+  const matchedInPeople = people.some(
+    (person) =>
+      person.id === cleanId ||
+      person.userId === cleanId ||
+      person.dlUserId === cleanId ||
+      person.acceptedPersonId === cleanId,
+  );
+
+  if (matchedInPeople) {
+    return true;
+  }
+
+  return inviteDrafts.some(
+    (draft) =>
+      (Boolean(draft.inviterUserId) && draft.inviterUserId === cleanId) ||
+      (Boolean(draft.acceptedPersonId) && draft.acceptedPersonId === cleanId),
+  );
+}
+
+/**
  * 사진 모델 분리 resolver (이름 모델과 동형).
  * - remoteProfilePhotoUrl: 상대가 자기 Me 에 설정한 현재 프로필 사진(연결 sync 로 갱신).
  * - localPhotoOverride: 내가 친구에게 지정하는 로컬 사진. Phase 1 미구현(자리만 둠).

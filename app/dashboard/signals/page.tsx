@@ -9,7 +9,10 @@ import {
 } from "@/lib/signal/read-signals";
 import { supabase } from "@/lib/supabase-client";
 import { usePeopleStore } from "@/app/dashboard/people/store";
-import { getPersonDisplayName } from "@/app/dashboard/people/data";
+import {
+  getPersonDisplayName,
+  isConnectedSignalUserId,
+} from "@/app/dashboard/people/data";
 
 type LoadStatus = "idle" | "loading" | "success" | "error";
 
@@ -113,11 +116,24 @@ export default function SignalsPage() {
     void syncAcceptedInvitesToPeople();
   }, [syncAcceptedInvitesToPeople]);
 
+  // 받은 신호는 sender 가 현재 연결된 사람으로 resolve 될 때만 노출한다.
+  // 연결을 삭제한 상대가 보낸 신호는 인박스 카드 / 미확인 카운트에서 제외한다.
+  // 보낸 신호는 그대로 유지한다(받는 사람 표시/카드 동작 변경 없음).
+  const visibleSignals = useMemo(() => {
+    return signals.filter((signal) => {
+      const isReceived = signal.receiver_id === currentUserId;
+      if (!isReceived) {
+        return true;
+      }
+      return isConnectedSignalUserId(signal.sender_id, people, inviteDrafts);
+    });
+  }, [signals, currentUserId, people, inviteDrafts]);
+
   const unreadSignals = useMemo(() => {
-    return signals.filter(
+    return visibleSignals.filter(
       (signal) => signal.receiver_id === currentUserId && !signal.is_read,
     );
-  }, [currentUserId, signals]);
+  }, [currentUserId, visibleSignals]);
 
   const unreadCount = unreadSignals.length;
 
@@ -410,13 +426,13 @@ export default function SignalsPage() {
             </div>
           ) : null}
 
-          {loadStatus !== "loading" && signals.length === 0 ? (
+          {loadStatus !== "loading" && visibleSignals.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
               아직 신호가 없어요.
             </div>
           ) : null}
 
-          {signals.map((signal) => {
+          {visibleSignals.map((signal) => {
             const isReceived = signal.receiver_id === currentUserId;
             const isUnread = isReceived && !signal.is_read;
             const oppositeName = isReceived
