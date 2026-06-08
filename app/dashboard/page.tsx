@@ -1207,40 +1207,18 @@ useEffect(() => {
     }
 
     setLayoutState((current) => {
-      const placedEntityIds = new Set<string>();
-
-      for (const layer of Object.values(current)) {
-        for (const entityId of layer.visibleSlotIds) {
-          if (entityId) {
-            placedEntityIds.add(entityId);
-          }
-        }
-
-        for (const entityId of layer.hiddenSlotIds) {
-          if (entityId) {
-            placedEntityIds.add(entityId);
-          }
-        }
-      }
-
+      // 폴더 멤버는 폴더 안에서 관리되므로 재배치/삽입 대상에서 제외한다(폴더 보존).
+      // 폴더 추가(combine) 시점에 이미 폴더 레이어 tier 로 sync 되므로 손대지 않는다.
+      const folderMemberIds = new Set<string>();
       for (const folder of Object.values(folders)) {
         for (const memberId of folder.memberIds) {
           if (memberId) {
-            placedEntityIds.add(memberId);
+            folderMemberIds.add(memberId);
           }
         }
       }
 
-      const unplacedPeople = people.filter(
-        (person) => !placedEntityIds.has(person.id),
-      );
-
-      if (unplacedPeople.length === 0) {
-        return current;
-      }
-
       const next: Record<string, LayerLayoutState> = {};
-
       for (const [layerId, layer] of Object.entries(current)) {
         next[layerId] = {
           ...layer,
@@ -1250,38 +1228,93 @@ useEffect(() => {
       }
 
       const layerIds = Object.keys(next);
+      if (layerIds.length === 0) {
+        return current;
+      }
 
-      for (const person of unplacedPeople) {
-        const targetLayerId =
-          layerIds.find(
-            (layerId) => getTierByLayerId(layerId) === person.tier,
-          ) ?? layerIds[layerIds.length - 1];
+      // 현재 레이어 슬롯(visible/hidden)에 배치된 person 위치를 수집한다.
+      type SlotLocation = {
+        layerId: string;
+        area: "visible" | "hidden";
+        index: number;
+      };
+      const slotLocationById = new Map<string, SlotLocation>();
+      for (const [layerId, layer] of Object.entries(next)) {
+        layer.visibleSlotIds.forEach((id, index) => {
+          if (id) {
+            slotLocationById.set(id, { layerId, area: "visible", index });
+          }
+        });
+        layer.hiddenSlotIds.forEach((id, index) => {
+          if (id) {
+            slotLocationById.set(id, { layerId, area: "hidden", index });
+          }
+        });
+      }
 
+      const resolveTargetLayerId = (tier: number) =>
+        layerIds.find((layerId) => getTierByLayerId(layerId) === tier) ??
+        layerIds[layerIds.length - 1];
+
+      const placeIntoLayer = (layerId: string, personId: string) => {
+        const layer = next[layerId];
+        if (!layer) {
+          return;
+        }
+        const emptyVisibleIndex = layer.visibleSlotIds.findIndex((id) => !id);
+        if (emptyVisibleIndex >= 0) {
+          layer.visibleSlotIds[emptyVisibleIndex] = personId;
+          return;
+        }
+        if (!layer.hiddenSlotIds.includes(personId)) {
+          layer.hiddenSlotIds.push(personId);
+        }
+      };
+
+      let changed = false;
+
+      for (const person of people) {
+        // 폴더 안의 사람은 폴더 동작 보존을 위해 건드리지 않는다.
+        if (folderMemberIds.has(person.id)) {
+          continue;
+        }
+
+        const targetLayerId = resolveTargetLayerId(person.tier);
         if (!targetLayerId) {
           continue;
         }
 
-        const targetLayer = next[targetLayerId];
+        const location = slotLocationById.get(person.id);
 
-        if (!targetLayer) {
+        // (1) 아직 어디에도 배치되지 않은 사람 → People tier 레이어에 삽입.
+        if (!location) {
+          placeIntoLayer(targetLayerId, person.id);
+          changed = true;
           continue;
         }
 
-        const emptyVisibleIndex = targetLayer.visibleSlotIds.findIndex(
-          (id) => !id,
-        );
-
-        if (emptyVisibleIndex >= 0) {
-          targetLayer.visibleSlotIds[emptyVisibleIndex] = person.id;
+        // (2) 이미 People tier 와 일치하는 레이어에 있으면 위치를 그대로 둔다
+        //     (visible/hidden, index 보존 — 정상 사용자의 배치는 건드리지 않음).
+        if (location.layerId === targetLayerId) {
           continue;
         }
 
-        if (!targetLayer.hiddenSlotIds.includes(person.id)) {
-          targetLayer.hiddenSlotIds.push(person.id);
+        // (3) People tier 와 다른 레이어에 배치돼 있으면(=Home/People tier 불일치)
+        //     기존 슬롯에서 빼고 People tier 레이어로 옮긴다. Home 에서 옮기면
+        //     항상 People tier 가 sync 되므로, 이 보정은 sync 누락 / 초대수락 기본
+        //     배치 등으로 생긴 불일치에서만 동작하고 정상 배치는 바꾸지 않는다.
+        if (location.area === "visible") {
+          next[location.layerId].visibleSlotIds[location.index] = null;
+        } else {
+          next[location.layerId].hiddenSlotIds = next[
+            location.layerId
+          ].hiddenSlotIds.filter((id) => id !== person.id);
         }
+        placeIntoLayer(targetLayerId, person.id);
+        changed = true;
       }
 
-      return next;
+      return changed ? next : current;
     });
   }, [people, hasHydrated, storageReady, folders]);
 
