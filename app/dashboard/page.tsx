@@ -1589,65 +1589,56 @@ useEffect(() => {
         }
       }
 
-      let didMove = false;
-      // Capture swap meta so we can sync the displaced target entity's
-      // person.tier(s) to the source's old layer. Without this a person→folder
-      // swap (mobile path) leaves the folder's members on their previous tier
-      // even though Home count already reflects the new layer.
-      let sourceOldLayerId: string | null = null;
-      let swappedTargetEntityId: string | null = null;
+      // Resolve the move synchronously from the committed layoutState — see
+      // the home-main long-press path for the full rationale. Reading didMove
+      // from inside the setLayoutState updater was unreliable (React runs the
+      // updater during render), so updatePersonTier could be skipped and the
+      // 9c15bfb reconcile effect would relocate the person back. Deciding
+      // synchronously guarantees the person.tier sync fires for every move.
+      const targetLayer = layoutState[layerId];
+      if (!targetLayer) {
+        return;
+      }
 
-      setLayoutState((current) => {
-        const targetLayer = current[layerId];
+      const targetSlots =
+        area === "visible"
+          ? targetLayer.visibleSlotIds
+          : targetLayer.hiddenSlotIds;
 
-        if (!targetLayer) {
-          return current;
-        }
+      // Never let a drop land on "나"(family-me)'s slot.
+      if (typeof index === "number" && targetSlots[index] === "family-me") {
+        return;
+      }
 
-        if (typeof index === "number") {
-          const targetSlots =
-            area === "visible"
-              ? targetLayer.visibleSlotIds
-              : targetLayer.hiddenSlotIds;
-          if (targetSlots[index] === "family-me") {
-            return current;
-          }
-        }
+      const location = findEntityLocation(layoutState, entityId);
+      if (!location) {
+        return;
+      }
 
-        const location = findEntityLocation(current, entityId);
+      // Dropped back on its own slot → nothing to do.
+      if (
+        location.layerId === layerId &&
+        location.area === area &&
+        (typeof index !== "number" || location.index === index)
+      ) {
+        return;
+      }
 
-        if (!location) {
-          return current;
-        }
+      // Swap meta: re-tier the entity displaced into source's old layer so
+      // People count stays consistent with Home (mobile person→folder swap).
+      const occupant =
+        typeof index === "number" ? targetSlots[index] ?? null : null;
+      const swappedTargetEntityId =
+        occupant &&
+        occupant !== entityId &&
+        occupant !== "family-me" &&
+        location.layerId !== layerId
+          ? occupant
+          : null;
+      const sourceOldLayerId = location.layerId;
 
-        if (
-          location.layerId === layerId &&
-          location.area === area &&
-          (typeof index !== "number" || location.index === index)
-        ) {
-          return current;
-        }
-
-        didMove = true;
-        sourceOldLayerId = location.layerId;
-
-        if (typeof index === "number") {
-          const targetSlots =
-            area === "visible"
-              ? targetLayer.visibleSlotIds
-              : targetLayer.hiddenSlotIds;
-          const occupant = targetSlots[index] ?? null;
-          if (
-            occupant &&
-            occupant !== entityId &&
-            occupant !== "family-me" &&
-            location.layerId !== layerId
-          ) {
-            swappedTargetEntityId = occupant;
-          }
-        }
-
-        return moveEntityToTarget(
+      setLayoutState((current) =>
+        moveEntityToTarget(
           current,
           {
             sourceLayerId: location.layerId,
@@ -1658,25 +1649,19 @@ useEffect(() => {
           layerId,
           area,
           index,
-        );
-      });
+        ),
+      );
 
-      if (didMove) {
-        usePeopleStore.getState().updatePersonTier(entityId, getTierByLayerId(layerId));
+      const updatePersonTier = usePeopleStore.getState().updatePersonTier;
+      updatePersonTier(entityId, getTierByLayerId(layerId));
 
-        // Mobile swap target sync: the entity displaced into source's old
-        // layer must have its person.tier (or folder member tiers) updated
-        // so People count stays consistent with Home.
-        if (swappedTargetEntityId && sourceOldLayerId) {
-          const swappedTier = getTierByLayerId(sourceOldLayerId);
-          const swappedPersonIds = getEntityPersonIdsForTierSync(
-            swappedTargetEntityId,
-            folders,
-          );
-          const updatePersonTier = usePeopleStore.getState().updatePersonTier;
-          for (const pid of swappedPersonIds) {
-            updatePersonTier(pid, swappedTier);
-          }
+      if (swappedTargetEntityId) {
+        const swappedTier = getTierByLayerId(sourceOldLayerId);
+        for (const pid of getEntityPersonIdsForTierSync(
+          swappedTargetEntityId,
+          folders,
+        )) {
+          updatePersonTier(pid, swappedTier);
         }
       }
     },
@@ -1851,65 +1836,59 @@ useEffect(() => {
         }
       }
 
-      let didMove = false;
-      // Mirror layer-sheet path: capture swap meta so the displaced target
-      // entity (often a folder) gets its members re-tiered to source's
-      // old layer. Without this, mobile person→folder swap leaves People
-      // count out of sync with Home count.
-      let sourceOldLayerId: string | null = null;
-      let swappedTargetEntityId: string | null = null;
+      // Resolve the move synchronously from the committed layoutState. The
+      // previous version mutated didMove / swap meta INSIDE the setLayoutState
+      // updater and read them right after, but React runs functional updaters
+      // during the render phase (after this callback returns), so the post-call
+      // read saw stale values and updatePersonTier was skipped — leaving People
+      // tier unsynced. The 9c15bfb reconcile effect then relocated the person
+      // back to their (unchanged) tier layer, so on mobile the tile looked
+      // impossible to move. Deciding synchronously (like the desktop HTML5
+      // path) guarantees the person.tier sync fires for every real move.
+      const targetLayer = layoutState[layerId];
+      if (!targetLayer) {
+        return;
+      }
 
-      setLayoutState((current) => {
-        const targetLayer = current[layerId];
+      const targetSlots =
+        area === "visible"
+          ? targetLayer.visibleSlotIds
+          : targetLayer.hiddenSlotIds;
 
-        if (!targetLayer) {
-          return current;
-        }
+      // Never let a drop land on "나"(family-me)'s slot.
+      if (typeof index === "number" && targetSlots[index] === "family-me") {
+        return;
+      }
 
-        if (typeof index === "number") {
-          const targetSlots =
-            area === "visible"
-              ? targetLayer.visibleSlotIds
-              : targetLayer.hiddenSlotIds;
-          if (targetSlots[index] === "family-me") {
-            return current;
-          }
-        }
+      const location = findEntityLocation(layoutState, entityId);
+      if (!location) {
+        return;
+      }
 
-        const location = findEntityLocation(current, entityId);
+      // Dropped back on its own slot → nothing to do.
+      if (
+        location.layerId === layerId &&
+        location.area === area &&
+        (typeof index !== "number" || location.index === index)
+      ) {
+        return;
+      }
 
-        if (!location) {
-          return current;
-        }
+      // Swap meta: re-tier the entity displaced into source's old layer so
+      // People count stays consistent with Home (mobile person→folder swap).
+      const occupant =
+        typeof index === "number" ? targetSlots[index] ?? null : null;
+      const swappedTargetEntityId =
+        occupant &&
+        occupant !== entityId &&
+        occupant !== "family-me" &&
+        location.layerId !== layerId
+          ? occupant
+          : null;
+      const sourceOldLayerId = location.layerId;
 
-        if (
-          location.layerId === layerId &&
-          location.area === area &&
-          (typeof index !== "number" || location.index === index)
-        ) {
-          return current;
-        }
-
-        didMove = true;
-        sourceOldLayerId = location.layerId;
-
-        if (typeof index === "number") {
-          const targetSlots =
-            area === "visible"
-              ? targetLayer.visibleSlotIds
-              : targetLayer.hiddenSlotIds;
-          const occupant = targetSlots[index] ?? null;
-          if (
-            occupant &&
-            occupant !== entityId &&
-            occupant !== "family-me" &&
-            location.layerId !== layerId
-          ) {
-            swappedTargetEntityId = occupant;
-          }
-        }
-
-        return moveEntityToTarget(
+      setLayoutState((current) =>
+        moveEntityToTarget(
           current,
           {
             sourceLayerId: location.layerId,
@@ -1920,24 +1899,19 @@ useEffect(() => {
           layerId,
           area,
           index,
-        );
-      });
+        ),
+      );
 
-      if (didMove) {
-        usePeopleStore
-          .getState()
-          .updatePersonTier(entityId, getTierByLayerId(layerId));
+      const updatePersonTier = usePeopleStore.getState().updatePersonTier;
+      updatePersonTier(entityId, getTierByLayerId(layerId));
 
-        if (swappedTargetEntityId && sourceOldLayerId) {
-          const swappedTier = getTierByLayerId(sourceOldLayerId);
-          const swappedPersonIds = getEntityPersonIdsForTierSync(
-            swappedTargetEntityId,
-            folders,
-          );
-          const updatePersonTier = usePeopleStore.getState().updatePersonTier;
-          for (const pid of swappedPersonIds) {
-            updatePersonTier(pid, swappedTier);
-          }
+      if (swappedTargetEntityId) {
+        const swappedTier = getTierByLayerId(sourceOldLayerId);
+        for (const pid of getEntityPersonIdsForTierSync(
+          swappedTargetEntityId,
+          folders,
+        )) {
+          updatePersonTier(pid, swappedTier);
         }
       }
     },
