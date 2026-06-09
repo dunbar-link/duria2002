@@ -100,6 +100,7 @@ import {
   markConnectableCandidateExplored,
   moveEntityToTarget,
   readConnectableCandidateStateMap,
+  resolveRailTarget,
   writeConnectableCandidateStateMap,
 } from "./_components/home/home-page-utils";
 import { useFolderLongPressDrag } from "./_components/home/use-folder-long-press-drag";
@@ -1600,13 +1601,30 @@ useEffect(() => {
         return;
       }
 
+      // Mobile rail-fallback drops land on a layer but not a concrete slot, so
+      // they arrive as area="visible" with index=undefined. moveEntityToTarget
+      // bails on a visible target without an index (silent no-op = "이동 안 됨"),
+      // so resolve to the layer's first empty visible slot — or the hidden
+      // overflow when the visible row is full — exactly like the desktop
+      // rail-drop path (handleDropToRailLayer / resolveRailTarget).
+      let dropArea = area;
+      let dropIndex = index;
+      if (area === "visible" && typeof index !== "number") {
+        const railTarget = resolveRailTarget(layoutState, layerId);
+        dropArea = railTarget.targetArea;
+        dropIndex = railTarget.targetIndex;
+      }
+
       const targetSlots =
-        area === "visible"
+        dropArea === "visible"
           ? targetLayer.visibleSlotIds
           : targetLayer.hiddenSlotIds;
 
       // Never let a drop land on "나"(family-me)'s slot.
-      if (typeof index === "number" && targetSlots[index] === "family-me") {
+      if (
+        typeof dropIndex === "number" &&
+        targetSlots[dropIndex] === "family-me"
+      ) {
         return;
       }
 
@@ -1615,11 +1633,11 @@ useEffect(() => {
         return;
       }
 
-      // Dropped back on its own slot → nothing to do.
+      // Dropped back on its own slot/layer → nothing to do.
       if (
         location.layerId === layerId &&
-        location.area === area &&
-        (typeof index !== "number" || location.index === index)
+        location.area === dropArea &&
+        (typeof dropIndex !== "number" || location.index === dropIndex)
       ) {
         return;
       }
@@ -1627,7 +1645,7 @@ useEffect(() => {
       // Swap meta: re-tier the entity displaced into source's old layer so
       // People count stays consistent with Home (mobile person→folder swap).
       const occupant =
-        typeof index === "number" ? targetSlots[index] ?? null : null;
+        typeof dropIndex === "number" ? targetSlots[dropIndex] ?? null : null;
       const swappedTargetEntityId =
         occupant &&
         occupant !== entityId &&
@@ -1647,8 +1665,8 @@ useEffect(() => {
             sourceArea: location.area,
           },
           layerId,
-          area,
-          index,
+          dropArea,
+          dropIndex,
         ),
       );
 
@@ -1850,13 +1868,30 @@ useEffect(() => {
         return;
       }
 
+      // Mobile rail-fallback drops land on a layer but not a concrete slot, so
+      // they arrive as area="visible" with index=undefined. moveEntityToTarget
+      // bails on a visible target without an index (silent no-op = "이동 안 됨"),
+      // so resolve to the layer's first empty visible slot — or the hidden
+      // overflow when the visible row is full — exactly like the desktop
+      // rail-drop path (handleDropToRailLayer / resolveRailTarget).
+      let dropArea = area;
+      let dropIndex = index;
+      if (area === "visible" && typeof index !== "number") {
+        const railTarget = resolveRailTarget(layoutState, layerId);
+        dropArea = railTarget.targetArea;
+        dropIndex = railTarget.targetIndex;
+      }
+
       const targetSlots =
-        area === "visible"
+        dropArea === "visible"
           ? targetLayer.visibleSlotIds
           : targetLayer.hiddenSlotIds;
 
       // Never let a drop land on "나"(family-me)'s slot.
-      if (typeof index === "number" && targetSlots[index] === "family-me") {
+      if (
+        typeof dropIndex === "number" &&
+        targetSlots[dropIndex] === "family-me"
+      ) {
         return;
       }
 
@@ -1865,11 +1900,11 @@ useEffect(() => {
         return;
       }
 
-      // Dropped back on its own slot → nothing to do.
+      // Dropped back on its own slot/layer → nothing to do.
       if (
         location.layerId === layerId &&
-        location.area === area &&
-        (typeof index !== "number" || location.index === index)
+        location.area === dropArea &&
+        (typeof dropIndex !== "number" || location.index === dropIndex)
       ) {
         return;
       }
@@ -1877,7 +1912,7 @@ useEffect(() => {
       // Swap meta: re-tier the entity displaced into source's old layer so
       // People count stays consistent with Home (mobile person→folder swap).
       const occupant =
-        typeof index === "number" ? targetSlots[index] ?? null : null;
+        typeof dropIndex === "number" ? targetSlots[dropIndex] ?? null : null;
       const swappedTargetEntityId =
         occupant &&
         occupant !== entityId &&
@@ -1897,8 +1932,8 @@ useEffect(() => {
             sourceArea: location.area,
           },
           layerId,
-          area,
-          index,
+          dropArea,
+          dropIndex,
         ),
       );
 
