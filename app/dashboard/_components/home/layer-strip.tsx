@@ -182,6 +182,9 @@ export default function LayerStrip({
                   onOpenFolder={onOpenFolder}
                   onPersonClick={onPersonClick}
                   onLongPressDragStart={onLongPressDragStart}
+                  // Home rail is non-scrollable: defer pointer capture to the
+                  // long-press fire so a short tap keeps its click on mobile.
+                  deferPointerCaptureUntilLongPress
                 />
               );
             })}

@@ -609,6 +609,7 @@ export function PersonTile({
   onOpenFolder,
   onPersonClick,
   onLongPressDragStart,
+  deferPointerCaptureUntilLongPress = false,
 }: {
   entityId: string;
   folders: FolderMap;
@@ -654,6 +655,11 @@ export function PersonTile({
     entityId: string,
     point: { x: number; y: number },
   ) => void;
+  // Home rail tiles set this true so setPointerCapture is deferred to the
+  // long-press fire — a plain tap then keeps its synthetic click on mobile.
+  // Overflow/folder sheet tiles leave it false (capture on pointerdown) to
+  // stay scroll-stable during the hold.
+  deferPointerCaptureUntilLongPress?: boolean;
 }) {
   const folder = folders[entityId];
   const person = folder ? null : personCatalog[entityId];
@@ -766,6 +772,7 @@ export function PersonTile({
     moveTolerance: 8,
     disabled: !longPressEnabled,
     capturePointer: longPressEnabled,
+    captureOnPointerDown: !deferPointerCaptureUntilLongPress,
   });
 
   const tileCore = (

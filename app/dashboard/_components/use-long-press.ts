@@ -13,6 +13,13 @@ type UseLongPressOptions = {
   moveTolerance?: number;
   disabled?: boolean;
   capturePointer?: boolean;
+  // When capturePointer is true, this controls WHEN setPointerCapture runs.
+  // true (default): capture on pointerdown — keeps an in-flight drag stable in
+  // scrollable containers (overflow sheets) but can suppress the synthetic
+  // click of a short tap on mobile.
+  // false: defer capture until the long-press fires — a plain tap then keeps
+  // its click. Use for non-scrollable surfaces (home rail) where tap must work.
+  captureOnPointerDown?: boolean;
 };
 
 type LongPressBind = {
@@ -34,6 +41,7 @@ export function useLongPress(options: UseLongPressOptions): {
     moveTolerance = 8,
     disabled = false,
     capturePointer = false,
+    captureOnPointerDown = true,
   } = options;
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,6 +50,8 @@ export function useLongPress(options: UseLongPressOptions): {
   const pressedPointerIdRef = useRef<number | null>(null);
   const pressedPointerTypeRef = useRef<string>("mouse");
   const capturedTargetRef = useRef<Element | null>(null);
+  // Element to capture if/when capture is deferred to the long-press fire.
+  const pendingCaptureTargetRef = useRef<Element | null>(null);
   const wasLongPressedRef = useRef(false);
 
   const clearTimer = useCallback(() => {
@@ -114,15 +124,21 @@ export function useLongPress(options: UseLongPressOptions): {
       startPointRef.current = point;
       latestPointRef.current = point;
 
-      if (capturePointer) {
+      // Capture the active pointer so an in-flight ghost drag keeps touch
+      // ownership. When captureOnPointerDown is false we DEFER the capture to
+      // the long-press fire below: capturing on pointerdown can suppress the
+      // synthetic click of a short tap on mobile (which broke plain taps on
+      // home person tiles). The home rail is non-scrollable, so nothing can
+      // steal the touch during the pre-long-press hold.
+      pendingCaptureTargetRef.current = event.currentTarget;
+      capturedTargetRef.current = null;
+      if (capturePointer && captureOnPointerDown) {
         try {
           event.currentTarget.setPointerCapture(event.pointerId);
           capturedTargetRef.current = event.currentTarget;
         } catch {
           capturedTargetRef.current = null;
         }
-      } else {
-        capturedTargetRef.current = null;
       }
 
       clearTimer();
@@ -130,6 +146,26 @@ export function useLongPress(options: UseLongPressOptions): {
       timerRef.current = setTimeout(() => {
         const finalPoint = latestPointRef.current ?? point;
         wasLongPressedRef.current = true;
+        // Deferred-capture path: now that the long-press (drag) is starting,
+        // grab the pointer so pointermove keeps flowing during the ghost drag.
+        if (
+          capturePointer &&
+          !captureOnPointerDown &&
+          capturedTargetRef.current === null &&
+          pendingCaptureTargetRef.current !== null &&
+          pressedPointerIdRef.current !== null
+        ) {
+          try {
+            (
+              pendingCaptureTargetRef.current as Element & {
+                setPointerCapture: (id: number) => void;
+              }
+            ).setPointerCapture(pressedPointerIdRef.current);
+            capturedTargetRef.current = pendingCaptureTargetRef.current;
+          } catch {
+            capturedTargetRef.current = null;
+          }
+        }
         onLongPress(finalPoint);
         // Keep pointer capture and pressedPointerIdRef so the ghost drag
         // retains active-touch ownership through pointermove. Capture is
@@ -137,7 +173,15 @@ export function useLongPress(options: UseLongPressOptions): {
         resetTimerState();
       }, delay);
     },
-    [capturePointer, clearTimer, delay, disabled, onLongPress, resetTimerState]
+    [
+      capturePointer,
+      captureOnPointerDown,
+      clearTimer,
+      delay,
+      disabled,
+      onLongPress,
+      resetTimerState,
+    ]
   );
 
   const handlePointerMove = useCallback(
