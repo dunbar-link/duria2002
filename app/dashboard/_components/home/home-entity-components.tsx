@@ -26,6 +26,37 @@ const HOME_BLUE_SIGNAL_CHANGE_EVENT = "dunbar-link-blue-signals-changed";
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const PROFILE_UPDATED_EVENT = "dunbar-link-me-profile-updated";
 
+// 터치(거친 포인터) 기기를 감지한다. 이런 기기에서 person 타일에 native HTML5
+// draggable 이 켜져 있으면 길게 누를 때 브라우저가 native drag 를 시작하고,
+// 그 onDragStart 가 cancelLongPress() 를 호출해 pointer 기반 long-press 고스트를
+// 가로챈다(=이동 고스트가 안 뜸). 이 값으로 터치에서는 person 타일 native drag 를
+// 꺼서 long-press 시스템이 터치를 전담하게 한다. SSR 안전을 위해 초기값은 false.
+function useIsCoarsePointer(): boolean {
+  const [coarse, setCoarse] = useState(false);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
+      return;
+    }
+
+    const mq = window.matchMedia("(pointer: coarse)");
+    const update = () => setCoarse(mq.matches);
+    update();
+
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    }
+
+    return undefined;
+  }, []);
+
+  return coarse;
+}
+
 function readMeProfileImageUrl() {
   if (typeof window === "undefined") {
     return "";
@@ -627,6 +658,7 @@ export function PersonTile({
   const folder = folders[entityId];
   const person = folder ? null : personCatalog[entityId];
   const people = usePeopleStore((state) => state.people);
+  const isCoarsePointer = useIsCoarsePointer();
   const [blueSignalSenderIds, setBlueSignalSenderIds] = useState<Set<string>>(
     () => readBlueSignalSenderIds(),
   );
@@ -716,6 +748,12 @@ export function PersonTile({
   const isMeTile = entityId === "family-me";
   const dragSourceBlocked = suppressDragSource || isMeTile;
 
+  // 터치 기기에서는 person 타일의 native HTML5 drag 를 끈다. native drag 가
+  // 길게 누르기에서 시작되면 onDragStart→cancelLongPress 로 long-press 고스트를
+  // 가로채 이동 자체가 안 된다(모바일 Chrome). 폴더 타일은 기존 동작을 유지하고,
+  // 데스크톱(정밀 포인터)은 HTML5 drag 를 그대로 쓴다.
+  const nativeDragEnabled = !dragSourceBlocked && !(isCoarsePointer && !folder);
+
   const longPressEnabled = Boolean(
     onLongPressDragStart && !folder && !dragSourceBlocked,
   );
@@ -749,7 +787,7 @@ export function PersonTile({
       WebkitUserSelect: "none",
       WebkitTouchCallout: "none",
     }}
-    draggable={!dragSourceBlocked}
+    draggable={nativeDragEnabled}
     {...(longPressEnabled ? longPressBind : {})}
     onDragStart={(event) => {
       if (dragSourceBlocked) {
