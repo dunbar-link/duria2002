@@ -789,7 +789,17 @@ export function PersonTile({
     )}
     style={{
       width: tileWidth,
-      touchAction: "manipulation",
+      // 홈 레일(비스크롤)의 long-press drag 소스 타일은 touch-action: none.
+      // manipulation 은 pan 을 허용하므로 ghost 생성 후 손가락이 움직이는 순간
+      // Chrome 이 터치를 스크롤 제스처로 가져가며 pointercancel 을 쏘고(실기기
+      // 진단 로그: start→ghost→+0.8s pointercancel), 이후 pointermove 가 끊겨
+      // 이동이 불가능했다. touch-action 은 터치 시작 시점 요소 기준으로
+      // 평가되므로 드래그 시작 후의 body lock(touch-action:none)으로는 막을 수
+      // 없다. +N/폴더 시트 타일은 시트 스크롤을 위해 manipulation 을 유지한다.
+      touchAction:
+        longPressEnabled && deferPointerCaptureUntilLongPress
+          ? "none"
+          : "manipulation",
       userSelect: "none",
       WebkitUserSelect: "none",
       WebkitTouchCallout: "none",
