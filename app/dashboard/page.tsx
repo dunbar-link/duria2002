@@ -1425,6 +1425,44 @@ useEffect(() => {
   const [folderGhostHoverState, setFolderGhostHoverState] =
     useState<DragOverState>(null);
 
+  // home-main / +N(layer-sheet) long-press drag 가 공유하는 "놓기" 하이라이트
+  // 미러. folder 경로의 onHoverChange 와 같은 패턴이지만, 그 경로와 달리
+  // shouldSkipDropTarget(드롭 후보 계산)을 추가하지 않으므로 "나"(family-me)
+  // 슬롯은 여기서 시각적으로만 걸러낸다 — 그 슬롯에 드롭하면 onDrop 가드가
+  // no-op 처리하므로 하이라이트도 보여주지 않는 게 일관적이다.
+  const handleLongPressGhostHover = useCallback(
+    (
+      candidate: {
+        layerId: string;
+        area: "visible" | "hidden";
+        index?: number;
+      } | null,
+    ) => {
+      if (
+        candidate &&
+        candidate.area === "visible" &&
+        typeof candidate.index === "number"
+      ) {
+        const slotEntityId =
+          layoutState[candidate.layerId]?.visibleSlotIds[candidate.index] ??
+          null;
+        if (slotEntityId === "family-me") {
+          setFolderGhostHoverState(null);
+          return;
+        }
+        setFolderGhostHoverState({
+          targetLayerId: candidate.layerId,
+          targetIndex: candidate.index,
+          targetArea: "visible",
+          action: "swap",
+        });
+      } else {
+        setFolderGhostHoverState(null);
+      }
+    },
+    [layoutState],
+  );
+
   const { dragState: folderLongPressDragState, beginDrag: beginFolderLongPressDrag } =
     useFolderLongPressDrag({
       onDrop: ({ folderId, entityId, layerId, area, index }) => {
@@ -1683,6 +1721,9 @@ useEffect(() => {
         }
       }
     },
+    // folder 경로에서 검증된 "놓기" 하이라이트 미러를 이 long-press 경로에도
+    // 연결한다(시각 전용 — 드롭 계산/onDrop 로직은 변경 없음).
+    onHoverChange: handleLongPressGhostHover,
   });
 
   const handleLayerSheetLongPressDragStart = useCallback(
@@ -1950,6 +1991,9 @@ useEffect(() => {
         }
       }
     },
+    // folder 경로에서 검증된 "놓기" 하이라이트 미러를 이 long-press 경로에도
+    // 연결한다(시각 전용 — 드롭 계산/onDrop 로직은 변경 없음).
+    onHoverChange: handleLongPressGhostHover,
   });
 
   const handleHomeMainLongPressDragStart = useCallback(
@@ -1968,6 +2012,16 @@ useEffect(() => {
     },
     [beginHomeMainLongPressDrag, folders],
   );
+
+  // long-press ghost drag 중인 소스 entityId. LayerStrip 의 PersonTile 이
+  // HTML5 drag 소스와 동일한 dim(scale 0.92 + opacity 0.35) 스타일을 재사용해
+  // "잡고 있다" 느낌을 주고 drop 순간이동감을 줄인다. folder 멤버/+N(hidden)
+  // 소스는 홈 레일에 타일이 없으므로 실질적으로 home-main 드래그에서 보인다.
+  const longPressDraggingEntityId =
+    homeMainLongPressDragState?.entityId ??
+    layerSheetLongPressDragState?.entityId ??
+    folderLongPressDragState?.entityId ??
+    null;
 
   const handleClosePersonActionSheet = useCallback(() => {
     setSelectedHomePersonId(null);
@@ -2805,6 +2859,7 @@ const isJoined =
                       // finger cannot hijack "나"/other home tiles as a
                       // second long-press / HTML5 drag source.
                       suppressDragSource={Boolean(folderLongPressDragState)}
+                      longPressDraggingEntityId={longPressDraggingEntityId}
                     />
                   );
                 }}

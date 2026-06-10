@@ -62,6 +62,11 @@ type LayerStripProps = {
   // or long-press drag. Used to lock out home as a drag source while a
   // folder ghost drag is already in flight.
   suppressDragSource?: boolean;
+  // entityId of the tile currently being long-press ghost dragged. That tile
+  // renders with the same dimmed "being dragged" style as an HTML5 drag
+  // source, so the original doesn't sit fully opaque while its ghost flies
+  // (which read as a teleport at drop time).
+  longPressDraggingEntityId?: string | null;
 };
 
 export default function LayerStrip({
@@ -88,6 +93,7 @@ export default function LayerStrip({
   onPersonClick,
   onLongPressDragStart,
   suppressDragSource = false,
+  longPressDraggingEntityId = null,
 }: LayerStripProps) {
   const isDragActive = dragState !== null;
   const isConnectableDrag = dragState?.sourceLayerId === "connectable-source";
@@ -165,9 +171,10 @@ export default function LayerStrip({
                   index={index}
                   sourceArea="visible"
                   isDragging={
-                    dragState?.sourceLayerId === layer.id &&
-                    dragState.entityId === entityId &&
-                    dragState.sourceArea === "visible"
+                    (dragState?.sourceLayerId === layer.id &&
+                      dragState.entityId === entityId &&
+                      dragState.sourceArea === "visible") ||
+                    longPressDraggingEntityId === entityId
                   }
                   isDropTarget={isDropTarget}
                   isCombineTarget={isCombineTarget}
