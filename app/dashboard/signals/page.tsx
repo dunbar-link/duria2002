@@ -8,11 +8,13 @@ import {
   type SignalRecord,
 } from "@/lib/signal/read-signals";
 import { supabase } from "@/lib/supabase-client";
+import { sendSignal } from "@/lib/signal/send-signal";
 import { usePeopleStore } from "@/app/dashboard/people/store";
 import {
   getPersonDisplayName,
   isConnectedSignalUserId,
 } from "@/app/dashboard/people/data";
+import SignalBottomSheet from "@/app/dashboard/_components/home/signal-bottom-sheet";
 
 type LoadStatus = "idle" | "loading" | "success" | "error";
 
@@ -103,6 +105,12 @@ export default function SignalsPage() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("idle");
   const [message, setMessage] = useState("");
   const [busySignalId, setBusySignalId] = useState<string | null>(null);
+  // 신호함 카드에서 바로 답신호를 보낼 대상. 설정되면 기존 SignalBottomSheet
+  // (이모지 피커)가 열리고, 선택 시 기존 sendSignal 흐름으로 1명에게 전송한다.
+  const [replyTarget, setReplyTarget] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     const userId = getCurrentUserId();
@@ -338,6 +346,26 @@ export default function SignalsPage() {
     setMessage("모든 신호를 읽음 처리했어요.");
   }
 
+  // 답신호 전송. 기존 sendSignal(1명 수신) 흐름 재사용 — 새 API/스키마 없음.
+  // 시트(onSelect)가 호출하며, 시트는 선택 직후 onClose 로 replyTarget 을
+  // 비우므로 여기서는 전송 결과 메시지와 목록 갱신만 책임진다. (보낸 신호는
+  // receiver 기준 realtime 구독에 안 잡히므로 loadSignals 로 직접 갱신.)
+  async function handleSendReply(emoji: string) {
+    if (!replyTarget || !currentUserId || currentUserId === "me") {
+      return;
+    }
+
+    const success = await sendSignal(currentUserId, [replyTarget.userId], emoji);
+
+    if (!success) {
+      setMessage("신호 전송에 실패했어요.");
+      return;
+    }
+
+    setMessage(`${replyTarget.name}님에게 신호를 보냈어요.`);
+    void loadSignals();
+  }
+
   async function handleDeleteSignal(signalId: string) {
     setBusySignalId(signalId);
     setMessage("");
@@ -357,6 +385,7 @@ export default function SignalsPage() {
   }
 
   return (
+    <>
     <main className="h-[100dvh] overflow-y-auto bg-slate-50 px-4 pb-36 pt-5 text-slate-950">
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         <header className="flex items-center justify-between gap-3">
@@ -435,9 +464,18 @@ export default function SignalsPage() {
           {visibleSignals.map((signal) => {
             const isReceived = signal.receiver_id === currentUserId;
             const isUnread = isReceived && !signal.is_read;
-            const oppositeName = isReceived
-              ? getPersonName(signal.sender_id)
-              : getPersonName(signal.receiver_id);
+            const oppositeUserId = isReceived
+              ? signal.sender_id
+              : signal.receiver_id;
+            const oppositeName = getPersonName(oppositeUserId);
+            // 답신호 버튼은 상대가 "현재 연결된 사람"으로 resolve 될 때만
+            // 노출한다(9ac4aa0 필터와 동일 게이트). 자기 자신/알 수 없음 대상
+            // 제외. signals 는 수신자별 1 row 라 보낸 신호도 항상 상대 1명.
+            const canReply =
+              Boolean(oppositeUserId) &&
+              oppositeUserId !== currentUserId &&
+              oppositeName !== "알 수 없음" &&
+              isConnectedSignalUserId(oppositeUserId, people, inviteDrafts);
 
             return (
               <article
@@ -497,8 +535,29 @@ export default function SignalsPage() {
                   </button>
                 </div>
 
-                <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  {isReceived ? "보낸 사람" : "받는 사람"}: {oppositeName}
+                <div className="mt-4 flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  <span className="min-w-0 truncate">
+                    {isReceived ? "보낸 사람" : "받는 사람"}: {oppositeName}
+                  </span>
+
+                  {canReply ? (
+                    <button
+                      type="button"
+                      // stopPropagation 하지 않는다 — 미확인 받은 신호에서
+                      // 답신호를 누르면 카드 onClick(markSignalRead)이 함께
+                      // 동작해 읽음 처리되는 것이 의도된 동작(홈 파란점 답장과
+                      // 동일한 의미).
+                      onClick={() => {
+                        setReplyTarget({
+                          userId: oppositeUserId,
+                          name: oppositeName,
+                        });
+                      }}
+                      className="shrink-0 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
+                    >
+                      {isReceived ? "답신호" : "또 보내기"}
+                    </button>
+                  ) : null}
                 </div>
 
                 {isUnread ? (
@@ -512,5 +571,14 @@ export default function SignalsPage() {
         </section>
       </div>
     </main>
+
+    <SignalBottomSheet
+      open={replyTarget !== null}
+      onClose={() => setReplyTarget(null)}
+      onSelect={(emoji) => {
+        void handleSendReply(emoji);
+      }}
+    />
+    </>
   );
 }
