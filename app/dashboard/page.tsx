@@ -2743,7 +2743,14 @@ const isJoined =
         </div>
 
         <div
-          className={`hide-scrollbar min-h-0 flex-1 overflow-hidden px-[10px] pt-[6px] [overscroll-behavior-y:contain] ${
+          // Fold 펼침(≈1:1)처럼 세로가 짧은 viewport 에서는 레이어 5줄이 가용
+          // 높이를 넘어 최하단(핵심/가족)이 잘렸다(P1). 홈 콘텐츠 영역만 세로
+          // 스크롤을 허용해 잘림을 해소한다 — 긴 화면에선 콘텐츠가 다 들어가
+          // 스크롤이 생기지 않으므로 기존과 동일. 드래그 중에는 touch-none 으로
+          // 스크롤이 잠기고, 타일 발 터치는 touch-action:none(eae3fba)이라 pan
+          // 을 시작하지 않아 빈 영역에서만 스크롤된다. pb 는 스크롤 끝에서
+          // 마지막 레이어가 하단에 붙지 않게 하는 여백(스크롤 콘텐츠에 포함).
+          className={`hide-scrollbar min-h-0 flex-1 overflow-y-auto px-[10px] pb-[12px] pt-[6px] [overscroll-behavior-y:contain] ${
             folderLongPressDragState ||
             layerSheetLongPressDragState ||
             homeMainLongPressDragState
