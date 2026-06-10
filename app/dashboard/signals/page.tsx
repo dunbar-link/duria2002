@@ -116,6 +116,13 @@ export default function SignalsPage() {
     userId: string;
     name: string;
   } | null>(null);
+  // me 이름 미완성으로 답신호가 차단된 카드의 signal.id. 상단 message 영역은
+  // 스크롤 페이지 최상단에 있어 아래쪽 카드에서 버튼을 누르면 뷰포트 밖이라
+  // 안내가 안 보였다(실기기 확인). 차단된 카드 바로 아래에 inline 안내를
+  // 함께 띄워 사용자가 그 자리에서 이유를 볼 수 있게 한다.
+  const [replyGuardSignalId, setReplyGuardSignalId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const userId = getCurrentUserId();
@@ -564,8 +571,10 @@ export default function SignalsPage() {
                         if (isIncompleteMeName(readMeProfileName())) {
                           event.stopPropagation();
                           setMessage(ME_NAME_REQUIRED_MESSAGE);
+                          setReplyGuardSignalId(signal.id);
                           return;
                         }
+                        setReplyGuardSignalId(null);
                         setReplyTarget({
                           userId: oppositeUserId,
                           name: oppositeName,
@@ -577,6 +586,12 @@ export default function SignalsPage() {
                     </button>
                   ) : null}
                 </div>
+
+                {replyGuardSignalId === signal.id ? (
+                  <p className="mt-2 text-right text-[11px] text-rose-500">
+                    {ME_NAME_REQUIRED_MESSAGE}
+                  </p>
+                ) : null}
 
                 {isUnread ? (
                   <p className="mt-3 text-xs text-rose-400">
