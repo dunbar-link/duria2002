@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
+  isIncompleteMeName,
+  ME_NAME_REQUIRED_MESSAGE,
+  readMeProfileName,
+} from "@/lib/me/profile-name";
+import {
   readSignalsForUser,
   type SignalRecord,
 } from "@/lib/signal/read-signals";
@@ -355,6 +360,13 @@ export default function SignalsPage() {
       return;
     }
 
+    // 안전망: 버튼 탭 시점 가드를 우회해 시트가 열렸더라도 me 이름이
+    // 미완성("나"/빈 값)이면 전송하지 않는다 — 홈 파란점 답장과 동일 기준.
+    if (isIncompleteMeName(readMeProfileName())) {
+      setMessage(ME_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+
     const success = await sendSignal(currentUserId, [replyTarget.userId], emoji);
 
     if (!success) {
@@ -546,8 +558,14 @@ export default function SignalsPage() {
                       // stopPropagation 하지 않는다 — 미확인 받은 신호에서
                       // 답신호를 누르면 카드 onClick(markSignalRead)이 함께
                       // 동작해 읽음 처리되는 것이 의도된 동작(홈 파란점 답장과
-                      // 동일한 의미).
-                      onClick={() => {
+                      // 동일한 의미). 단, me 이름 미완성으로 차단할 때는 홈이
+                      // 파란점을 유지하듯 읽음 처리도 막고 안내만 보여준다.
+                      onClick={(event) => {
+                        if (isIncompleteMeName(readMeProfileName())) {
+                          event.stopPropagation();
+                          setMessage(ME_NAME_REQUIRED_MESSAGE);
+                          return;
+                        }
                         setReplyTarget({
                           userId: oppositeUserId,
                           name: oppositeName,
