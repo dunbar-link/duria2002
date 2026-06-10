@@ -5,7 +5,6 @@ import {
   FOLDER_HOVER_CENTER_MAX,
   FOLDER_HOVER_CENTER_MIN,
 } from "./home-page-types";
-import { isDragDebugEnabled, logDragEvent } from "@/lib/debug/drag-debug";
 
 export type FolderDropArea = "visible" | "hidden";
 
@@ -98,13 +97,6 @@ export function useFolderLongPressDrag({
       // Defensive: tear down any prior drag setup that somehow remained.
       runCleanup();
 
-      // Drag diagnostics (opt-in). Read the flag once so pointermove stays a
-      // cheap counter increment; no per-move localStorage writes.
-      const debugEnabled = isDragDebugEnabled();
-      let moveCount = 0;
-      let lastMoveX = input.x;
-      let lastMoveY = input.y;
-
       const bodyStyle = document.body.style as CSSStyleDeclaration & {
         webkitUserSelect?: string;
         webkitTouchCallout?: string;
@@ -153,12 +145,6 @@ export function useFolderLongPressDrag({
         }
         inactivityTimer = setTimeout(() => {
           inactivityTimer = null;
-          logDragEvent("inactivity-timeout", {
-            entityId: stateRef.current?.entityId,
-            moveCount,
-            lastMoveX,
-            lastMoveY,
-          });
           cleanup();
           setState(null);
         }, inactivityTimeoutMs);
@@ -286,11 +272,6 @@ export function useFolderLongPressDrag({
         setState((prev) =>
           prev ? { ...prev, x: event.clientX, y: event.clientY } : prev,
         );
-        if (debugEnabled) {
-          moveCount += 1;
-          lastMoveX = event.clientX;
-          lastMoveY = event.clientY;
-        }
         // Emit the current hit-test result so a consumer can mirror it into
         // dragOverState and reuse the home "놓기" highlight. Skipped slots
         // (e.g., family-me own slot) come back as null and the highlight
@@ -306,18 +287,6 @@ export function useFolderLongPressDrag({
         const target = current
           ? findDropTarget(event.clientX, event.clientY)
           : null;
-        logDragEvent("drop", {
-          entityId: current?.entityId,
-          source: current?.sourceFolderId,
-          moveCount,
-          upX: event.clientX,
-          upY: event.clientY,
-          lastMoveX,
-          lastMoveY,
-          target: target
-            ? `${target.layerId}/${target.area}/${target.index ?? "rail"}/${target.action}`
-            : "null",
-        });
         if (current && target) {
           onDropRef.current({
             folderId: current.sourceFolderId,
@@ -344,13 +313,6 @@ export function useFolderLongPressDrag({
         if (elapsed < cancelGraceMs) {
           return;
         }
-        logDragEvent("pointercancel", {
-          entityId: stateRef.current?.entityId,
-          elapsedMs: elapsed,
-          moveCount,
-          lastMoveX,
-          lastMoveY,
-        });
         cleanup();
         setState(null);
       }
@@ -404,14 +366,6 @@ export function useFolderLongPressDrag({
       cleanupRef.current = cleanup;
 
       setState(input);
-
-      logDragEvent("ghost", {
-        entityId: input.entityId,
-        label: input.label,
-        source: input.sourceFolderId,
-        x: input.x,
-        y: input.y,
-      });
     },
     [runCleanup],
   );
