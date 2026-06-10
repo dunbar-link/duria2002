@@ -16,11 +16,18 @@
  *    /api/invites/mine GET 만 호출.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { usePeopleStore } from "../people/store";
 import { getPersonDisplayName } from "../people/data";
 import { STORAGE_KEY } from "../_components/home/home-page-types";
+import {
+  clearDragEvents,
+  isDragDebugEnabled,
+  readDragEvents,
+  setDragDebugEnabled,
+  type DragDebugEvent,
+} from "@/lib/debug/drag-debug";
 
 type FolderMap = Record<string, { id: string; memberIds: string[] }>;
 type LayerLayoutState = {
@@ -1114,10 +1121,121 @@ export default function DashboardDebugBetaPage() {
         )}
       </Section>
 
+      <MobileDragDebugSection />
+
       <footer className="mt-2 text-[10px] text-[#64748B]">
-        read-only. 변경/저장 없음.
+        read-only. 변경/저장 없음. (Mobile Drag Debug 섹션 제외)
       </footer>
     </main>
+  );
+}
+
+// 진단 전용 섹션. 이 페이지의 다른 부분과 달리 drag-debug 전용 localStorage
+// 키(enable flag / event log)만 read/write 한다. 앱 도메인 상태(store/people/
+// home layout)는 건드리지 않는다.
+function MobileDragDebugSection() {
+  const [enabled, setEnabled] = useState(false);
+  const [events, setEvents] = useState<DragDebugEvent[]>([]);
+  const [copyState, setCopyState] = useState("");
+
+  const refresh = useCallback(() => {
+    setEnabled(isDragDebugEnabled());
+    setEvents(readDragEvents());
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const logText = useMemo(
+    () => events.map((event) => JSON.stringify(event)).join("\n"),
+    [events],
+  );
+
+  const handleToggle = () => {
+    const next = !enabled;
+    setDragDebugEnabled(next);
+    setEnabled(next);
+  };
+
+  const handleClear = () => {
+    clearDragEvents();
+    setEvents([]);
+    setCopyState("");
+  };
+
+  const handleCopy = async () => {
+    const payload = logText || "(no drag events)";
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopyState("복사됨");
+    } catch {
+      setCopyState("복사 실패 — 아래 박스를 길게 눌러 전체선택/복사하세요");
+    }
+    window.setTimeout(() => setCopyState(""), 2500);
+  };
+
+  return (
+    <Section title="섹션 D. Mobile Drag Debug (opt-in)">
+      <p className="mb-2 text-[11px] leading-relaxed text-[#94A3B8]">
+        long-press drag 단계별 로그를 기록합니다. enable 후 dashboard 에서 드래그를
+        한 번 시도하고 이 화면으로 돌아와 복사하세요. flag 가 꺼져 있으면 일반
+        동작에 영향이 없습니다.
+      </p>
+
+      <div className="flex items-center justify-between gap-2 py-0.5">
+        <span className="text-[#94A3B8]">drag debug</span>
+        <button
+          type="button"
+          onClick={handleToggle}
+          className={`rounded-[8px] px-3 py-1 text-[11px] font-semibold ${
+            enabled
+              ? "bg-[#16A34A] text-white"
+              : "bg-[#334155] text-[#E2E8F0]"
+          }`}
+        >
+          {enabled ? "ENABLED (끄기)" : "DISABLED (켜기)"}
+        </button>
+      </div>
+
+      <KV k="event count" v={events.length} />
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={refresh}
+          className="rounded-[8px] bg-[#1E293B] px-3 py-1 text-[11px] font-semibold text-[#E2E8F0]"
+        >
+          새로고침
+        </button>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="rounded-[8px] bg-[#2563EB] px-3 py-1 text-[11px] font-semibold text-white"
+        >
+          복사
+        </button>
+        <button
+          type="button"
+          onClick={handleClear}
+          className="rounded-[8px] bg-[#7F1D1D] px-3 py-1 text-[11px] font-semibold text-white"
+        >
+          비우기
+        </button>
+      </div>
+
+      {copyState ? (
+        <p className="mt-2 text-[11px] text-[#FBBF24]">{copyState}</p>
+      ) : null}
+
+      <textarea
+        readOnly
+        value={logText}
+        spellCheck={false}
+        className="mt-2 h-[200px] w-full rounded-[10px] border border-[#334155] bg-[#0B1220] p-2 font-mono text-[10px] leading-relaxed text-[#E2E8F0]"
+        placeholder="(no drag events) — drag debug 를 켜고 dashboard 에서 드래그를 시도하세요."
+      />
+    </Section>
   );
 }
 

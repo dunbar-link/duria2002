@@ -58,6 +58,7 @@ import {
 } from "@/lib/signal/read-signals";
 import Link from "next/link";
 import { sendSignal } from "@/lib/signal/send-signal";
+import { logDragEvent } from "@/lib/debug/drag-debug";
 import HomeRecommendationList from "./_components/recommendation/HomeRecommendationList";
 import HomeRecommendationSheet from "./_components/home/home-recommendation-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1312,6 +1313,14 @@ useEffect(() => {
           ].hiddenSlotIds.filter((id) => id !== person.id);
         }
         placeIntoLayer(targetLayerId, person.id);
+        // Diagnostics: this is the 9c15bfb reconcile relocating a placed person
+        // to their People-tier layer — i.e. the potential post-drop rollback.
+        logDragEvent("reconcile-relocate", {
+          entityId: person.id,
+          from: location.layerId,
+          to: targetLayerId,
+          tier: person.tier,
+        });
         changed = true;
       }
 
@@ -1598,6 +1607,7 @@ useEffect(() => {
       // synchronously guarantees the person.tier sync fires for every move.
       const targetLayer = layoutState[layerId];
       if (!targetLayer) {
+        logDragEvent("noop", { reason: "no-target-layer", entityId, layerId });
         return;
       }
 
@@ -1615,6 +1625,12 @@ useEffect(() => {
         dropIndex = railTarget.targetIndex;
       }
 
+      logDragEvent("drop-onDrop", {
+        entityId,
+        recv: `${layerId}/${area}/${index ?? "rail"}`,
+        resolved: `${layerId}/${dropArea}/${dropIndex ?? "—"}`,
+      });
+
       const targetSlots =
         dropArea === "visible"
           ? targetLayer.visibleSlotIds
@@ -1625,11 +1641,13 @@ useEffect(() => {
         typeof dropIndex === "number" &&
         targetSlots[dropIndex] === "family-me"
       ) {
+        logDragEvent("noop", { reason: "family-me-slot", entityId, layerId });
         return;
       }
 
       const location = findEntityLocation(layoutState, entityId);
       if (!location) {
+        logDragEvent("noop", { reason: "source-not-found", entityId });
         return;
       }
 
@@ -1639,6 +1657,11 @@ useEffect(() => {
         location.area === dropArea &&
         (typeof dropIndex !== "number" || location.index === dropIndex)
       ) {
+        logDragEvent("noop", {
+          reason: "same-slot",
+          entityId,
+          at: `${location.layerId}/${location.area}/${location.index}`,
+        });
         return;
       }
 
@@ -1672,6 +1695,13 @@ useEffect(() => {
 
       const updatePersonTier = usePeopleStore.getState().updatePersonTier;
       updatePersonTier(entityId, getTierByLayerId(layerId));
+      logDragEvent("move-apply", {
+        entityId,
+        from: `${location.layerId}/${location.area}/${location.index}`,
+        to: `${layerId}/${dropArea}/${dropIndex ?? "—"}`,
+        tier: getTierByLayerId(layerId),
+        swap: swappedTargetEntityId ?? null,
+      });
 
       if (swappedTargetEntityId) {
         const swappedTier = getTierByLayerId(sourceOldLayerId);
@@ -1865,6 +1895,7 @@ useEffect(() => {
       // path) guarantees the person.tier sync fires for every real move.
       const targetLayer = layoutState[layerId];
       if (!targetLayer) {
+        logDragEvent("noop", { reason: "no-target-layer", entityId, layerId });
         return;
       }
 
@@ -1882,6 +1913,12 @@ useEffect(() => {
         dropIndex = railTarget.targetIndex;
       }
 
+      logDragEvent("drop-onDrop", {
+        entityId,
+        recv: `${layerId}/${area}/${index ?? "rail"}`,
+        resolved: `${layerId}/${dropArea}/${dropIndex ?? "—"}`,
+      });
+
       const targetSlots =
         dropArea === "visible"
           ? targetLayer.visibleSlotIds
@@ -1892,11 +1929,13 @@ useEffect(() => {
         typeof dropIndex === "number" &&
         targetSlots[dropIndex] === "family-me"
       ) {
+        logDragEvent("noop", { reason: "family-me-slot", entityId, layerId });
         return;
       }
 
       const location = findEntityLocation(layoutState, entityId);
       if (!location) {
+        logDragEvent("noop", { reason: "source-not-found", entityId });
         return;
       }
 
@@ -1906,6 +1945,11 @@ useEffect(() => {
         location.area === dropArea &&
         (typeof dropIndex !== "number" || location.index === dropIndex)
       ) {
+        logDragEvent("noop", {
+          reason: "same-slot",
+          entityId,
+          at: `${location.layerId}/${location.area}/${location.index}`,
+        });
         return;
       }
 
@@ -1939,6 +1983,13 @@ useEffect(() => {
 
       const updatePersonTier = usePeopleStore.getState().updatePersonTier;
       updatePersonTier(entityId, getTierByLayerId(layerId));
+      logDragEvent("move-apply", {
+        entityId,
+        from: `${location.layerId}/${location.area}/${location.index}`,
+        to: `${layerId}/${dropArea}/${dropIndex ?? "—"}`,
+        tier: getTierByLayerId(layerId),
+        swap: swappedTargetEntityId ?? null,
+      });
 
       if (swappedTargetEntityId) {
         const swappedTier = getTierByLayerId(sourceOldLayerId);
@@ -1954,7 +2005,15 @@ useEffect(() => {
 
   const handleHomeMainLongPressDragStart = useCallback(
     (entityId: string, point: { x: number; y: number }) => {
-      if (!isPersonEntityId(entityId)) {
+      const personEligible = isPersonEntityId(entityId);
+      logDragEvent("start", {
+        entityId,
+        isPerson: personEligible,
+        label: getEntityLabel(entityId, folders),
+        x: point.x,
+        y: point.y,
+      });
+      if (!personEligible) {
         return;
       }
 
