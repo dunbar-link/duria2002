@@ -96,7 +96,22 @@
 3. 캡처 1장
 ```
 
-## 6. 운영자 메모
+## 6. 테스트가 꼬일 때 안내
+
+기존 테스트폰의 쿠키/세션 때문에 초대/수락이 꼬일 수 있다. 아래 문구를 그대로 보내면 된다.
+
+```
+테스트가 꼬이면 아래 중 하나로 다시 열어줘 😊
+
+1. Chrome 시크릿 탭에서 초대 링크 열기
+2. 카톡 안에서 바로 열지 말고 외부 브라우저로 열기
+3. 기존에 열었던 브라우저 말고 다른 브라우저로 열기
+4. 그래도 안 되면 dunbar-link.vercel.app 사이트 데이터 삭제
+```
+
+자세한 운영자용 기준은 [beta-browser-reset-guide.md](./beta-browser-reset-guide.md) 참고.
+
+## 7. 운영자 메모
 
 테스터에게 너무 많은 걸 요구하지 말 것. 받은 피드백은 [beta-feedback-log-template.md](./beta-feedback-log-template.md)의 표에 기록하고, 분류는 [beta-backlog-triage.md](./beta-backlog-triage.md) 기준을 따른다.
 
