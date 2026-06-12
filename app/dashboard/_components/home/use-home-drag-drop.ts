@@ -277,6 +277,24 @@ export function useHomeDragDrop({
             )
           );
           syncPersonTierForLayer(dragState.entityId, targetLayerId, folders);
+
+          // swap 으로 source layer 에 밀려난 occupant 의 tier 도 재동기화한다.
+          // 누락하면 reconcile 이 occupant 를 원래 tier layer 의 hidden 으로
+          // 강제 복귀시켜 cap 초과(예: 핵심 6/5)가 생긴다. (모바일 long-press
+          // 경로의 swappedTargetEntityId 처리와 동일한 의미)
+          if (
+            targetEntityId &&
+            targetEntityId !== dragState.entityId &&
+            targetEntityId !== "family-me" &&
+            dragState.sourceLayerId !== targetLayerId
+          ) {
+            syncPersonTierForLayer(
+              targetEntityId,
+              dragState.sourceLayerId,
+              folders
+            );
+          }
+
           clearDragUiState();
           return;
         }
@@ -308,6 +326,25 @@ export function useHomeDragDrop({
       );
 
       syncPersonTierForLayer(dragState.entityId, targetLayerId, folders);
+
+      // 사람/폴더 타일 위 edge-drop(swap)으로 source layer 에 밀려난
+      // occupant 의 tier 도 재동기화한다. 누락하면 reconcile 이 occupant 를
+      // 원래 tier layer 의 hidden 으로 강제 복귀시켜 cap 초과(예: 핵심
+      // 6/5)가 생긴다. (모바일 long-press 경로의 swappedTargetEntityId
+      // 처리와 동일한 의미)
+      if (
+        capOccupantEntityId &&
+        capOccupantEntityId !== dragState.entityId &&
+        capOccupantEntityId !== "family-me" &&
+        dragState.sourceLayerId !== targetLayerId
+      ) {
+        syncPersonTierForLayer(
+          capOccupantEntityId,
+          dragState.sourceLayerId,
+          folders
+        );
+      }
+
       clearDragUiState();
     },
     [
