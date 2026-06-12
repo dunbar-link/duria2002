@@ -305,6 +305,115 @@ export function getDynamicCountLabel(
   return `${currentCount}명`;
 }
 
+/**
+ * Dunbar tier 별 최대 인원. countLabel(0/5 등) 표시 숫자와 반드시 일치해야
+ * 한다. family 는 cap 없음. count 기준은 표시와 동일한 getLayerRealCount
+ * (folder/+n 내부 인원 포함, family-me 제외)다.
+ */
+export const LAYER_CAPS: Record<string, number> = {
+  core: 5,
+  intimate: 15,
+  trust: 50,
+  maintain: 150,
+};
+
+export function getLayerCap(layerId: string): number | null {
+  return Object.prototype.hasOwnProperty.call(LAYER_CAPS, layerId)
+    ? LAYER_CAPS[layerId]
+    : null;
+}
+
+export function getLayerCapMessage(layerId: string): string {
+  const cap = getLayerCap(layerId);
+  const label = getLayerById(layerId)?.label;
+
+  if (cap === null || !label) {
+    return "이 단계는 더 추가할 수 없어요.";
+  }
+
+  return `${label} 관계는 최대 ${cap}명까지 관리할 수 있어요. 먼저 한 명을 다른 단계로 옮기거나 빼주세요.`;
+}
+
+type LayerCapCheckInput = {
+  layout: Record<string, LayerLayoutState>;
+  folders: FolderMap;
+  /** 이동/추가되는 entity. 아직 생성 전(새 사람 추가)이면 null — 1명으로 계산. */
+  entityId: string | null;
+  targetLayerId: string;
+  /**
+   * entity 가 떠나는 layer. 미지정이면 layout 에서 탐색한다. 폴더 내부에서
+   * 빠져나오는 entity 는 layout 에 없으므로 폴더 top location 의 layer 를
+   * 명시해서 넘겨야 같은 layer 이동이 올바르게 통과된다.
+   */
+  sourceLayerId?: string | null;
+  /** swap 으로 target 슬롯에서 source layer 로 밀려나는 entity (combine 은 null). */
+  displacedEntityId?: string | null;
+};
+
+/**
+ * 이동/추가가 Dunbar cap 을 깨면 초과되는 layerId 를, 아니면 null 을
+ * 반환한다. 같은 layer 안 재배치는 count 불변이라 항상 통과. cross-layer
+ * swap 은 count 가 양쪽에서 맞교환되므로 target 과 source 양쪽 cap 을 모두
+ * 본다(사람 1명 ↔ 폴더 N명 교환이 source 를 초과시킬 수 있다). 이미 cap 을
+ * 초과한 기존 데이터는 건드리지 않는다 — 신규 진입만 차단하는 정책.
+ */
+export function getLayerCapViolation({
+  layout,
+  folders,
+  entityId,
+  targetLayerId,
+  sourceLayerId,
+  displacedEntityId,
+}: LayerCapCheckInput): string | null {
+  const targetLayerState = layout[targetLayerId];
+
+  if (!targetLayerState) {
+    return null;
+  }
+
+  const resolvedSourceLayerId =
+    sourceLayerId ??
+    (entityId ? findEntityLocation(layout, entityId)?.layerId ?? null : null);
+
+  if (resolvedSourceLayerId === targetLayerId) {
+    return null;
+  }
+
+  // catalog 미등록(추가 직전) entity 는 0 으로 새지 않게 최소 1명으로 본다.
+  const rawIncoming = entityId ? getEntityRealCount(entityId, folders) : 1;
+  const incomingCount = rawIncoming > 0 ? rawIncoming : 1;
+
+  const displacedCount =
+    displacedEntityId && displacedEntityId !== entityId
+      ? getEntityRealCount(displacedEntityId, folders)
+      : 0;
+
+  const targetCap = getLayerCap(targetLayerId);
+
+  if (targetCap !== null) {
+    const targetCount = getLayerRealCount(targetLayerState, folders);
+
+    if (targetCount - displacedCount + incomingCount > targetCap) {
+      return targetLayerId;
+    }
+  }
+
+  if (displacedCount > 0 && resolvedSourceLayerId) {
+    const sourceCap = getLayerCap(resolvedSourceLayerId);
+    const sourceLayerState = layout[resolvedSourceLayerId];
+
+    if (sourceCap !== null && sourceLayerState) {
+      const sourceCount = getLayerRealCount(sourceLayerState, folders);
+
+      if (sourceCount - incomingCount + displacedCount > sourceCap) {
+        return resolvedSourceLayerId;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function getHiddenEntityRealCount(
   hiddenSlotIds: Array<string | null>,
   folders: FolderMap

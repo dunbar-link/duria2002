@@ -17,6 +17,7 @@ import {
   combineEntityIntoTarget,
   getEntityPersonIdsForTierSync,
   getHoverActionFromPointer,
+  getLayerCapViolation,
   getTierByLayerId,
   insertExternalEntityToTarget,
   moveEntityToTarget,
@@ -55,6 +56,8 @@ type UseHomeDragDropParams = {
     targetLayerId: string,
     targetArea: DragSourceArea
   ) => void;
+  /** Dunbar cap 초과로 드롭이 차단됐을 때 초과된 layerId 로 안내한다. */
+  onCapBlocked?: (blockedLayerId: string) => void;
 };
 
 export function useHomeDragDrop({
@@ -63,6 +66,7 @@ export function useHomeDragDrop({
   setLayoutState,
   setFolders,
   onExternalEntityAdded,
+  onCapBlocked,
 }: UseHomeDragDropParams) {
   const [dragState, setDragState] = useState<DragState>(null);
   const [dragOverState, setDragOverState] = useState<DragOverState>(null);
@@ -173,6 +177,21 @@ export function useHomeDragDrop({
         dragState.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID;
 
       if (isExternalSource) {
+        // Dunbar cap: 외부(추천/검색) 후보를 layer 에 새로 추가하는 경로.
+        const blockedLayerId = getLayerCapViolation({
+          layout: layoutState,
+          folders,
+          entityId: dragState.entityId,
+          targetLayerId,
+          sourceLayerId: null,
+        });
+
+        if (blockedLayerId) {
+          onCapBlocked?.(blockedLayerId);
+          clearDragUiState();
+          return;
+        }
+
         setLayoutState((current) =>
           insertExternalEntityToTarget(
             current,
@@ -204,6 +223,34 @@ export function useHomeDragDrop({
       }
 
       const action = occupied ? getHoverActionFromPointer(event) : "swap";
+
+      // Dunbar cap: cross-layer 이동/합치기 pre-check. swap 은 occupant 가
+      // source layer 로 맞교환되어 displaced 로 상쇄되고, combine(사람 →
+      // 폴더/사람)은 occupant 가 target 에 그대로 남으므로 displaced 없음.
+      // 같은 layer 내 재배치는 헬퍼가 통과시킨다.
+      const capTargetSlots =
+        targetArea === "visible"
+          ? layoutState[targetLayerId]?.visibleSlotIds
+          : layoutState[targetLayerId]?.hiddenSlotIds;
+      const capOccupantEntityId = occupied
+        ? capTargetSlots?.[targetIndex] ?? null
+        : null;
+      const isCombineIntoOccupant =
+        occupied && action === "combine" && !folders[dragState.entityId];
+      const capBlockedLayerId = getLayerCapViolation({
+        layout: layoutState,
+        folders,
+        entityId: dragState.entityId,
+        targetLayerId,
+        sourceLayerId: dragState.sourceLayerId,
+        displacedEntityId: isCombineIntoOccupant ? null : capOccupantEntityId,
+      });
+
+      if (capBlockedLayerId) {
+        onCapBlocked?.(capBlockedLayerId);
+        clearDragUiState();
+        return;
+      }
 
       if (occupied && action === "combine") {
         const targetSlotArray =
@@ -268,6 +315,7 @@ export function useHomeDragDrop({
       dragState,
       folders,
       layoutState,
+      onCapBlocked,
       onExternalEntityAdded,
       setFolders,
       setLayoutState,
@@ -301,6 +349,25 @@ export function useHomeDragDrop({
       setDragOverState(null);
       setSpecialDropTargetKey(`more-${layerId}`);
 
+      // Dunbar cap: +N(hidden) 으로의 이동/추가도 같은 한도를 적용한다.
+      // hidden 은 항상 빈 슬롯으로 들어가므로 displaced 없음.
+      const blockedLayerId = getLayerCapViolation({
+        layout: layoutState,
+        folders,
+        entityId: dragState.entityId,
+        targetLayerId: layerId,
+        sourceLayerId:
+          dragState.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID
+            ? null
+            : dragState.sourceLayerId,
+      });
+
+      if (blockedLayerId) {
+        onCapBlocked?.(blockedLayerId);
+        clearDragUiState();
+        return;
+      }
+
       if (dragState.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID) {
         setLayoutState((current) =>
           insertExternalEntityToTarget(
@@ -323,7 +390,15 @@ export function useHomeDragDrop({
       syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
-    [clearDragUiState, dragState, folders, onExternalEntityAdded, setLayoutState]
+    [
+      clearDragUiState,
+      dragState,
+      folders,
+      layoutState,
+      onCapBlocked,
+      onExternalEntityAdded,
+      setLayoutState,
+    ]
   );
 
   const handleDragOverRailLayer = useCallback(
@@ -377,6 +452,25 @@ export function useHomeDragDrop({
         return;
       }
 
+      // Dunbar cap: 레일(layer 라벨) 드롭 경로. rail 은 항상 빈 슬롯으로
+      // 들어가므로 displaced 없음.
+      const blockedLayerId = getLayerCapViolation({
+        layout: layoutState,
+        folders,
+        entityId: dragState.entityId,
+        targetLayerId: layerId,
+        sourceLayerId:
+          dragState.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID
+            ? null
+            : dragState.sourceLayerId,
+      });
+
+      if (blockedLayerId) {
+        onCapBlocked?.(blockedLayerId);
+        clearDragUiState();
+        return;
+      }
+
       if (dragState.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID) {
         const resolved = resolveRailTarget(layoutState, layerId);
 
@@ -416,7 +510,15 @@ export function useHomeDragDrop({
       syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
-    [clearDragUiState, dragState, folders, layoutState, onExternalEntityAdded, setLayoutState]
+    [
+      clearDragUiState,
+      dragState,
+      folders,
+      layoutState,
+      onCapBlocked,
+      onExternalEntityAdded,
+      setLayoutState,
+    ]
   );
 
   const handleDragOverHiddenContainer = useCallback(
@@ -443,6 +545,24 @@ export function useHomeDragDrop({
         return;
       }
 
+      // Dunbar cap: hidden 컨테이너 직접 드롭도 같은 한도를 적용한다.
+      const blockedLayerId = getLayerCapViolation({
+        layout: layoutState,
+        folders,
+        entityId: dragState.entityId,
+        targetLayerId: layerId,
+        sourceLayerId:
+          dragState.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID
+            ? null
+            : dragState.sourceLayerId,
+      });
+
+      if (blockedLayerId) {
+        onCapBlocked?.(blockedLayerId);
+        clearDragUiState();
+        return;
+      }
+
       if (dragState.sourceLayerId === CONNECTABLE_SOURCE_LAYER_ID) {
         setLayoutState((current) =>
           insertExternalEntityToTarget(
@@ -465,7 +585,15 @@ export function useHomeDragDrop({
       syncPersonTierForLayer(dragState.entityId, layerId, folders);
       clearDragUiState();
     },
-    [clearDragUiState, dragState, folders, onExternalEntityAdded, setLayoutState]
+    [
+      clearDragUiState,
+      dragState,
+      folders,
+      layoutState,
+      onCapBlocked,
+      onExternalEntityAdded,
+      setLayoutState,
+    ]
   );
 
   const isConnectableDragActive =

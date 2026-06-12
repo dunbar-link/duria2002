@@ -91,6 +91,8 @@ import {
   getEntityPersonIdsForTierSync,
   getFirstEmptyIndex,
   getHomeLayerDerivedStateMap,
+  getLayerCapMessage,
+  getLayerCapViolation,
   getSuppressedConnectableEntityIds,
   insertExternalEntityToTarget,
   isPersonEntityId,
@@ -698,13 +700,17 @@ function HomePersonActionSheet({
                 홈에서 제거
               </button>
 
-              <button
-                type="button"
-                onClick={onResetLocalData}
-                className="flex h-[42px] w-full items-center justify-center rounded-[16px] border border-slate-200 bg-slate-50 text-[12px] font-semibold text-slate-500"
-              >
-                로컬 친구 데이터 전체 초기화
-              </button>
+              {/* 데이터 초기화는 개발/테스트 전용 — production 사용자
+                  화면에는 노출하지 않는다. */}
+              {process.env.NODE_ENV === "development" ? (
+                <button
+                  type="button"
+                  onClick={onResetLocalData}
+                  className="flex h-[42px] w-full items-center justify-center rounded-[16px] border border-slate-200 bg-slate-50 text-[12px] font-semibold text-slate-500"
+                >
+                  로컬 친구 데이터 전체 초기화
+                </button>
+              ) : null}
             </div>
 
             {feedback ? (
@@ -1353,6 +1359,32 @@ useEffect(() => {
     );
   }, [selectedInviteDraft, selectedHomePerson]);
 
+  // Dunbar cap 차단 안내 토스트. 드래그/이동/추가의 모든 cap 차단 경로가
+  // 공유한다. 짧게 보여주고 자동으로 사라진다.
+  const [capNotice, setCapNotice] = useState<string | null>(null);
+  const capNoticeTimerRef = useRef<number | null>(null);
+
+  const notifyCapBlocked = useCallback((blockedLayerId: string) => {
+    setCapNotice(getLayerCapMessage(blockedLayerId));
+
+    if (capNoticeTimerRef.current !== null) {
+      window.clearTimeout(capNoticeTimerRef.current);
+    }
+
+    capNoticeTimerRef.current = window.setTimeout(() => {
+      setCapNotice(null);
+      capNoticeTimerRef.current = null;
+    }, 2800);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (capNoticeTimerRef.current !== null) {
+        window.clearTimeout(capNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
   const {
     dragState,
     dragOverState,
@@ -1372,6 +1404,7 @@ useEffect(() => {
     setLayoutState,
     folders,
     setFolders,
+    onCapBlocked: notifyCapBlocked,
   });
 
   const isConnectableDragActive = false;
@@ -1414,6 +1447,7 @@ useEffect(() => {
     setLayoutState,
     folders,
     setFolders,
+    onCapBlocked: notifyCapBlocked,
   });
 
   // Hover preview state for the folder ghost drag. Mirrored from the hook's
@@ -1603,6 +1637,20 @@ useEffect(() => {
         ) {
           const location = findEntityLocation(layoutState, entityId);
           if (location) {
+            // Dunbar cap: combine 은 target layer 인원이 순증한다.
+            const capBlockedLayerId = getLayerCapViolation({
+              layout: layoutState,
+              folders,
+              entityId,
+              targetLayerId: layerId,
+              sourceLayerId: location.layerId,
+            });
+
+            if (capBlockedLayerId) {
+              notifyCapBlocked(capBlockedLayerId);
+              return;
+            }
+
             const result = combineEntityIntoTarget(
               layoutState,
               folders,
@@ -1692,6 +1740,23 @@ useEffect(() => {
           ? occupant
           : null;
       const sourceOldLayerId = location.layerId;
+
+      // Dunbar cap: cross-layer 이동/swap pre-check. swap 은 밀려나는
+      // occupant(swappedTargetEntityId)가 source layer 로 맞교환되므로
+      // displaced 로 상쇄해 계산한다. 같은 layer 재배치는 통과.
+      const capBlockedLayerId = getLayerCapViolation({
+        layout: layoutState,
+        folders,
+        entityId,
+        targetLayerId: layerId,
+        sourceLayerId: location.layerId,
+        displacedEntityId: swappedTargetEntityId,
+      });
+
+      if (capBlockedLayerId) {
+        notifyCapBlocked(capBlockedLayerId);
+        return;
+      }
 
       setLayoutState((current) =>
         moveEntityToTarget(
@@ -1870,6 +1935,20 @@ useEffect(() => {
         ) {
           const location = findEntityLocation(layoutState, entityId);
           if (location) {
+            // Dunbar cap: combine 은 target layer 인원이 순증한다.
+            const capBlockedLayerId = getLayerCapViolation({
+              layout: layoutState,
+              folders,
+              entityId,
+              targetLayerId: layerId,
+              sourceLayerId: location.layerId,
+            });
+
+            if (capBlockedLayerId) {
+              notifyCapBlocked(capBlockedLayerId);
+              return;
+            }
+
             const result = combineEntityIntoTarget(
               layoutState,
               folders,
@@ -1962,6 +2041,23 @@ useEffect(() => {
           ? occupant
           : null;
       const sourceOldLayerId = location.layerId;
+
+      // Dunbar cap: cross-layer 이동/swap pre-check. swap 은 밀려나는
+      // occupant(swappedTargetEntityId)가 source layer 로 맞교환되므로
+      // displaced 로 상쇄해 계산한다. 같은 layer 재배치는 통과.
+      const capBlockedLayerId = getLayerCapViolation({
+        layout: layoutState,
+        folders,
+        entityId,
+        targetLayerId: layerId,
+        sourceLayerId: location.layerId,
+        displacedEntityId: swappedTargetEntityId,
+      });
+
+      if (capBlockedLayerId) {
+        notifyCapBlocked(capBlockedLayerId);
+        return;
+      }
 
       setLayoutState((current) =>
         moveEntityToTarget(
@@ -2060,6 +2156,21 @@ useEffect(() => {
     const targetLayerId = addSheetState.layerId;
     const targetIndex = addSheetState.index;
 
+    // Dunbar cap: 빈 슬롯이 보여도 folder/+N 인원까지 합친 실제 count 가
+    // 한도에 닿았으면 새 사람을 만들지 않는다.
+    const capBlockedLayerId = getLayerCapViolation({
+      layout: layoutState,
+      folders,
+      entityId: null,
+      targetLayerId,
+    });
+
+    if (capBlockedLayerId) {
+      notifyCapBlocked(capBlockedLayerId);
+      handleCloseAddSheet();
+      return;
+    }
+
     const created = addPerson({
       name: trimmed,
       tier: getTierByLayerId(targetLayerId),
@@ -2108,6 +2219,21 @@ useEffect(() => {
   }
 
   function handleAddFromSearch(entityId: string, targetLayerId: string) {
+    // Dunbar cap: 검색 후보를 layer 에 새로 추가하는 경로.
+    const capBlockedLayerId = getLayerCapViolation({
+      layout: layoutState,
+      folders,
+      entityId,
+      targetLayerId,
+      sourceLayerId: null,
+    });
+
+    if (capBlockedLayerId) {
+      notifyCapBlocked(capBlockedLayerId);
+      setSearchSheetOpen(false);
+      return;
+    }
+
     setConnectableStateMap((current) =>
       markConnectableCandidateAddedToLayer(current, {
         entityId,
@@ -2766,6 +2892,17 @@ const isJoined =
   return (
     <>
       <main className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#F5F3EE] text-slate-900">
+        {capNotice ? (
+          <div
+            role="status"
+            className="pointer-events-none fixed inset-x-0 bottom-[96px] z-[130] flex justify-center px-6"
+          >
+            <div className="max-w-[340px] rounded-[18px] bg-[#2C2C2A] px-4 py-3 text-center text-[13px] font-semibold leading-snug text-[#F1EFE8] shadow-[0_12px_30px_rgba(15,23,42,0.25)]">
+              {capNotice}
+            </div>
+          </div>
+        ) : null}
+
         <div className="sticky top-0 z-20 shrink-0 border-b border-[#D3D1C7] bg-[#FAFAF8] px-[10px] pt-[10px]">
           <div className="relative">
             <DashboardHomeHeader />

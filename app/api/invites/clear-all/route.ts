@@ -20,6 +20,16 @@ function getSupabaseAdminClient() {
 }
 
 export async function POST() {
+  // Beta 안전 가드: 이 엔드포인트는 dl_invites 전체(모든 사용자의 초대
+  // 기록)를 삭제하는 개발/테스트 전용 기능이다. 인증·사용자 필터가 없어
+  // production 에서 호출되면 다른 테스터의 데이터까지 사라지므로 차단한다.
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { ok: false, deleted: 0, message: "disabled in production" },
+      { status: 403 },
+    );
+  }
+
   try {
     const supabase = getSupabaseAdminClient();
 

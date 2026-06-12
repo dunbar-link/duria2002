@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { KeyboardEvent, MouseEvent, useEffect, useMemo, useState } from "react";
 import type { ContactChannel, DashboardPerson } from "./data";
@@ -411,16 +410,6 @@ function IconDelete() {
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <path d="M10 11v6" />
       <path d="M14 11v6" />
-    </svg>
-  );
-}
-
-function IconHome() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 11.5 12 4l9 7.5" />
-      <path d="M5 10.5V21h14V10.5" />
-      <path d="M9 21v-6h6v6" />
     </svg>
   );
 }
@@ -1125,21 +1114,21 @@ export default function DashboardPeoplePage() {
           </div>
 
           <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleResetAllPeopleData}
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#FBEAF0] text-[17px] text-[#993556] ring-1 ring-[#F4C0D1] active:scale-95"
-              aria-label="전체 초기화"
-            >
-              ↺
-            </button>
-            <Link
-              href="/dashboard"
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white text-[#4B5563] ring-1 ring-[#D3D1C7] active:scale-95"
-              aria-label="홈"
-            >
-              <IconHome />
-            </Link>
+            {/*
+              전체 초기화는 개발/테스트 전용. 일반 사용자가 실수로 전체
+              데이터를 날리지 않도록 production 에서는 렌더하지 않는다.
+              (홈 단축키는 하단 네비 Home 탭과 완전 중복이라 제거)
+            */}
+            {process.env.NODE_ENV === "development" ? (
+              <button
+                type="button"
+                onClick={handleResetAllPeopleData}
+                className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#FBEAF0] text-[17px] text-[#993556] ring-1 ring-[#F4C0D1] active:scale-95"
+                aria-label="전체 초기화"
+              >
+                ↺
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -1215,8 +1204,10 @@ export default function DashboardPeoplePage() {
               const isPendingInstall = Boolean(
                 pendingInviteDraft || findPendingForPerson(person),
               );
+              // 설치대기(pending) 사람도 연락 버튼이 무반응이 되지 않게
+              // picker 를 연다 — channelChoices 가 ["copy"](문구 복사)로
+              // 좁혀져 있어 가입 전 상대에게도 가능한 액션만 노출된다.
               const isContactPickerOpen =
-                !isPendingInstall &&
                 person.ctaKind === "contact" &&
                 openContactPickerId === person.id;
 

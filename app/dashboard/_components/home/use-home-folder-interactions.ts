@@ -14,7 +14,9 @@ import {
   findEntityLocation,
   getEntityPersonIdsForTierSync,
   getFirstEmptyIndex,
+  getLayerCapViolation,
   getTierByLayerId,
+  getTopFolderId,
   moveEntityToTarget,
   moveFolderEntityWithinFolder,
   renameFolderEntity,
@@ -49,11 +51,14 @@ export function useHomeFolderInteractions({
   folders,
   setLayoutState,
   setFolders,
+  onCapBlocked,
 }: {
   layoutState: Record<string, LayerLayoutState>;
   folders: FolderMap;
   setLayoutState: Dispatch<SetStateAction<Record<string, LayerLayoutState>>>;
   setFolders: Dispatch<SetStateAction<FolderMap>>;
+  /** Dunbar cap 초과로 이동이 차단됐을 때 초과된 layerId 로 안내한다. */
+  onCapBlocked?: (blockedLayerId: string) => void;
 }) {
   const [folderDragState, setFolderDragState] = useState<FolderDragState>(null);
   const [folderDragOverState, setFolderDragOverState] =
@@ -215,6 +220,35 @@ export function useHomeFolderInteractions({
       !hasExplicitIndex &&
       getFirstEmptyIndex(targetLayer.visibleSlotIds) < 0
     ) {
+      return;
+    }
+
+    // Dunbar cap: 폴더에서 다른 layer 로 빼내는 경로도 같은 한도를 적용한다.
+    // entity 는 폴더가 놓인 layer 의 count 에 이미 포함되어 있으므로 source
+    // 는 폴더 top location 의 layer 로 본다. 명시 슬롯에 occupant 가 있으면
+    // swap 으로 source layer 에 맞교환된다.
+    const capTargetSlots =
+      targetArea === "visible"
+        ? targetLayer.visibleSlotIds
+        : targetLayer.hiddenSlotIds;
+    const capDisplacedEntityId = hasExplicitIndex
+      ? capTargetSlots[targetIndex as number] ?? null
+      : null;
+    const sourceTopFolderId = getTopFolderId(folders, folderId);
+    const capSourceLayerId =
+      findEntityLocation(layoutState, sourceTopFolderId)?.layerId ?? null;
+    const capBlockedLayerId = getLayerCapViolation({
+      layout: layoutState,
+      folders,
+      entityId,
+      targetLayerId,
+      sourceLayerId: capSourceLayerId,
+      displacedEntityId: capDisplacedEntityId,
+    });
+
+    if (capBlockedLayerId) {
+      onCapBlocked?.(capBlockedLayerId);
+      closeFolderMoveMenu();
       return;
     }
 
