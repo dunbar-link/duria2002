@@ -95,6 +95,28 @@ function getPersonIdentityKey(p: Record<string, unknown>): string {
   );
 }
 
+// People 카드 상태 3단계. 판정 우선순위: 연결(remote PID 존재) → 초대(PID 없고
+// 현재 초대 대기) → 생성. 이름은 상태 판정에 쓰지 않는다.
+type PersonStage = "connected" | "invited" | "created";
+
+function resolvePersonStage(
+  p: Record<string, unknown>,
+  isPending: boolean,
+): PersonStage {
+  const hasPid = [p.userId, p.dlUserId, p.acceptedPersonId].some(
+    (v) => typeof v === "string" && v.trim().length > 0,
+  );
+  if (hasPid) return "connected";
+  if (isPending) return "invited";
+  return "created";
+}
+
+const STAGE_META: Record<PersonStage, { label: string; chipClass: string }> = {
+  connected: { label: "연결", chipClass: "bg-[#DDF7EE] text-[#0B7A5D]" },
+  invited: { label: "초대", chipClass: "bg-[#FCE8C9] text-[#936018]" },
+  created: { label: "생성", chipClass: "bg-[#ECEAE3] text-[#73706A]" },
+};
+
 function getPersonName(person: DashboardPerson & Record<string, unknown>) {
   const raw =
     person.name ?? person.displayName ?? person.fullName ?? person.title ?? "Unknown";
@@ -636,29 +658,6 @@ export default function DashboardPeoplePage() {
     return { byId, byName };
   }, [allPendingInvitesDedup]);
 
-  // person-level dedup: 같은 사람에게 여러 번 초대 버튼을 눌러 invite 가
-  // 여러 행 생겨도 설치대기 count 는 1 로만 친다. key 우선순위는 sourcePersonId
-  // → provisionalPersonId → 정규화된 inviteeName 순. 셋 다 비면 token 으로 fallback.
-  const allPendingInvitesByPerson = useMemo<DedupPending[]>(() => {
-    const seen = new Set<string>();
-    const result: DedupPending[] = [];
-    for (const inv of allPendingInvitesDedup) {
-      let personKey = "";
-      if (inv.sourcePersonId) {
-        personKey = `pid:${inv.sourcePersonId}`;
-      } else if (inv.provisionalPersonId) {
-        personKey = `pid:${inv.provisionalPersonId}`;
-      } else {
-        const n = normalizeName(inv.inviteeName);
-        personKey = n ? `name:${n}` : `token:${inv.token}`;
-      }
-      if (seen.has(personKey)) continue;
-      seen.add(personKey);
-      result.push(inv);
-    }
-    return result;
-  }, [allPendingInvitesDedup]);
-
   function findPendingForPerson(person: { id: string; name: string }) {
     const byId = pendingPersonIndex.byId.get(person.id);
     if (byId) return byId;
@@ -1124,10 +1123,33 @@ export default function DashboardPeoplePage() {
     );
   }
 
-  // 설치대기는 person 단위 dedup 결과를 사용해 같은 사람 중복 카운트 차단.
-  // 가입완료는 isAcceptedPerson 그대로 (isJoined + serverId).
-  const summaryPendingCount = allPendingInvitesByPerson.length;
-  const summaryAcceptedCount = enrichedPeople.filter(isAcceptedPerson).length;
+  // People 상태 3단계 분류. enrichedPeople 를 identity 키로 한 번만 분류해
+  // partition 을 보장한다(전체 = 생성 + 초대 + 연결, 상호 배타). 초대 판정은
+  // 기존 검증된 pending 식별(provisionalPersonId/sourcePersonId 기반 id 색인)만
+  // 쓰고 이름은 쓰지 않는다. 새 네트워크 요청 없음.
+  const stageByIdentity = useMemo(() => {
+    const map = new Map<string, PersonStage>();
+    for (const person of enrichedPeople) {
+      const isPending = Boolean(
+        pendingInviteMapByPersonId[person.id] ||
+          pendingPersonIndex.byId.get(person.id),
+      );
+      map.set(
+        getPersonIdentityKey(person.raw as Record<string, unknown>),
+        resolvePersonStage(person.raw as Record<string, unknown>, isPending),
+      );
+    }
+    return map;
+  }, [enrichedPeople, pendingInviteMapByPersonId, pendingPersonIndex]);
+
+  const stageCounts = useMemo(() => {
+    const counts = { created: 0, invited: 0, connected: 0, total: 0 };
+    for (const stage of stageByIdentity.values()) {
+      counts[stage] += 1;
+    }
+    counts.total = stageByIdentity.size;
+    return counts;
+  }, [stageByIdentity]);
 
   if (!hasHydrated) {
     return (
@@ -1183,15 +1205,22 @@ export default function DashboardPeoplePage() {
           </div>
         ) : null}
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-[14px] bg-[#DDF7EE] px-3 py-2 ring-1 ring-[#8EE5CA]">
-            <p className="text-[10px] font-semibold text-[#0B7A5D]">가입 완료</p>
-            <p className="mt-0.5 text-[19px] font-bold leading-tight text-[#0B7A5D]">{summaryAcceptedCount}</p>
+        {/* 상태 요약: 생성 | 초대 | 연결 3칸. 모바일 한 줄에 들어가도록 기존
+            2칸 대형 카드보다 압축(라벨/숫자/패딩 축소). 전체 = 세 칸의 합. */}
+        <div className="mt-3 grid grid-cols-3 gap-1.5">
+          <div className="rounded-[12px] bg-[#ECEAE3] px-2.5 py-1.5 ring-1 ring-[#D8D5CC]">
+            <p className="text-[10px] font-semibold text-[#73706A]">생성</p>
+            <p className="text-[18px] font-bold leading-tight text-[#73706A]">{stageCounts.created}</p>
           </div>
 
-          <div className="rounded-[14px] bg-[#FCE8C9] px-3 py-2 ring-1 ring-[#F7B95C]">
-            <p className="text-[10px] font-semibold text-[#936018]">설치 대기</p>
-            <p className="mt-0.5 text-[19px] font-bold leading-tight text-[#936018]">{summaryPendingCount}</p>
+          <div className="rounded-[12px] bg-[#FCE8C9] px-2.5 py-1.5 ring-1 ring-[#F7B95C]">
+            <p className="text-[10px] font-semibold text-[#936018]">초대</p>
+            <p className="text-[18px] font-bold leading-tight text-[#936018]">{stageCounts.invited}</p>
+          </div>
+
+          <div className="rounded-[12px] bg-[#DDF7EE] px-2.5 py-1.5 ring-1 ring-[#8EE5CA]">
+            <p className="text-[10px] font-semibold text-[#0B7A5D]">연결</p>
+            <p className="text-[18px] font-bold leading-tight text-[#0B7A5D]">{stageCounts.connected}</p>
           </div>
         </div>
 
@@ -1234,7 +1263,7 @@ export default function DashboardPeoplePage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[120px] pt-3">
         {filteredPeople.length === 0 ? (
-          <EmptyState title="아직 없어요" body="가입 완료된 사람이 여기에 보여요." />
+          <EmptyState title="아직 없어요" body="추가하거나 초대한 사람이 여기에 보여요." />
         ) : (
           <div className="space-y-2">
             {filteredPeople.map((person) => {
@@ -1257,6 +1286,11 @@ export default function DashboardPeoplePage() {
                 : buildChannelChoices(person.raw as DashboardPerson);
 
               const tierStyle = getSimpleTierStyle(person.tierValue);
+              const stage =
+                stageByIdentity.get(
+                  getPersonIdentityKey(person.raw as Record<string, unknown>),
+                ) ?? "created";
+              const stageMeta = STAGE_META[stage];
               // border 기준: accepted 만 solid. local-only / pending 모두 dashed
               // (Home tile 점선 정책과 일치). isPendingInstall 은 채널 / CTA
               // 분기에 그대로 사용한다.
@@ -1307,7 +1341,7 @@ export default function DashboardPeoplePage() {
                         </h2>
                       </div>
 
-                      <div className="mt-1 flex items-center gap-2">
+                      <div className="mt-1 flex items-center gap-1.5">
                         <span
                           className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
                           style={{
@@ -1317,6 +1351,13 @@ export default function DashboardPeoplePage() {
                           }}
                         >
                           {tierStyle.label}
+                        </span>
+                        {/* 상태 pill 은 tier 칩보다 시각 우선순위를 낮게(작은
+                            글씨/연한 색/가는 굵기). 설명 문장은 추가하지 않는다. */}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${stageMeta.chipClass}`}
+                        >
+                          {stageMeta.label}
                         </span>
                       </div>
                     </div>

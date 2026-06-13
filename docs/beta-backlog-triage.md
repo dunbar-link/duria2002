@@ -175,6 +175,26 @@
 
 **기존 중복 데이터**: 자동 정리하지 않음. 실제 정리는 카드별 identity key/PID/exact token/유지·제거 대상 확정 후 별도 승인. UI 개별 삭제는 이제 안전(identity/token 스코프)하므로, PASS 후 카드별 삭제로 정리 가능. 단, 홈 "홈에서 제거"(dashboard/page.tsx) 는 아직 person.id 기준(서버 이름삭제는 없음) — 중복 id 정리에는 People 삭제 사용 권장(홈 경로 스코프화는 후속 후보).
 
+### 2026-06-13 — People 상태 3단계(생성/초대/연결) UX 정리
+
+People 상단 `가입 완료 / 설치 대기` 2분류로는 홈에서 이름만 추가한 local-only 사람과 실제 초대 대기를 구분하기 어려워, 상태 표시를 3단계로 통일(상태 UX만, 흐름/스키마/API 무변경).
+
+**상태 정의·우선순위 (이름 미사용)**
+
+- 연결: remote PID(userId/dlUserId/acceptedPersonId) 존재. (기존 가입 완료)
+- 초대: PID 없고 현재 초대 대기(기존 검증된 pending 식별 — provisionalPersonId/sourcePersonId 기반 id 색인만, 새 네트워크 요청 없음). (기존 설치 대기)
+- 생성: PID 없고 초대 대기도 없는 local-only.
+- 판정 순서: 연결 → 초대 → 생성. 이름은 상태 판정에 쓰지 않는다.
+
+**수정 (app/dashboard/people/page.tsx)**
+
+- `resolvePersonStage`/`STAGE_META` 모듈 헬퍼 + `stageByIdentity`(enrichedPeople 를 identity 키로 1회 분류) + `stageCounts`. partition 보장 → 전체 = 생성 + 초대 + 연결.
+- 상단 요약: 2칸 대형 → 3칸 compact(생성|초대|연결, 라벨/숫자/패딩 축소, 모바일 한 줄).
+- 사람 카드: tier 칩 옆에 tier 보다 낮은 우선순위의 상태 pill(작은 글씨/연한 색). 설명 문장 없음.
+- 사용자 화면에서 "가입 완료/설치 대기" 문구 제거. 기존 `allPendingInvitesByPerson`(설치대기 카운트 전용) 제거.
+
+**검증**: fixture(연결7/초대4/생성1) → 상단 생성1·초대4·연결7, 합계 12, 카드 pill 일치, 순서 생성|초대|연결. 회귀(필터 DOM 누적0, 중복 id React key 경고0, 삭제 identity/token 격리) 통과. tsc/build PASS.
+
 ## 다음 의사결정 원칙
 
 1. 한 번 나온 불편은 **메모**만 한다 (이 문서 표에 추가).
