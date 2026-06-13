@@ -1106,8 +1106,11 @@ export const usePeopleStore = create<PeopleState>()(
                 "";
               // PID(가입 완료) → 초대 token(provisionalPersonId) 순 고유 식별.
               // 이름 키는 쓰지 않는다(동명이인 분리). token 기반 stableId 로
-              // 재sync 시에도 같은 사람을 다시 만들지 않는다.
-              const stableId = item.sourcePersonId || item.provisionalPersonId;
+              // 재sync 시에도 같은 사람을 다시 만들지 않는다. sourcePersonId 는
+              // 서로 다른 초대/PID 가 공유할 수 있어(같은 source 를 여러 번 초대)
+              // person.id 충돌 → React key 충돌의 원인이라 id 에 쓰지 않는다.
+              // 수락 1건당 고유한 token 기반 provisionalPersonId 만 쓴다.
+              const stableId = item.provisionalPersonId;
               const key = acceptedUserId
                 ? `user:${acceptedUserId}`
                 : `id:${stableId}`;
@@ -1129,7 +1132,7 @@ export const usePeopleStore = create<PeopleState>()(
 
               return {
                 ...nextPerson,
-                id: stableId || nextPerson.id,
+                id: stableId,
                 isJoined: true,
                 userId: acceptedUserId || undefined,
                 dlUserId: acceptedUserId || undefined,
@@ -1171,8 +1174,9 @@ export const usePeopleStore = create<PeopleState>()(
                 (isSelf ? readMeProfileName() : "") ||
                 cleanText(item.inviterName) ||
                 "";
-              // PID → 초대 token 순. 이름 키 제거(동명이인 분리).
-              const stableId = item.sourcePersonId || item.provisionalPersonId;
+              // PID → 초대 token 순. 이름 키 제거. sourcePersonId 공유로 인한
+              // person.id 충돌을 막기 위해 token 기반 provisionalPersonId 만 쓴다.
+              const stableId = item.provisionalPersonId;
               const key = inviterUserId
                 ? `user:${inviterUserId}`
                 : `id:${stableId}`;
@@ -1194,7 +1198,7 @@ export const usePeopleStore = create<PeopleState>()(
 
               return {
                 ...nextPerson,
-                id: stableId || nextPerson.id,
+                id: stableId,
                 isJoined: true,
                 userId: inviterUserId || undefined,
                 dlUserId: inviterUserId || undefined,

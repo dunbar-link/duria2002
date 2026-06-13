@@ -130,6 +130,29 @@
 
 **기존 증식 데이터**: production 브라우저의 김준석 다수 카드는 자동 삭제/병합하지 않음. 신규 재현 차단만 적용. 정리는 카드별 person.id/PID/token/상태 확인 후 개별 삭제(전체 초기화·DB 직접 수정·clear-all 금지).
 
+### 2026-06-13 — Beta P1 People 카드 DOM 누적 (중복 person.id / React key 충돌)
+
+5cd06c6 이후에도 실기기(Android Chrome)에서 가족 필터 반복 시 김준석 카드가 화면에 누적(2→7)되던 BLOCKED 문제. 실기기 원격 DevTools로 원인 확정.
+
+**원인**
+
+- canonical store/localStorage/count 는 불변(증식 아님). 실제 DOM 노드만 누적.
+- store.people 13명 중 고유 person.id 12개 — **서로 다른 PID 2명이 동일 local person.id 공유**. 카드 React key 가 `person.id` 단독이라 **중복 key** 발생 → Android Chrome 에서 reconciliation undefined 동작으로 DOM 노드 누적(데스크톱에선 안정적 잘못된 수라 미재현됨).
+- 중복 id 생성원: ① `buildAddedPerson` 의 `person-${Date.now()}` (같은 ms 충돌) ② sync 의 새 사람 id 가 `sourcePersonId || provisionalPersonId` 였는데, 같은 source 를 여러 번 초대하면 서로 다른 PID 가 같은 sourcePersonId(=person.id)를 공유.
+
+**수정 (3파일)**
+
+- `app/dashboard/people/data.ts`: `buildAddedPerson` id 를 `crypto.randomUUID()` 기반으로(충돌 불가, 같은 ms 1000개 생성해도 고유). 외부 라이브러리 미추가.
+- `app/dashboard/people/store.ts`: sync(missingAccepted/inviterPeople) 새 사람 id 를 공유 가능한 sourcePersonId 대신 수락 1건당 고유한 token 기반 `provisionalPersonId` 로. → 신규 중복 id 차단.
+- `app/dashboard/people/page.tsx`: 카드 React key 를 `person.id` 단독 → `getPersonIdentityKey`(PID→id, 이름 제외)로. mergedPeopleSource dedup 과 동일 helper 라 렌더 목록 내 key 가 항상 고유(= Map 키). 구버전 중복 id 데이터도 서로 다른 PID 면 key 가 달라 누적되지 않음.
+
+**검증**: 중복 id 2명 fixture → React 중복키 경고 0, 가족 토글 12회 DOM 2 고정 / id 1000개 전부 고유 / sync 8회 멱등 / 동명이인 2장·사진·hint 격리 회귀 통과.
+
+**기존 데이터/주의**
+
+- 실기기의 기존 중복 id 는 자동 재발급/병합/삭제하지 않음(Home placement·folder·draft·signal 참조를 원자적으로 옮길 근거 부족). React key 수정으로 화면 누적은 해소되나, **동일 person.id 인 기존 2명은 store 연산(removePerson/updatePersonTier 가 id 기준)에서 함께 영향받을 잠재 위험**이 남음 → 카드별 PID/token 확인 후 한 명을 개별 삭제·재초대로 정리 권장(전체 초기화·DB 직접 수정·clear-all 금지).
+- count 13 vs 12: 전체 13 = 가입완료 8 + 설치대기 4 + local-only 1(서버 식별자·pending 없는 홈 추가 사람, 의도된 미포함). 고유 id 12 = 기존 중복 id 1쌍(위 데이터). 둘 다 이번 React key 버그와 별개의 기존 데이터 사안.
+
 ## 다음 의사결정 원칙
 
 1. 한 번 나온 불편은 **메모**만 한다 (이 문서 표에 추가).

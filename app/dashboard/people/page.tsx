@@ -79,6 +79,22 @@ function getPersonId(person: DashboardPerson & Record<string, unknown>) {
   return typeof raw === "string" ? raw : String(raw ?? "");
 }
 
+// 사람의 고유 identity 키. dedup(mergedPeopleSource)과 카드 React key 가 같은
+// 값을 쓰도록 한 곳에서 계산한다. 이름은 절대 쓰지 않는다(동명이인 분리).
+// remote PID(userId/dlUserId/acceptedPersonId) → person.id 순. id 는 항상 존재.
+// 서로 다른 PID 가 (구버전 데이터로) 같은 person.id 를 갖더라도 PID 가 우선이라
+// React key 가 겹치지 않는다.
+function getPersonIdentityKey(p: Record<string, unknown>): string {
+  const pick = (v: unknown) =>
+    typeof v === "string" && v.trim() ? v.trim() : "";
+  return (
+    pick(p.userId) ||
+    pick(p.dlUserId) ||
+    pick(p.acceptedPersonId) ||
+    pick(p.id)
+  );
+}
+
 function getPersonName(person: DashboardPerson & Record<string, unknown>) {
   const raw =
     person.name ?? person.displayName ?? person.fullName ?? person.title ?? "Unknown";
@@ -654,9 +670,8 @@ export default function DashboardPeoplePage() {
   const deviceUserId = getCurrentUserId();
 
   function getKey(p: any) {
-    // 이름(p.name)은 식별 키에서 제외한다 — 동명이인이 한 카드로 합쳐지지
-    // 않도록. 고유 식별자만: userId(가입) → acceptedPersonId → id.
-    return p.userId || p.acceptedPersonId || p.id;
+    // dedup 키와 카드 React key 가 동일 helper 를 쓰도록 통일한다(이름 제외).
+    return getPersonIdentityKey(p as Record<string, unknown>);
   }
 
   function isSelfPerson(p: any) {
@@ -1253,7 +1268,10 @@ export default function DashboardPeoplePage() {
 
               return (
                 <div
-                  key={person.id}
+                  // React key 는 person.id 단독이 아니라 identity 키를 쓴다. 구버전
+                  // 데이터에서 서로 다른 PID 가 같은 person.id 를 갖는 경우
+                  // person.id 단독 key 는 충돌해 필터 전환 시 카드가 누적된다.
+                  key={getPersonIdentityKey(person.raw as Record<string, unknown>)}
                   className="rounded-[20px] bg-[#FAFAF8] p-3 shadow-[0_8px_22px_rgba(15,23,42,0.04)] ring-1 ring-[#D3D1C7]"
                 >
                   <div className="flex items-center gap-3">

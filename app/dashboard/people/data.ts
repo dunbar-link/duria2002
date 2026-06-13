@@ -464,6 +464,18 @@ export function getPersonDisplayPhoto(person: PersonPhotoFields): string {
   );
 }
 
+// person.id 는 같은 밀리초에 여러 명이 생성돼도 절대 충돌하지 않아야 한다
+// (충돌 시 React list key 가 겹쳐 렌더가 깨진다). timestamp 단독 대신 UUID 를 쓴다.
+function generatePersonId(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return `person-${crypto.randomUUID()}`;
+  }
+  return `person-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function buildAddedPerson(input: AddDashboardPersonInput): DashboardPerson {
   const trimmedName = input.name.trim();
   const relationshipType = normalizeRelationshipType(input.relationshipType);
@@ -473,7 +485,7 @@ export function buildAddedPerson(input: AddDashboardPersonInput): DashboardPerso
   const trimmedNote = cleanText(input.note);
 
   return {
-    id: `person-${Date.now()}`,
+    id: generatePersonId(),
     name: trimmedName,
     countryCode: trimmedCountryCode,
     tier: input.tier,
