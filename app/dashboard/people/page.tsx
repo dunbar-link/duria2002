@@ -650,12 +650,9 @@ export default function DashboardPeoplePage() {
   const deviceUserId = getCurrentUserId();
 
   function getKey(p: any) {
-    return (
-      p.userId ||
-      p.acceptedPersonId ||
-      p.id ||
-      p.name
-    );
+    // 이름(p.name)은 식별 키에서 제외한다 — 동명이인이 한 카드로 합쳐지지
+    // 않도록. 고유 식별자만: userId(가입) → acceptedPersonId → id.
+    return p.userId || p.acceptedPersonId || p.id;
   }
 
   function isSelfPerson(p: any) {

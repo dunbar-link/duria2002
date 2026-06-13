@@ -83,6 +83,31 @@
 
 - 폴더 단체 신호, 포인트 시스템, 이모지 확장(기존 Signal Library v2), 신호함 히스토리 구조 변경, Me 페이지 리디자인 — 베타 단계에서는 핵심 루프와 Dunbar 제한 불변식 우선.
 
+### 2026-06-13 — Beta P1 데이터 무결성 (동명이인 자동 병합 방지)
+
+서로 다른 초대(token)·기기(PID)의 사용자가 같은 이름을 입력하면 사람 카드가 하나로 자동 병합되고, 병합 과정에서 기존 프로필 사진이 사라지는 P1 데이터 무결성 버그를 수정.
+
+**식별 불변식 (확정)**
+
+- 이름은 표시값일 뿐 식별키가 아니다. `display_name`/`remoteProfileName`/`localAlias`/초대 입력 이름으로 사람을 병합하지 않는다.
+- 서로 다른 invite token / PID / connection 은 이름이 같아도 별도 사람으로 유지한다.
+- 식별 우선순위: userId(가입 PID) → invite token(provisionalPersonId=`invite-pending-<token>`) → local person id. 로그인/계정 통합은 향후 별도 기능이며, 그때도 이름 일치만으로 자동 병합하지 않는다.
+
+**수정 (P1)**
+
+- `app/dashboard/people/store.ts`: `dedupePeopleByIdentity`·`syncAcceptedInvitesToPeople`(매처 2곳·existingKeys·신규카드 키)·`addPerson` 에서 이름(`normalizePersonName`) 기반 매칭/병합/중복판정을 전부 제거. pending→accepted 연결은 token(provisionalPersonId)/PID 로만 잇는다. 프로필 사진 "비면 비운다" 정책은 이제 PID/token 으로 매칭된 동일 연결에만 적용되므로, 이름만 같은 다른 PID 가 기존 사진을 null 로 덮어쓰지 못한다.
+- `app/dashboard/people/page.tsx`: `mergedPeopleSource` 의 `getKey` 에서 `|| p.name` fallback 제거(동명이인이 한 카드로 흡수되지 않게). Home(store 기준)과 People 표시 연결 수가 일치.
+- `app/invite/[token]/page.tsx`: Me 이름 입력칸을 전역 `readMeProfileName()` 으로 프리필하지 않는다(이전 초대 이름 누수 차단). 현재 초대 이름 힌트는 해당 token 의 `invitee_name` snapshot 을 흐린 placeholder 로만 표시. 초대 A→힌트 김준석, 초대 B→힌트 준석M 로 token 격리.
+
+**유지(정상 확인, 미변경)**
+
+- 신호 sender/receiver resolve 는 PID 기반(이름 미사용)이라 그대로 둠. 삭제 연결 신호 보호 로직 유지.
+- 동일 PID 의 정상 sync(사진 삭제 시 이니셜 복귀, 이름 변경 철수→김철수 반영)는 PID 매칭으로 계속 동작(회귀 확인).
+
+**기존 손상 데이터**
+
+- 이미 병합/중복된 김준석 카드(테스터 1명 기준 3개)는 자동 분리·삭제하지 않는다(어느 신호/사진이 어느 PID 소유인지 자동 추정 시 추가 손상 위험). 신규 재현 방지만 적용하고, 정리는 안전한 개별 삭제 후 재초대 절차로 수동 진행.
+
 ## 다음 의사결정 원칙
 
 1. 한 번 나온 불편은 **메모**만 한다 (이 문서 표에 추가).

@@ -434,22 +434,15 @@ function getStoredUserId(person: DashboardPerson & Record<string, unknown>) {
   return userId || dlUserId || acceptedPersonId;
 }
 
-function normalizePersonName(value: string | null | undefined) {
-  return (value ?? "").trim().toLowerCase();
-}
-
 function dedupePeopleByIdentity(people: DashboardPerson[]) {
   const byIdentity = new Map<string, DashboardPerson>();
 
   for (const person of people) {
     const extended = person as DashboardPerson & Record<string, unknown>;
     const userId = getStoredUserId(extended);
-    const nameKey = normalizePersonName(person.name);
-    const key = userId
-      ? `user:${userId}`
-      : nameKey
-        ? `name:${nameKey}`
-        : `id:${person.id}`;
+    // 식별 키는 고유값만 사용한다. 이름(name)으로 합치면 서로 다른 PID/연결의
+    // 동명이인이 한 장으로 병합돼 데이터가 사라지므로 절대 키로 쓰지 않는다.
+    const key = userId ? `user:${userId}` : `id:${person.id}`;
     const existing = byIdentity.get(key);
 
     if (!existing) {
@@ -487,15 +480,13 @@ export const usePeopleStore = create<PeopleState>()(
         const nextPerson = buildAddedPerson(input);
 
         set((state) => {
-          const existingByName = state.people.find(
-            (person) =>
-              normalizePersonName(person.name) ===
-              normalizePersonName(nextPerson.name),
-          );
-
-          const nextPeople = dedupePeopleByIdentity(
-            existingByName ? state.people : [...state.people, nextPerson],
-          );
+          // 이름이 같아도 별도 사람으로 추가한다. 동일성 판단은 고유 식별자
+          // (userId/id) 기준 dedupePeopleByIdentity 에 맡긴다 — 이름으로 합치면
+          // 서로 다른 사람이 한 장으로 사라진다.
+          const nextPeople = dedupePeopleByIdentity([
+            ...state.people,
+            nextPerson,
+          ]);
           const nextChannels = buildChannelState(nextPeople);
 
           return {
@@ -941,7 +932,6 @@ export const usePeopleStore = create<PeopleState>()(
             const extended = person as DashboardPerson &
               Record<string, unknown>;
             const counterpartId = getStoredUserId(extended);
-            const personName = normalizePersonName(person.name);
 
             // 방향 1: 상대가 "수락자"(내가 초대자)인 초대.
             // 이때 상대의 현재 이름은 acceptedPersonName 이다.
@@ -958,14 +948,13 @@ export const usePeopleStore = create<PeopleState>()(
                 item.acceptedPersonId === counterpartId
               )
                 return true;
+              // 초대 token 기반 연결: pending 카드 id(invite-pending-<token>)와
+              // 같은 token 의 수락 row 를 잇는다. 이름 매칭은 제거한다 — 다른
+              // PID 동명이인 row 가 이 카드를 가로채 사진/식별자를 덮어쓰는 것을
+              // 막는다.
               if (
-                item.acceptedPersonName &&
-                normalizePersonName(item.acceptedPersonName) === personName
-              )
-                return true;
-              if (
-                item.inviteeName &&
-                normalizePersonName(item.inviteeName) === personName
+                item.provisionalPersonId &&
+                item.provisionalPersonId === person.id
               )
                 return true;
               return false;
@@ -984,9 +973,10 @@ export const usePeopleStore = create<PeopleState>()(
                 return true;
               if (item.inviterUserId && item.inviterUserId === counterpartId)
                 return true;
+              // token 기반 연결만. 이름(inviterName) 매칭 제거(동명이인 가로채기 방지).
               if (
-                item.inviterName &&
-                normalizePersonName(item.inviterName) === personName
+                item.provisionalPersonId &&
+                item.provisionalPersonId === person.id
               )
                 return true;
               return false;
@@ -1087,12 +1077,10 @@ export const usePeopleStore = create<PeopleState>()(
             updatedPeople.map((person) => {
               const extended = person as DashboardPerson & Record<string, unknown>;
               const storedUserId = getStoredUserId(extended);
-              const nameKey = normalizePersonName(person.name);
+              // 이름 키 제거: 동명이인을 같은 키로 보지 않는다.
               return storedUserId
                 ? `user:${storedUserId}`
-                : nameKey
-                  ? `name:${nameKey}`
-                  : `id:${person.id}`;
+                : `id:${person.id}`;
             }),
           );
 
@@ -1116,9 +1104,13 @@ export const usePeopleStore = create<PeopleState>()(
                 cleanText(item.acceptedPersonName) ||
                 cleanText(item.inviteeName) ||
                 "";
+              // PID(가입 완료) → 초대 token(provisionalPersonId) 순 고유 식별.
+              // 이름 키는 쓰지 않는다(동명이인 분리). token 기반 stableId 로
+              // 재sync 시에도 같은 사람을 다시 만들지 않는다.
+              const stableId = item.sourcePersonId || item.provisionalPersonId;
               const key = acceptedUserId
                 ? `user:${acceptedUserId}`
-                : `name:${normalizePersonName(acceptedName)}`;
+                : `id:${stableId}`;
 
               if (existingKeys.has(key)) {
                 return null;
@@ -1137,7 +1129,7 @@ export const usePeopleStore = create<PeopleState>()(
 
               return {
                 ...nextPerson,
-                id: item.sourcePersonId || nextPerson.id,
+                id: stableId || nextPerson.id,
                 isJoined: true,
                 userId: acceptedUserId || undefined,
                 dlUserId: acceptedUserId || undefined,
@@ -1179,9 +1171,11 @@ export const usePeopleStore = create<PeopleState>()(
                 (isSelf ? readMeProfileName() : "") ||
                 cleanText(item.inviterName) ||
                 "";
+              // PID → 초대 token 순. 이름 키 제거(동명이인 분리).
+              const stableId = item.sourcePersonId || item.provisionalPersonId;
               const key = inviterUserId
                 ? `user:${inviterUserId}`
-                : `name:${normalizePersonName(inviterName)}`;
+                : `id:${stableId}`;
 
               if (existingKeys.has(key)) {
                 return null;
@@ -1200,6 +1194,7 @@ export const usePeopleStore = create<PeopleState>()(
 
               return {
                 ...nextPerson,
+                id: stableId || nextPerson.id,
                 isJoined: true,
                 userId: inviterUserId || undefined,
                 dlUserId: inviterUserId || undefined,

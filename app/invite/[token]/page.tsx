@@ -8,7 +8,6 @@ import {
   isIncompleteMeName,
   ME_NAME_REQUIRED_MESSAGE,
   readMeProfileImageUrl,
-  readMeProfileName,
   writeMeProfileNameIfEmpty,
 } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../../dashboard/people/store";
@@ -101,12 +100,12 @@ export default function InviteEntryPage() {
 
       const data = (await res.json()) as InviteRow;
       setInvite(data);
-      // 폼 기본값은 "수락자 본인" 이름이어야 한다. invitee_name(초대자가 입력한
-      // 임시 카드명)은 절대 기본값으로 쓰지 않는다. 기존 Me 이름이 유효하면
-      // 그 값을 채워 재입력 부담을 줄이고, 없거나 "나"면 빈칸으로 둔다.
-      const existingMe = readMeProfileName();
-      const defaultName = isIncompleteMeName(existingMe) ? "" : existingMe;
-      setForm({ name: defaultName, phone: data.invitee_phone ?? "" });
+      // 입력칸 기본값(value)은 항상 빈칸으로 둔다. 전역 Me 이름을 미리 채우면
+      // 다른 초대(예: 두 번째 초대 "준석M")를 같은 기기에서 열었을 때 이전
+      // 초대 이름("김준석")이 새 초대 화면에 새어 나온다(token 격리 위반).
+      // 현재 초대의 이름 힌트는 흐린 placeholder(아래 input)로만, 해당 token 의
+      // invitee_name snapshot 으로 보여준다.
+      setForm({ name: "", phone: data.invitee_phone ?? "" });
       setIsLoading(false);
     }
 
@@ -325,7 +324,7 @@ export default function InviteEntryPage() {
             <form onSubmit={handleSubmit} className="mt-5 space-y-4">
               <div>
                 <label className="text-sm font-semibold text-slate-800">이름</label>
-                <input value={form.name} onChange={(event) => updateField("name", event.target.value)} placeholder="이름을 입력해 주세요" className="mt-2 h-12 w-full rounded-2xl border-0 bg-slate-100 px-4 text-sm text-slate-900 outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300" />
+                <input value={form.name} onChange={(event) => updateField("name", event.target.value)} placeholder={invite.invitee_name?.trim() || "이름을 입력해 주세요"} className="mt-2 h-12 w-full rounded-2xl border-0 bg-slate-100 px-4 text-sm text-slate-900 outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300" />
               </div>
               <div>
                 <label className="text-sm font-semibold text-slate-800">전화번호 (선택)</label>
