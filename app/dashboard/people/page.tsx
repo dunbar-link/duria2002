@@ -67,6 +67,7 @@ type RemoteInviteRow = {
   tier: number;
   relationship_label: string | null;
   status: string;
+  source_person_id: string | null;
   accepted_person_id: string | null;
   accepted_person_name: string | null;
   accepted_at: string | null;
@@ -322,7 +323,10 @@ function buildRemoteInvitePerson(row: RemoteInviteRow): DashboardPerson {
     "이름 없음";
 
   return {
-    id: row.accepted_person_id?.trim() || `remote-invite-${row.token}`,
+    // PID 가 없으면 store sync 가 만드는 사람 id(invite-pending-<token>)와
+    // 같은 token 기반 id 로 맞춰, 같은 연결이 store/remote 양쪽에서 서로 다른
+    // 카드로 갈라지지 않게 한다.
+    id: row.accepted_person_id?.trim() || `invite-pending-${row.token}`,
     name: displayName,
     countryCode: "KR",
     tier: (row.tier as 1 | 5 | 15 | 50 | 150 | 500 | 1500) ?? 50,
@@ -664,30 +668,54 @@ export default function DashboardPeoplePage() {
     );
   }
 
-  // remote 먼저
+  // 1) canonical store people 를 먼저 채운다(Home 과 동일 기준). 동시에 이
+  //    사람들이 대표하는 식별자(PID / person.id)를 모은다.
+  const storeIds = new Set<string>();
+  const storePids = new Set<string>();
+  people.forEach((p) => {
+    if (isSelfPerson(p)) {
+      return;
+    }
+    map.set(getKey(p), p);
+    const ext = p as DashboardPerson & Record<string, unknown>;
+    if (typeof p.id === "string" && p.id) {
+      storeIds.add(p.id);
+    }
+    for (const pid of [ext.userId, ext.dlUserId, ext.acceptedPersonId]) {
+      if (typeof pid === "string" && pid.trim()) {
+        storePids.add(pid.trim());
+      }
+    }
+  });
+
+  // 2) remote accepted invite 는 store 에 아직 없는 연결만 추가한다. 같은
+  //    PID / source person / invite token 을 가진 사람이 이미 store 에 있으면
+  //    같은 연결이므로 건너뛴다. (이 dedup 이 없으면 store sync 가 만든 카드와
+  //    remote row 가 서로 다른 키로 남아 카드가 2배로 보이고, 필터 전환 때마다
+  //    증식하는 것처럼 보인다.)
   remoteAcceptedInvites.forEach((item) => {
-    if (
-      deviceUserId &&
-      (item.accepted_person_id ?? "").trim() === deviceUserId
-    ) {
+    const pid = (item.accepted_person_id ?? "").trim();
+    if (deviceUserId && pid === deviceUserId) {
+      return;
+    }
+    const src = (item.source_person_id ?? "").trim();
+    const tokenId = item.token ? `invite-pending-${item.token}` : "";
+
+    if (pid && storePids.has(pid)) {
+      return;
+    }
+    if (src && storeIds.has(src)) {
+      return;
+    }
+    if (tokenId && storeIds.has(tokenId)) {
       return;
     }
 
     const p = buildRemoteInvitePerson(item);
     const key = getKey(p);
-
     if (!map.has(key)) {
       map.set(key, p);
     }
-  });
-
-  // local 덮어쓰기
-  people.forEach((p) => {
-    if (isSelfPerson(p)) {
-      return;
-    }
-    const key = getKey(p);
-    map.set(key, p);
   });
 
   return Array.from(map.values());

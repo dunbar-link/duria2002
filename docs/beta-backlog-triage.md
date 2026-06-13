@@ -64,6 +64,7 @@
 | 신호함 히스토리 구조 개선 | Backlog | 대기 | 현재 신호함 동작은 정상. 구조 변경은 회귀 위험 대비 효용 낮음 | 히스토리 관련 불편이 반복 보고될 때 |
 | Me 페이지 전체 리디자인 | Backlog | 대기 | 기능 정상. 리디자인은 베타 범위 외 | 베타 종료 후 디자인 패스에서 |
 | 초대 폼 기본 tier(핵심=5) 하향 검토 | P2 후보 | 관찰 중 | 초대 기본값이 핵심(5)이라 초대만 반복해도 핵심 layer 로 유입되어 cap 에 빨리 닿음. 초대 수락/reconcile 은 사람 증발 방지를 위해 차단하지 않으므로(기존 초과 유지, 신규 진입만 차단) 기본값 하향이 근본 대응 | 핵심 layer 초과 유입이 반복 관찰되면 기본값 50(친밀)로 하향 |
+| 초대 공유 메시지에 URL 중복 표시 | P2 | 대기 | 카카오톡 공유 시 본문에 같은 invite URL 이 두 번 보임(+링크 미리보기 카드). 초대 자체는 정상. share payload 의 text 와 url 양쪽에 같은 주소가 들어갔을 가능성 | 본문엔 초대 문구만 두고 url 필드만 쓰거나, 본문 URL 한 번만. Android/카톡/Chrome 공유에서 URL 1회 표시 확인 |
 
 ## 베타 피드백 처리 기록
 
@@ -107,6 +108,27 @@
 **기존 손상 데이터**
 
 - 이미 병합/중복된 김준석 카드(테스터 1명 기준 3개)는 자동 분리·삭제하지 않는다(어느 신호/사진이 어느 PID 소유인지 자동 추정 시 추가 손상 위험). 신규 재현 방지만 적용하고, 정리는 안전한 개별 삭제 후 재초대 절차로 수동 진행.
+
+### 2026-06-13 — Beta P1 People 카드 증식/집계 불일치 (멱등성)
+
+1439a42 배포 후 실기기에서 People 필터 전환·재진입 시 동일 김준석 카드가 계속 늘어 보이는 회귀(BLOCKED) 수정.
+
+**원인**
+
+- store.people 의 `syncAcceptedInvitesToPeople` 자체는 멱등(동일 응답 N회 sync 해도 길이/ID 집합 불변 — 재현으로 확인). 필터 onClick 도 표시 상태만 바꿈(데이터 생성 없음).
+- 진짜 원인은 렌더 결합부 `mergedPeopleSource`. 같은 연결(같은 PID/token)인데 store sync 가 만든 사람의 id(`invite-pending-<token>` 또는 sourcePersonId)와 remote accepted row 의 id(`remote-invite-<token>`)가 달라 dedup 키가 어긋나 **같은 사람이 store/remote 양쪽에서 2장**으로 렌더됐다. PID 미확정 구간/토큰 다수일수록 카드가 부풀어 "필터 전환 때마다 증식"처럼 보였다.
+- 13 vs 12: total(13)=가입완료(8)+설치대기(4)+local-only(1). local-only(홈에서 이름만 추가, serverId·pending invite 없음)는 어디에도 안 잡히는 의도된 동작. People-친밀 3 vs Home 2 는 위 렌더 중복이 1 더한 결과 → 수정으로 해소.
+
+**수정 (app/dashboard/people/page.tsx 1파일)**
+
+- `mergedPeopleSource`: canonical store people 를 먼저 채우고 그 사람들의 식별자(PID/person.id)를 모은 뒤, remote accepted invite 는 같은 PID·source person·invite token 이 이미 store 에 있으면 건너뛴다 → 렌더 카드 수 = canonical store 수(필터 전환·재진입에도 불변).
+- `buildRemoteInvitePerson` 의 PID 미확정 id fallback 을 `remote-invite-<token>` → `invite-pending-<token>` 로 맞춰 store/remote 토큰 기반 id 일치.
+- `RemoteInviteRow` 타입에 `source_person_id` 추가(API 가 반환하는 값, dedup 에 사용).
+- store sync(store.ts)는 멱등 확인되어 미변경.
+
+**불변식 적용**: 필터는 읽기 전용 / 동일 PID 1카드 / 동일 token 1카드 / 동명이인(다른 PID)은 별도 유지 / Home·People 은 동일 canonical 기준.
+
+**기존 증식 데이터**: production 브라우저의 김준석 다수 카드는 자동 삭제/병합하지 않음. 신규 재현 차단만 적용. 정리는 카드별 person.id/PID/token/상태 확인 후 개별 삭제(전체 초기화·DB 직접 수정·clear-all 금지).
 
 ## 다음 의사결정 원칙
 
