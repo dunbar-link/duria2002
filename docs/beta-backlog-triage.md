@@ -153,6 +153,28 @@
 - 실기기의 기존 중복 id 는 자동 재발급/병합/삭제하지 않음(Home placement·folder·draft·signal 참조를 원자적으로 옮길 근거 부족). React key 수정으로 화면 누적은 해소되나, **동일 person.id 인 기존 2명은 store 연산(removePerson/updatePersonTier 가 id 기준)에서 함께 영향받을 잠재 위험**이 남음 → 카드별 PID/token 확인 후 한 명을 개별 삭제·재초대로 정리 권장(전체 초기화·DB 직접 수정·clear-all 금지).
 - count 13 vs 12: 전체 13 = 가입완료 8 + 설치대기 4 + local-only 1(서버 식별자·pending 없는 홈 추가 사람, 의도된 미포함). 고유 id 12 = 기존 중복 id 1쌍(위 데이터). 둘 다 이번 React key 버그와 별개의 기존 데이터 사안.
 
+### 2026-06-13 — Beta P1 People 삭제를 identity/token 스코프로 제한
+
+기존 중복 person.id 카드 정리 가능 여부 조사 중, People 삭제 기능 자체에 데이터 무결성 위험 확인 → 삭제 경로를 identity/token 기준으로 수정(기존 데이터는 정리하지 않음).
+
+**위험(수정 전)**
+
+- People 삭제 `handleDeletePerson` → `removePerson(person.id)` 가 `person.id` 기준 filter → 서로 다른 PID 가 같은 local person.id 를 공유하면 **두 카드 동시 삭제**.
+- draft/remote invite 매칭에 **이름 비교** 포함. 서버 `/api/invites/delete-for-person` 가 `invitee_name`/`accepted_person_name` 으로 dl_invites 삭제 → **이름이 같은 다른 사람·다른 PID 의 초대까지 서버에서 삭제**(사용자 스코프 없음).
+
+**수정 (4파일)**
+
+- `store.ts`: `removePersonByIdentity(identityKey)` 추가 — identity(userId/dlUserId/acceptedPersonId → person.id) 기준으로 정확히 한 사람만 제거. 같은 person.id 의 다른 PID 는 보존. draft 정리는 정확 PID(acceptedPersonId/inviterUserId)로만, 이름 비교 0. PID 없으면 draft 미정리(fail-closed). 같은 id 가 남아 있으면 quickNotes 등 공유 참조 유지.
+- `people/page.tsx`: `handleDeletePerson` 재작성 — 이름 매칭 전부 제거. 서버 삭제 대상 invite token 은 이 카드의 정확한 remote PID 와 연결된 것만 수집. `removePersonByIdentity(getPersonIdentityKey(...))` 로 로컬 1명만 제거. exact token 이 없으면 서버 호출 생략, 가입(PID) 카드면 "삭제 완료"로 단정하지 않고 재생성 가능 안내(fail-closed UX).
+- `api/invites/delete-for-person/route.ts`: **이름 기반 삭제 조건 완전 제거**. `tokens` 없거나 비면 400. token exact match 삭제만. dedup/빈값 제거, 최대 50개, owner(`ownerUserId`) 형식 검증 후 `inviter_user_id`/`accepted_person_id` 스코프(인젝션 방지). personName/personId 무시.
+- `docs/beta-backlog-triage.md`: 본 기록.
+
+**불변식**: 이름은 삭제 식별값 금지 / 다른 PID 는 같은 이름·id 라도 별개 / A 삭제 시 B·C 불변 / 서버 삭제는 exact token / token 없으면 fail-closed / 신호 데이터 미삭제.
+
+**검증(격리 fixture, 운영 DB 무삭제)**: A(id=X,PID-A)·B(id=X,PID-B)·C(id=Y,PID-C) → 첫 삭제(C) token-C만·이름 0·A·B 보존 / 둘째 삭제(A) token-A만·**B(같은 person.id) 생존**. route: 이름만→400, 빈 토큰→400, 가짜 토큰→200 deleted 0, dedup/최대50/이름무시 정상. 회귀(React key 경고0, sync 멱등, 동명이인·사진·hint) 통과.
+
+**기존 중복 데이터**: 자동 정리하지 않음. 실제 정리는 카드별 identity key/PID/exact token/유지·제거 대상 확정 후 별도 승인. UI 개별 삭제는 이제 안전(identity/token 스코프)하므로, PASS 후 카드별 삭제로 정리 가능. 단, 홈 "홈에서 제거"(dashboard/page.tsx) 는 아직 person.id 기준(서버 이름삭제는 없음) — 중복 id 정리에는 People 삭제 사용 권장(홈 경로 스코프화는 후속 후보).
+
 ## 다음 의사결정 원칙
 
 1. 한 번 나온 불편은 **메모**만 한다 (이 문서 표에 추가).

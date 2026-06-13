@@ -440,7 +440,9 @@ export default function DashboardPeoplePage() {
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
   const markContacted = usePeopleStore((state) => state.markContacted);
-  const removePerson = usePeopleStore((state) => state.removePerson);
+  const removePersonByIdentity = usePeopleStore(
+    (state) => state.removePersonByIdentity,
+  );
   const resetPeopleState = usePeopleStore((state) => state.resetPeopleState);
   const syncInviteDraftsFromRemote = usePeopleStore(
     (state) => state.syncInviteDraftsFromRemote,
@@ -956,66 +958,66 @@ export default function DashboardPeoplePage() {
     event.stopPropagation();
 
     const confirmed = window.confirm(
-      `${person.name}님을 People과 홈 데이터에서 제거할까요?\n\n연결 전 초대 기록도 함께 정리해서 설치대기 숫자가 남지 않게 합니다.`,
+      `${person.name}님을 People에서 제거할까요?\n\n이 카드의 정확한 초대(토큰)만 함께 정리합니다. 이름이 같은 다른 사람은 영향받지 않아요.`,
     );
 
     if (!confirmed) {
       return;
     }
 
-    const normalizedPersonName = normalizeName(person.name);
-    const matchedRemoteInvites = remoteInvites.filter((row) => {
-      const acceptedId = row.accepted_person_id?.trim() ?? "";
-      const acceptedName = normalizeName(row.accepted_person_name);
-      const inviteeName = normalizeName(row.invitee_name);
+    const raw = person.raw as Record<string, unknown>;
+    const identityKey = getPersonIdentityKey(raw);
+    // 이 카드의 remote PID(가입 식별자). 이름/local id 는 식별에 쓰지 않는다.
+    const pick = (v: unknown) =>
+      typeof v === "string" && v.trim() ? v.trim() : "";
+    const cardPid =
+      pick(raw.userId) || pick(raw.dlUserId) || pick(raw.acceptedPersonId);
 
-      if (acceptedId && acceptedId === person.id) {
-        return true;
-      }
-
-      if (acceptedName && acceptedName === normalizedPersonName) {
-        return true;
-      }
-
-      if (inviteeName && inviteeName === normalizedPersonName) {
-        return true;
-      }
-
-      return false;
-    });
-
-    const matchedLocalDrafts = inviteDrafts.filter((draft) => {
-      if (draft.sourcePersonId === person.id) return true;
-      if (draft.provisionalPersonId === person.id) return true;
-      if (draft.acceptedPersonId === person.id) return true;
-      if (normalizeName(draft.inviteeName) === normalizedPersonName) return true;
-      if (normalizeName(draft.acceptedPersonName) === normalizedPersonName) return true;
-      return false;
-    });
-
-    const tokens = Array.from(
-      new Set([
-        ...matchedRemoteInvites.map((row) => row.token).filter(Boolean),
-        ...matchedLocalDrafts.map((draft) => draft.token).filter(Boolean),
-      ]),
-    );
-
-    removePerson(person.id);
-    setRemoteInvites((prev) =>
-      prev.filter((row) => {
-        if (tokens.includes(row.token)) {
-          return false;
+    // 서버에서 지울 invite 는 "정확한 token" 으로만 찾는다. 이름 비교 금지.
+    // 이 카드의 PID 와 정확히 연결된 remote invite row / local draft 의 token 만.
+    const tokenSet = new Set<string>();
+    if (cardPid) {
+      remoteInvites.forEach((row) => {
+        if ((row.accepted_person_id ?? "").trim() === cardPid && row.token) {
+          tokenSet.add(row.token);
         }
-
-        if (row.accepted_person_id && row.accepted_person_id === person.id) {
-          return false;
+      });
+      inviteDrafts.forEach((draft) => {
+        if (
+          (draft.acceptedPersonId === cardPid ||
+            draft.inviterUserId === cardPid) &&
+          draft.token
+        ) {
+          tokenSet.add(draft.token);
         }
+      });
+    }
+    const tokens = Array.from(tokenSet).filter(Boolean);
 
-        const rowName = normalizeName(row.accepted_person_name ?? row.invitee_name);
-        return rowName !== normalizedPersonName;
-      }),
-    );
+    // local 카드는 항상 정확히 이 identity 하나만 제거(같은 person.id 의 다른
+    // PID, 같은 이름의 다른 사람은 절대 함께 지워지지 않는다).
+    removePersonByIdentity(identityKey);
+    // remote invite 표시 목록도 정확한 token 기준으로만 정리(이름/ id 금지).
+    if (tokens.length > 0) {
+      setRemoteInvites((prev) => prev.filter((row) => !tokens.includes(row.token)));
+    }
     setOpenContactPickerId(null);
+
+    // exact token 이 없으면 서버 삭제를 호출하지 않는다(이름/PID-만 삭제 금지).
+    if (tokens.length === 0) {
+      if (cardPid) {
+        // 서버 초대행이 남아 다음 sync 에서 다시 보일 수 있으므로 "삭제 완료"로
+        // 단정하지 않는다.
+        setActionMessageTone("neutral");
+        setActionMessage(
+          "화면에서 숨겼어요. 정확한 초대 토큰을 찾지 못해 서버 기록은 정리하지 못했고, 새로고침 시 다시 보일 수 있어요.",
+        );
+      } else {
+        setActionMessageTone("success");
+        setActionMessage("People에서 제거했어요.");
+      }
+      return;
+    }
 
     try {
       const response = await fetch("/api/invites/delete-for-person", {
@@ -1025,8 +1027,7 @@ export default function DashboardPeoplePage() {
         },
         body: JSON.stringify({
           tokens,
-          personId: person.id,
-          personName: person.name,
+          ownerUserId: getCurrentUserId(),
         }),
       });
 

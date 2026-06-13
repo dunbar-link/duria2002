@@ -140,6 +140,7 @@ type PeopleState = {
   snooze: (id: string, days?: number) => void;
   snoozePerson: (id: string) => void;
   removePerson: (id: string) => void;
+  removePersonByIdentity: (identityKey: string) => void;
   resetPeopleState: () => void;
   setHasHydrated: (value: boolean) => void;
 
@@ -640,6 +641,81 @@ export const usePeopleStore = create<PeopleState>()(
             if (targetName && draft.inviteeName === targetName) return false;
             return true;
           });
+
+          const nextChannels = buildChannelState(nextPeople);
+
+          return {
+            people: nextPeople,
+            quickNotes: nextQuickNotes,
+            availableChannels: nextChannels.availableChannels,
+            preferredChannels: nextChannels.preferredChannels,
+            inviteDrafts: nextInviteDrafts,
+          };
+        });
+      },
+
+      // identity(userId/dlUserId/acceptedPersonId → person.id) 기준으로 정확히
+      // 한 사람만 제거한다. 같은 person.id 를 가진 다른 PID(레거시 중복 데이터)는
+      // 보존된다. 이름은 절대 식별/삭제에 쓰지 않는다.
+      removePersonByIdentity: (identityKey) => {
+        const target = identityKey.trim();
+
+        if (!target) {
+          return;
+        }
+
+        set((state) => {
+          const identityOf = (person: DashboardPerson) =>
+            getStoredUserId(
+              person as DashboardPerson & Record<string, unknown>,
+            ) || person.id;
+
+          const targetPerson = state.people.find(
+            (person) => identityOf(person) === target,
+          );
+
+          if (!targetPerson) {
+            return {} as Partial<PeopleState>;
+          }
+
+          const targetUserId = getStoredUserId(
+            targetPerson as DashboardPerson & Record<string, unknown>,
+          );
+
+          const nextPeople = state.people.filter(
+            (person) => identityOf(person) !== target,
+          );
+
+          // 같은 person.id 를 가진 다른 사람이 남아 있으면 그 id 에 묶인 공유
+          // 참조(quickNotes)는 건드리지 않는다(Home/folder 의 entityId 참조도
+          // 남은 사람이 계속 사용).
+          const idStillUsed = nextPeople.some(
+            (person) => person.id === targetPerson.id,
+          );
+          const nextQuickNotes = { ...state.quickNotes };
+          if (!idStillUsed) {
+            delete nextQuickNotes[targetPerson.id];
+          }
+
+          // draft 정리는 정확한 PID(acceptedPersonId/inviterUserId)로만 한다.
+          // 이름 비교 금지. PID 가 없으면(=identity 가 공유 가능한 person.id)
+          // draft 를 건드리지 않는다 — 다른 사람 draft 까지 지우는 것을 막는
+          // fail-closed.
+          const nextInviteDrafts = targetUserId
+            ? state.inviteDrafts.filter((draft) => {
+                if (
+                  draft.acceptedPersonId &&
+                  draft.acceptedPersonId === targetUserId
+                )
+                  return false;
+                if (
+                  draft.inviterUserId &&
+                  draft.inviterUserId === targetUserId
+                )
+                  return false;
+                return true;
+              })
+            : state.inviteDrafts;
 
           const nextChannels = buildChannelState(nextPeople);
 
