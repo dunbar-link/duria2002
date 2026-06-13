@@ -1026,6 +1026,11 @@ useEffect(() => {
     index: number;
   } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  // Me 이름 미완성(빈 값/"나") 여부. SSR hydration mismatch 방지를 위해 초기엔
+  // false(미노출)로 두고 mount 후 클라이언트에서 결정한다. Home 재진입마다
+  // mount effect 가 재read 하므로 이름 저장 후 자동으로 사라진다. 새 storage
+  // key/전역 상태/이벤트 리스너 없음 — 기존 판정 함수만 재사용.
+  const [meNameIncomplete, setMeNameIncomplete] = useState(false);
 
   const derivedStateMap = useMemo(() => {
     return getHomeLayerDerivedStateMap(layoutState, folders);
@@ -1090,6 +1095,10 @@ useEffect(() => {
     if (!dismissed) {
       setShowOnboarding(true);
     }
+
+    // Me 이름이 미완성이면 Home 상단 activation CTA 를 노출한다. 이름이 채워진
+    // 뒤 Home 으로 다시 진입하면 이 effect 가 재실행돼 자동 비노출된다.
+    setMeNameIncomplete(isIncompleteMeName(readMeProfileName()));
   }, []);
 
   useEffect(() => {
@@ -2951,6 +2960,23 @@ const isJoined =
         >
           <DashboardHomeShell>
             <div className="flex flex-col gap-[12px]">
+              {/* Me 이름 미완성 사용자 activation: 본인 이름을 먼저 입력하도록
+                  안내. drag/drop 레일(HomeLayerSection) 앞의 compact 인라인
+                  CTA(모달/고정 아님). 전체 행이 /dashboard/me 로 이동하는 Link. */}
+              {meNameIncomplete ? (
+                <Link
+                  href="/dashboard/me"
+                  aria-label="Me 페이지에서 내 이름 입력하기"
+                  className="flex items-center justify-between gap-3 rounded-[16px] border border-[#E3D9C5] bg-[#FBF4E9] px-4 py-3 active:scale-[0.99]"
+                >
+                  <span className="min-w-0 text-[13px] font-semibold leading-snug text-[#7A5B2E]">
+                    먼저 Me에서 내 이름을 입력해 주세요
+                  </span>
+                  <span className="shrink-0 rounded-full bg-[#2C2C2A] px-3 py-1.5 text-[12px] font-semibold text-[#F1EFE8]">
+                    Me 입력하기
+                  </span>
+                </Link>
+              ) : null}
               <HomeLayerSection
                 layers={layerBlueprints}
                 renderLayer={(layer) => {
