@@ -52,7 +52,9 @@ function SheetSectionShell({
     <div
       className={cn(
         "rounded-[22px] border border-slate-200/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.82)_0%,rgba(248,250,252,0.86)_100%)] px-[12px] py-[11px] shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-all duration-150",
-        isDropContainer && "relative min-h-[174px]",
+        // 더보기 빈 "+" 슬롯을 더는 그리지 않으므로 10칸(≈174px) 높이가 필요
+        // 없다. drop 컨테이너 역할은 유지하되 compact 한 최소 높이만 둔다.
+        isDropContainer && "relative min-h-[72px]",
         isDropTarget &&
           "border-slate-300 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.10)] ring-2 ring-slate-200/80"
       )}
@@ -191,6 +193,13 @@ function BottomSheetGrid({
           isDropTarget && dragOverState?.action === "combine";
 
         if (!entityId) {
+          // 더보기(hidden) 섹션은 normalizeHiddenSlots 의 null 패딩 슬롯을
+          // 빈 "+" 슬롯으로 그리지 않는다(실제 사람 카드와 1:1 일치). visible
+          // 섹션의 빈 슬롯은 "홈 4칸 중 남은 자리" 의미라 그대로 둔다.
+          if (area === "hidden") {
+            return null;
+          }
+
           return (
             <EmptyDropSlot
               key={`${layer.id}-${area}-empty-${index}`}
