@@ -2814,7 +2814,6 @@ const isJoined =
         await navigator.share({
           title: shareTitle,
           text: shareText,
-          url: inviteUrl,
         });
         shareOutcome = "shared";
       } catch (err) {

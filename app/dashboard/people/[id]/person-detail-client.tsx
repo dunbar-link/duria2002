@@ -563,7 +563,6 @@ export default function PersonDetailClient({ person }: Props) {
         await navigator.share({
           title: shareTitle,
           text: shareText,
-          url: inviteUrl,
         });
         shareOutcome = "shared";
       } catch (err) {

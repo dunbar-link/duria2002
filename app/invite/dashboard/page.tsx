@@ -1327,7 +1327,6 @@ useEffect(() => {
         await navigator.share({
           title: shareTitle,
           text: shareText,
-          url: inviteUrl,
         });
         setPersonActionFeedback("초대 링크를 열었어요.");
         return;
