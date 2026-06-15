@@ -178,9 +178,14 @@ function BottomSheetGrid({
     <div
       className="grid justify-start gap-y-[14px]"
       style={{
-        gridTemplateColumns: `repeat(${SHEET_GRID_COLUMN_COUNT}, ${SHEET_TILE_WIDTH}px)`,
+        // 더보기(hidden) 섹션만 컨테이너 폭에 맞춰 자동 줄바꿈(좁은 모바일 4열,
+        // 넓은 화면 5열). visible 섹션은 기존 5열 고정 규칙을 그대로 둔다.
+        gridTemplateColumns:
+          area === "hidden"
+            ? `repeat(auto-fill, ${SHEET_TILE_WIDTH}px)`
+            : `repeat(${SHEET_GRID_COLUMN_COUNT}, ${SHEET_TILE_WIDTH}px)`,
         columnGap: `${SHEET_GRID_GAP_X}px`,
-        width: "fit-content",
+        width: area === "hidden" ? "100%" : "fit-content",
       }}
     >
       {ids.map((entityId, index) => {
@@ -390,13 +395,17 @@ export default function LayerBottomSheet({
 
       <section
         className={cn(
-          "fixed inset-x-[10px] bottom-0 z-50 mx-auto rounded-t-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-[16px] pb-4 pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.16)] transition-all duration-200 ease-out",
+          "fixed inset-x-0 bottom-0 z-50 mx-auto rounded-t-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-[16px] pb-4 pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.16)] transition-all duration-200 ease-out",
           isVisible
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-[24px] opacity-0"
         )}
         style={{
-          width: "min(100%, 412px)",
+          // inset-x-0 + mx-auto 와 함께 좌우 10px 대칭 여백을 만든다(viewport-20).
+          // 세로 등장/퇴장은 className 의 translate-y 가 담당하므로 translateX 는
+          // 추가하지 않는다.
+          width: "calc(100% - 20px)",
+          maxWidth: "412px",
         }}
       >
         <div className="mx-auto mb-[10px] h-[4px] w-[56px] rounded-full bg-slate-200" />
