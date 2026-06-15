@@ -1024,6 +1024,7 @@ useEffect(() => {
   const [addSheetState, setAddSheetState] = useState<{
     layerId: string;
     index: number;
+    targetArea: "visible" | "hidden";
   } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   // Me 이름 미완성(빈 값/"나") 여부. SSR hydration mismatch 방지를 위해 초기엔
@@ -2184,7 +2185,28 @@ useEffect(() => {
   }, []);
 
   function handleOpenAddSheet(layerId: string, index: number) {
-    setAddSheetState({ layerId, index });
+    setAddSheetState({ layerId, index, targetArea: "visible" });
+    setPendingName("");
+  }
+
+  // +N 시트의 "사람 추가" 진입(홈 visible 4칸이 찬 layer 전용). 새 사람을
+  // 현재 layer 의 hidden 영역에 배치한다. 사람을 만들기 전에 cap 을 먼저
+  // 확인해, cap 초과면 생성하지 않고 기존 안내(notifyCapBlocked)만 띄운다.
+  function handleOpenAddToHidden(layerId: string) {
+    const capBlockedLayerId = getLayerCapViolation({
+      layout: layoutState,
+      folders,
+      entityId: null,
+      targetLayerId: layerId,
+    });
+
+    if (capBlockedLayerId) {
+      notifyCapBlocked(capBlockedLayerId);
+      return;
+    }
+
+    handleCloseMore();
+    setAddSheetState({ layerId, index: -1, targetArea: "hidden" });
     setPendingName("");
   }
 
@@ -2206,6 +2228,7 @@ useEffect(() => {
 
     const targetLayerId = addSheetState.layerId;
     const targetIndex = addSheetState.index;
+    const targetArea = addSheetState.targetArea;
 
     // Dunbar cap: 빈 슬롯이 보여도 folder/+N 인원까지 합친 실제 count 가
     // 한도에 닿았으면 새 사람을 만들지 않는다.
@@ -2231,37 +2254,46 @@ useEffect(() => {
 
     registerAddedPersonToHomeCatalog(created);
 
-    setLayoutState((current) => {
-      const next = { ...current };
+    if (targetArea === "hidden") {
+      // 홈 visible 4칸이 찬 layer 의 +N 추가: 현재 layer 의 hidden 에 정확히
+      // 1회 배치한다(기존 placement 엔진 재사용 — null padding/순서 정규화 포함,
+      // visible 사람은 밀어내지 않음).
+      setLayoutState((current) =>
+        insertExternalEntityToTarget(current, created.id, targetLayerId, "hidden"),
+      );
+    } else {
+      setLayoutState((current) => {
+        const next = { ...current };
 
-      // 🔥 folderId 보호
-      for (const layer of Object.values(next)) {
-        layer.visibleSlotIds = layer.visibleSlotIds.map((id) =>
-          id && id.startsWith("folder-") ? id : id,
-        );
+        // 🔥 folderId 보호
+        for (const layer of Object.values(next)) {
+          layer.visibleSlotIds = layer.visibleSlotIds.map((id) =>
+            id && id.startsWith("folder-") ? id : id,
+          );
 
-        layer.hiddenSlotIds = layer.hiddenSlotIds.map((id) =>
-          id && id.startsWith("folder-") ? id : id,
-        );
-      }
+          layer.hiddenSlotIds = layer.hiddenSlotIds.map((id) =>
+            id && id.startsWith("folder-") ? id : id,
+          );
+        }
 
-      const target = current[targetLayerId];
+        const target = current[targetLayerId];
 
-      if (!target) {
-        return current;
-      }
+        if (!target) {
+          return current;
+        }
 
-      const nextVisible = [...target.visibleSlotIds];
-      nextVisible[targetIndex] = created.id;
+        const nextVisible = [...target.visibleSlotIds];
+        nextVisible[targetIndex] = created.id;
 
-      return {
-        ...current,
-        [targetLayerId]: {
-          ...target,
-          visibleSlotIds: nextVisible,
-        },
-      };
-    });
+        return {
+          ...current,
+          [targetLayerId]: {
+            ...target,
+            visibleSlotIds: nextVisible,
+          },
+        };
+      });
+    }
 
     setSelectedHomePersonId(created.id);
     setPersonActionFeedback("사람을 추가했어요.");
@@ -3175,6 +3207,7 @@ const isJoined =
           // second drag source.
           suppressDragSource={Boolean(folderLongPressDragState)}
           onPromoteHiddenToVisible={handlePromoteHiddenToVisible}
+          onAddPerson={handleOpenAddToHidden}
         />
       ) : null}
 

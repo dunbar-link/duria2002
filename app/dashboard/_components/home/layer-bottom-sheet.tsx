@@ -346,6 +346,9 @@ type LayerBottomSheetProps = {
   // section. When provided, the hidden grid loses its long-press drag and
   // each non-folder, non-me tile gets a small "↑" button.
   onPromoteHiddenToVisible?: (entityId: string) => void;
+  // 홈 visible 4칸이 모두 찬 layer 에서만 헤더에 "사람 추가" 버튼을 노출하고,
+  // 누르면 현재 layer 의 hidden 에 새 사람을 추가하도록 상위에 알린다.
+  onAddPerson?: (layerId: string) => void;
 };
 
 export default function LayerBottomSheet({
@@ -370,6 +373,7 @@ export default function LayerBottomSheet({
   onLongPressDragStart,
   suppressDragSource = false,
   onPromoteHiddenToVisible,
+  onAddPerson,
 }: LayerBottomSheetProps) {
   // 홈으로 올리기 활성 조건: visible 에 빈자리가 있거나(빈자리 승격),
   // 빈자리가 없어도 교체 가능한 "비-Me 사람" 슬롯이 있으면(full swap) 활성.
@@ -380,6 +384,11 @@ export default function LayerBottomSheet({
       (id) => id !== null && id !== "family-me" && isPersonEntityId(id),
     );
   const visibleFilledCount = visibleSlotIds.filter(Boolean).length;
+  // 홈에 보이는 4칸이 모두 차 있을 때만(빈 "+" 진입점이 사라진 상태) 헤더에
+  // "사람 추가" 를 노출한다. cap 도달 여부는 누른 뒤 onAddPerson 에서 검사하므로
+  // 버튼 자체는 숨기지 않는다.
+  const showAddPerson =
+    Boolean(onAddPerson) && visibleFilledCount === VISIBLE_SLOT_COUNT;
 
   return (
     <>
@@ -420,13 +429,25 @@ export default function LayerBottomSheet({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:bg-slate-50"
-          >
-            닫기
-          </button>
+          <div className="flex items-center gap-2">
+            {showAddPerson ? (
+              <button
+                type="button"
+                onClick={() => onAddPerson?.(layer.id)}
+                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors duration-150 hover:bg-slate-50 active:scale-95"
+              >
+                사람 추가
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:bg-slate-50"
+            >
+              닫기
+            </button>
+          </div>
         </div>
 
         {dragState ? (
