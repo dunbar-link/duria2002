@@ -13,7 +13,7 @@ import {
   VISIBLE_SLOT_COUNT,
   layerBlueprints,
 } from "./home-page-types";
-import { cn, getEntityRealCount } from "./home-page-utils";
+import { cn, getEntityRealCount, isPersonEntityId } from "./home-page-utils";
 import { EmptyDropSlot, PersonTile } from "./home-entity-components";
 
 function SheetSectionTitle({
@@ -357,7 +357,14 @@ export default function LayerBottomSheet({
   suppressDragSource = false,
   onPromoteHiddenToVisible,
 }: LayerBottomSheetProps) {
-  const canPromoteHidden = visibleSlotIds.some((id) => id === null);
+  // 홈으로 올리기 활성 조건: visible 에 빈자리가 있거나(빈자리 승격),
+  // 빈자리가 없어도 교체 가능한 "비-Me 사람" 슬롯이 있으면(full swap) 활성.
+  // Me 슬롯과 폴더(비-person)는 교체 대상이 아니므로 둘만 있으면 비활성 유지.
+  const canPromoteHidden =
+    visibleSlotIds.some((id) => id === null) ||
+    visibleSlotIds.some(
+      (id) => id !== null && id !== "family-me" && isPersonEntityId(id),
+    );
   const visibleFilledCount = visibleSlotIds.filter(Boolean).length;
 
   return (

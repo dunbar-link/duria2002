@@ -1847,15 +1847,12 @@ useEffect(() => {
       }
 
       let didMove = false;
+      // 홈이 가득 찼을 때 더보기로 밀려난 사람의 표시 이름(toast 안내용).
+      let displacedLabel = "";
 
       setLayoutState((current) => {
         const targetLayer = current[openLayerId];
         if (!targetLayer) {
-          return current;
-        }
-
-        const emptyIndex = getFirstEmptyIndex(targetLayer.visibleSlotIds);
-        if (emptyIndex < 0) {
           return current;
         }
 
@@ -1871,6 +1868,34 @@ useEffect(() => {
           return current;
         }
 
+        // 1) 홈 visible 에 빈자리가 있으면 그 자리로 올린다(기존 동작).
+        // 2) 가득 찼으면 홈 visible 의 "마지막 비-Me 사람" 슬롯과 위치만 swap.
+        //    Me 슬롯과 폴더(비-person)는 교체 대상에서 제외한다. 같은 layer
+        //    안의 표시 위치 교환이라 tier / People tier / cap 은 불변이다.
+        let targetIndex = getFirstEmptyIndex(targetLayer.visibleSlotIds);
+
+        if (targetIndex < 0) {
+          let swapIndex = -1;
+          for (let i = targetLayer.visibleSlotIds.length - 1; i >= 0; i--) {
+            const slotId = targetLayer.visibleSlotIds[i];
+            if (!slotId || slotId === "family-me" || !isPersonEntityId(slotId)) {
+              continue;
+            }
+            swapIndex = i;
+            break;
+          }
+
+          if (swapIndex < 0) {
+            return current;
+          }
+
+          targetIndex = swapIndex;
+          const displacedId = targetLayer.visibleSlotIds[swapIndex];
+          if (displacedId) {
+            displacedLabel = getEntityLabel(displacedId, folders);
+          }
+        }
+
         const next = moveEntityToTarget(
           current,
           {
@@ -1881,7 +1906,7 @@ useEffect(() => {
           },
           openLayerId,
           "visible",
-          emptyIndex,
+          targetIndex,
         );
 
         if (next === current) {
@@ -1896,9 +1921,26 @@ useEffect(() => {
         usePeopleStore
           .getState()
           .updatePersonTier(entityId, getTierByLayerId(openLayerId));
+
+        // full swap(밀려난 사람 있음)일 때만 안내 toast. 빈자리 승격은
+        // 기존처럼 조용히 처리한다(추가 toast 없음). 기존 capNotice
+        // 토스트 인프라를 그대로 재사용한다.
+        if (displacedLabel) {
+          const promotedLabel = getEntityLabel(entityId, folders);
+          setCapNotice(
+            `${promotedLabel}님을 홈에 올리고 ${displacedLabel}님을 더보기로 옮겼어요`,
+          );
+          if (capNoticeTimerRef.current !== null) {
+            window.clearTimeout(capNoticeTimerRef.current);
+          }
+          capNoticeTimerRef.current = window.setTimeout(() => {
+            setCapNotice(null);
+            capNoticeTimerRef.current = null;
+          }, 2800);
+        }
       }
     },
-    [openLayerId, setLayoutState],
+    [openLayerId, setLayoutState, folders],
   );
 
   const {
