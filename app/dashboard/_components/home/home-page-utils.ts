@@ -295,7 +295,11 @@ export function getDynamicCountLabel(
   layoutState: Record<string, LayerLayoutState>,
   folders: FolderMap
 ) {
-  const currentCount = getLayerRealCount(layoutState[layer.id], folders);
+  // 가족(family) 대표 카운트만 Me 를 표시 숫자에 포함한다(등록 0명 → 1/∞). 실제
+  // 관계 배열·slot·cap·drag 에는 Me 를 넣지 않고, 표시 직전 numerator 에만 +1 한다.
+  // 다른 tier 는 등록 상대 수 그대로다.
+  const realCount = getLayerRealCount(layoutState[layer.id], folders);
+  const currentCount = layer.id === "family" ? realCount + 1 : realCount;
 
   if (layer.countLabel.includes("/")) {
     const [, maxPart] = layer.countLabel.split("/");

@@ -823,9 +823,12 @@ export default function DashboardPeoplePage() {
   const tierCounts = useMemo(() => {
     return {
       all: enrichedPeople.length,
-      family: enrichedPeople.filter((person) =>
-        matchesTierFilter(person.tierValue, "family"),
-      ).length,
+      // 가족 chip 만 Me 를 표시 숫자에 포함(Home 가족 카운트와 일치). 목록 배열에는
+      // Me 를 넣지 않고 표시 수에만 +1. 다른 tier 와 "전체(all)" 는 그대로.
+      family:
+        enrichedPeople.filter((person) =>
+          matchesTierFilter(person.tierValue, "family"),
+        ).length + 1,
       tier5: enrichedPeople.filter((person) =>
         matchesTierFilter(person.tierValue, "tier5"),
       ).length,
