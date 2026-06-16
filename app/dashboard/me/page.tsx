@@ -708,14 +708,22 @@ export default function DashboardMePage() {
           <CompactField label="초등학교" value={profile.elementarySchool} onChange={(value) => updateProfile("elementarySchool", value)} placeholder="초등학교" checked={profile.elementarySchoolPublic} onPublicChange={(next) => updateProfile("elementarySchoolPublic", next)} />
           <CompactField label="중학교" value={profile.middleSchool} onChange={(value) => updateProfile("middleSchool", value)} placeholder="중학교" checked={profile.middleSchoolPublic} onPublicChange={(next) => updateProfile("middleSchoolPublic", next)} />
           <CompactField label="고등학교" value={profile.highSchool} onChange={(value) => updateProfile("highSchool", value)} placeholder="고등학교" checked={profile.highSchoolPublic} onPublicChange={(next) => updateProfile("highSchoolPublic", next)} />
-          <p className="mt-1 text-[12px] font-semibold text-[#64748B]">대학교</p>
-          <CompactField label="학교명" value={profile.schoolName} onChange={(value) => updateProfile("schoolName", value)} placeholder="학교명" checked={profile.schoolNamePublic} onPublicChange={(next) => updateProfile("schoolNamePublic", next)} />
-          <CompactField label="학과" value={profile.major} onChange={(value) => updateProfile("major", value)} placeholder="학과" checked={profile.majorPublic} onPublicChange={(next) => updateProfile("majorPublic", next)} />
-          <CompactField label="학번" value={profile.studentId} onChange={(value) => updateProfile("studentId", value)} placeholder="학번" checked={profile.studentIdPublic} onPublicChange={(next) => updateProfile("studentIdPublic", next)} />
-          <p className="mt-1 text-[12px] font-semibold text-[#64748B]">회사</p>
-          <CompactField label="회사명" value={profile.companyName} onChange={(value) => updateProfile("companyName", value)} placeholder="회사명" checked={profile.companyNamePublic} onPublicChange={(next) => updateProfile("companyNamePublic", next)} />
-          <CompactField label="직위" value={profile.jobTitle} onChange={(value) => updateProfile("jobTitle", value)} placeholder="직위" checked={profile.jobTitlePublic} onPublicChange={(next) => updateProfile("jobTitlePublic", next)} />
-          <CompactField label="부서" value={profile.department} onChange={(value) => updateProfile("department", value)} placeholder="부서" checked={profile.departmentPublic} onPublicChange={(next) => updateProfile("departmentPublic", next)} />
+          <div>
+            <p className="text-[12px] font-semibold text-[#64748B]">대학교</p>
+            <div className="mt-1 space-y-2 rounded-[20px] border border-[#D3D1C7] p-3">
+              <CompactField label="학교명" value={profile.schoolName} onChange={(value) => updateProfile("schoolName", value)} placeholder="학교명" checked={profile.schoolNamePublic} onPublicChange={(next) => updateProfile("schoolNamePublic", next)} />
+              <CompactField label="학과" value={profile.major} onChange={(value) => updateProfile("major", value)} placeholder="학과" checked={profile.majorPublic} onPublicChange={(next) => updateProfile("majorPublic", next)} />
+              <CompactField label="학번" value={profile.studentId} onChange={(value) => updateProfile("studentId", value)} placeholder="학번" checked={profile.studentIdPublic} onPublicChange={(next) => updateProfile("studentIdPublic", next)} />
+            </div>
+          </div>
+          <div>
+            <p className="text-[12px] font-semibold text-[#64748B]">회사</p>
+            <div className="mt-1 space-y-2 rounded-[20px] border border-[#D3D1C7] p-3">
+              <CompactField label="회사명" value={profile.companyName} onChange={(value) => updateProfile("companyName", value)} placeholder="회사명" checked={profile.companyNamePublic} onPublicChange={(next) => updateProfile("companyNamePublic", next)} />
+              <CompactField label="직위" value={profile.jobTitle} onChange={(value) => updateProfile("jobTitle", value)} placeholder="직위" checked={profile.jobTitlePublic} onPublicChange={(next) => updateProfile("jobTitlePublic", next)} />
+              <CompactField label="부서" value={profile.department} onChange={(value) => updateProfile("department", value)} placeholder="부서" checked={profile.departmentPublic} onPublicChange={(next) => updateProfile("departmentPublic", next)} />
+            </div>
+          </div>
         </div>
       </section>
 
