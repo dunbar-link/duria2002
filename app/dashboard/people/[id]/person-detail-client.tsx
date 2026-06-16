@@ -6,6 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { sendSignal } from "@/lib/signal/send-signal";
 import {
+  readSignalsBetweenUsers,
+  type SignalRecord,
+} from "@/lib/signal/read-signals";
+import {
   isIncompleteMeName,
   ME_NAME_REQUIRED_MESSAGE,
   readMeProfileImageUrl,
@@ -40,6 +44,22 @@ import { InviteDraft, RemoteInviteDraftLike, usePeopleStore } from "../store";
 type Props = {
   person: DashboardPerson;
 };
+
+// 신호함(signals/page.tsx)과 동일한 시각 표기. "MM.DD HH:mm" 한국어.
+function formatSignalTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "방금";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
 
 type QuickActionFeedbackTone = "success" | "neutral";
 
@@ -243,6 +263,10 @@ export default function PersonDetailClient({ person }: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isHydrated, setIsHydrated] = useState(false);
   const [signalOpen, setSignalOpen] = useState(false);
+  // 사람 상세 "최근 신호"(읽기 전용): 나 ↔ 이 상대의 최신 5건.
+  // null = 아직 조회 전(불러오는 중), [] = 조회됐고 기록 없음, [...] = 기록.
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [recentSignals, setRecentSignals] = useState<SignalRecord[] | null>(null);
   // 친구 표시 이름(별명) 편집 입력값. person.localAlias 와 동기화한다.
   const [aliasDraft, setAliasDraft] = useState(person.localAlias ?? "");
 
@@ -378,6 +402,31 @@ export default function PersonDetailClient({ person }: Props) {
       ""
     );
   }, [person, latestInviteDraft]);
+
+  // 진입/상대 변경 시 나 ↔ 이 상대의 최근 신호 5건을 pair query 로 1회 조회한다.
+  // 상대 user id 가 없으면(연결 전/생성 상태) 서버 요청하지 않고 빈 기록으로 둔다.
+  // 전체 신호를 받아 클라에서 거르지 않는다(많아도 누락 없음).
+  useEffect(() => {
+    const me = getCurrentUserId();
+    setCurrentUserId(me);
+
+    if (!me || me === "me" || !receiverUserId) {
+      setRecentSignals([]);
+      return;
+    }
+
+    let cancelled = false;
+    setRecentSignals(null);
+
+    void readSignalsBetweenUsers(me, receiverUserId, 5).then((rows) => {
+      if (cancelled) return;
+      setRecentSignals(rows);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [receiverUserId]);
 
   const isJoined = useMemo(() => {
     const personRecord = person as DashboardPerson & Record<string, unknown>;
@@ -798,6 +847,50 @@ export default function PersonDetailClient({ person }: Props) {
 
         <section className="mt-3 px-4">
           <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+            <h2 className="text-[17px] font-bold">최근 신호</h2>
+
+            {!receiverUserId ? (
+              <p className="mt-3 text-[13px] leading-6 text-[#64748B]">
+                연결되면 주고받은 신호가 여기에 표시돼요.
+              </p>
+            ) : recentSignals === null ? (
+              <p className="mt-3 text-[13px] text-[#8D99AE]">불러오는 중...</p>
+            ) : recentSignals.length === 0 ? (
+              <p className="mt-3 text-[13px] leading-6 text-[#64748B]">
+                아직 주고받은 신호가 없어요.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {recentSignals.map((signal) => {
+                  const isSent = signal.sender_id === currentUserId;
+                  return (
+                    <li
+                      key={signal.id}
+                      className="flex items-center gap-3 rounded-[16px] bg-white px-3 py-2 ring-1 ring-[#D3D1C7]"
+                    >
+                      <span className="text-[22px] leading-none">{signal.emoji}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          isSent
+                            ? "bg-[#EFE7FA] text-[#4B2E83]"
+                            : "bg-[#DDF7EE] text-[#0B7A5D]"
+                        }`}
+                      >
+                        {isSent ? "보냄" : "받음"}
+                      </span>
+                      <span className="ml-auto text-[12px] text-[#8D99AE]">
+                        {formatSignalTime(signal.created_at)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 px-4">
+          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-[17px] font-bold">표시 이름</h2>
               {person.remoteProfileName &&
@@ -881,6 +974,11 @@ export default function PersonDetailClient({ person }: Props) {
           setSavedMessage("신호를 보냈어요.");
           setSignalOpen(false);
           setRefreshKey((value) => value + 1);
+
+          // 방금 보낸 신호를 "최근 신호"에 즉시 반영(같은 pair query 재사용).
+          void readSignalsBetweenUsers(getCurrentUserId(), receiverUserId, 5).then(
+            (rows) => setRecentSignals(rows),
+          );
 
           void fetch("/api/push/send", {
             method: "POST",

@@ -123,3 +123,45 @@ export async function readUnreadReceivedSenderIds(userId: string) {
 
   return Array.from(new Set(senderIds));
 }
+
+/**
+ * 두 사용자(나 ↔ 상대) 사이의 최근 신호만 서버에서 직접 조회한다(사람 상세
+ * "최근 신호" 전용). 전체 신호를 받아 클라이언트에서 거르지 않고, sender/receiver
+ * 쌍으로 서버 필터하므로 신호가 아무리 많아도 해당 상대의 최신 N건이 누락되지
+ * 않는다. user id 기반(이름 매칭 아님). is_read 는 변경하지 않는다(조회 전용).
+ * 두 id 가 비었거나 같으면 서버 요청 없이 빈 배열을 반환한다.
+ */
+export async function readSignalsBetweenUsers(
+  meUserId: string,
+  otherUserId: string,
+  limit = 5,
+) {
+  const cleanMe = cleanUserId(meUserId);
+  const cleanOther = cleanUserId(otherUserId);
+
+  if (
+    !cleanMe ||
+    cleanMe === "me" ||
+    !cleanOther ||
+    cleanOther === "me" ||
+    cleanMe === cleanOther
+  ) {
+    return [] as SignalRecord[];
+  }
+
+  const { data, error } = await supabase
+    .from("signals")
+    .select("id, sender_id, receiver_id, emoji, created_at, is_read")
+    .or(
+      `and(sender_id.eq.${cleanMe},receiver_id.eq.${cleanOther}),and(sender_id.eq.${cleanOther},receiver_id.eq.${cleanMe})`,
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.warn("사람별 신호 조회 실패:", error.message);
+    return [] as SignalRecord[];
+  }
+
+  return (data ?? []) as SignalRecord[];
+}
