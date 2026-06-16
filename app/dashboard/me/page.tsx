@@ -146,6 +146,7 @@ function CompactField({
   onPublicChange,
   type = "text",
   required = false,
+  labelHidden = false,
 }: {
   label: string;
   value: string;
@@ -155,26 +156,34 @@ function CompactField({
   onPublicChange?: (next: boolean) => void;
   type?: string;
   required?: boolean;
+  labelHidden?: boolean;
 }) {
   return (
     <div className="rounded-[16px] bg-white px-3 py-1.5 ring-1 ring-[#D3D1C7]">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <label className="text-[11px] font-semibold text-[#64748B]">
+      {labelHidden ? (
+        <label className="sr-only">
           {label}
-          {required ? <span className="text-[#D94848]"> *</span> : null}
+          {required ? " *" : ""}
         </label>
-        {onPublicChange ? (
-          <label className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#64748B]">
-            <input
-              type="checkbox"
-              checked={Boolean(checked)}
-              onChange={(event) => onPublicChange(event.target.checked)}
-              className="h-3.5 w-3.5 accent-[#4B2E83]"
-            />
-            공개
+      ) : (
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label className="text-[11px] font-semibold text-[#64748B]">
+            {label}
+            {required ? <span className="text-[#D94848]"> *</span> : null}
           </label>
-        ) : null}
-      </div>
+          {onPublicChange ? (
+            <label className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#64748B]">
+              <input
+                type="checkbox"
+                checked={Boolean(checked)}
+                onChange={(event) => onPublicChange(event.target.checked)}
+                className="h-3.5 w-3.5 accent-[#4B2E83]"
+              />
+              공개
+            </label>
+          ) : null}
+        </div>
+      )}
       <input
         type={type}
         value={value}
@@ -578,10 +587,13 @@ export default function DashboardMePage() {
       </section>
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
-        <h2 className="text-[18px] font-bold">이름</h2>
+        <h2 className="text-[18px] font-bold">
+          이름 <span className="text-[#D94848]">*</span>
+        </h2>
         <div className="mt-2">
           <CompactField
             label="이름"
+            labelHidden
             value={profile.name}
             onChange={(value) => updateProfile("name", value)}
             placeholder="이름"
@@ -624,6 +636,7 @@ export default function DashboardMePage() {
         입력 내용은 자동 저장됩니다.
       </p>
 
+      <div className="mt-2 flex justify-end">
       <button
         type="button"
         onClick={() => {
@@ -667,10 +680,11 @@ export default function DashboardMePage() {
             setPhotoNotice({ tone: "success", text: "저장했어요" });
           }
         }}
-        className="mt-3 min-h-[66px] w-full rounded-[18px] bg-[#079863] py-[14px] text-[17px] font-bold text-white shadow-md ring-1 ring-[#057A50] active:scale-[0.98]"
+        className="inline-flex h-11 w-auto items-center justify-center rounded-full bg-slate-900 px-5 text-sm font-semibold text-white active:scale-[0.98]"
       >
         저장하기
       </button>
+      </div>
     </main>
   );
 }
