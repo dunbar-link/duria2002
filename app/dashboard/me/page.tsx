@@ -157,7 +157,7 @@ function CompactField({
   required?: boolean;
 }) {
   return (
-    <div className="rounded-[16px] bg-white px-3 py-2 ring-1 ring-[#D3D1C7]">
+    <div className="rounded-[16px] bg-white px-3 py-1.5 ring-1 ring-[#D3D1C7]">
       <div className="mb-1 flex items-center justify-between gap-2">
         <label className="text-[11px] font-semibold text-[#64748B]">
           {label}
@@ -513,12 +513,12 @@ export default function DashboardMePage() {
 
   return (
     <main className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-y-auto bg-[#F5F3EE] px-4 pb-[120px] pt-5 text-[#0F172A] [overscroll-behavior-y:contain]">
-      <section className="rounded-[28px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+      <section className="rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
         <p className="text-[12px] font-semibold tracking-[0.22em] text-[#8D99AE]">
           내 정보
         </p>
 
-        <div className="mt-4 flex items-center justify-between gap-4">
+        <div className="mt-3 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[30px] font-bold leading-tight tracking-[-0.04em]">
               {profile.name.trim() || "나"}
@@ -582,7 +582,7 @@ export default function DashboardMePage() {
         )}
       </section>
 
-      <section className="mt-3 rounded-[28px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+      <section className="mt-2 rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">이름</h2>
         <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
           먼저 이름을 입력해 주세요. 이름을 입력하면 초대와 신호를 사용할 수 있어요.
@@ -598,7 +598,7 @@ export default function DashboardMePage() {
         </div>
       </section>
 
-      <section className="mt-3 grid grid-cols-3 gap-2">
+      <section className="mt-2 grid grid-cols-3 gap-2">
         <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-3 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">친구들</p>
           <p className="mt-1 text-[22px] font-bold">{people.length}</p>
@@ -613,7 +613,7 @@ export default function DashboardMePage() {
         </div>
       </section>
 
-      <section className="mt-3 rounded-[28px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+      <section className="mt-2 rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">추가 정보</h2>
         <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
           나머지는 필요할 때 입력해도 돼요.
@@ -631,7 +631,7 @@ export default function DashboardMePage() {
         </div>
       </section>
 
-      <p className="mt-3 text-center text-[12px] font-medium leading-5 text-[#8D99AE]">
+      <p className="mt-2 text-center text-[12px] font-medium leading-5 text-[#8D99AE]">
         입력 내용은 자동 저장되며, 저장하기를 누르면 이름과 사진이 즉시 반영돼요.
       </p>
 
@@ -678,7 +678,7 @@ export default function DashboardMePage() {
             setPhotoNotice({ tone: "success", text: "저장했어요" });
           }
         }}
-        className="mt-4 min-h-[66px] w-full rounded-[18px] bg-[#079863] py-[14px] text-[17px] font-bold text-white shadow-md ring-1 ring-[#057A50] active:scale-[0.98]"
+        className="mt-3 min-h-[66px] w-full rounded-[18px] bg-[#079863] py-[14px] text-[17px] font-bold text-white shadow-md ring-1 ring-[#057A50] active:scale-[0.98]"
       >
         저장하기
       </button>
