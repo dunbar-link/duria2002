@@ -20,17 +20,22 @@ function SheetSectionTitle({
   title,
   count,
   rightLabel,
+  action,
 }: {
   title: string;
   count: number;
   rightLabel?: string;
+  action?: ReactNode;
 }) {
   return (
-    <div className="mb-[7px] flex items-center justify-between">
+    <div className="mb-[7px] flex items-center justify-between gap-2">
       <h3 className="text-[12px] font-medium text-slate-500">{title}</h3>
-      <span className="text-[11px] text-slate-400">
-        {rightLabel ?? `${count}명`}
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="whitespace-nowrap text-[11px] text-slate-400">
+          {rightLabel ?? `${count}명`}
+        </span>
+        {action}
+      </div>
     </div>
   );
 }
@@ -384,11 +389,11 @@ export default function LayerBottomSheet({
       (id) => id !== null && id !== "family-me" && isPersonEntityId(id),
     );
   const visibleFilledCount = visibleSlotIds.filter(Boolean).length;
-  // 홈에 보이는 4칸이 모두 차 있을 때만(빈 "+" 진입점이 사라진 상태) 헤더에
-  // "사람 추가" 를 노출한다. cap 도달 여부는 누른 뒤 onAddPerson 에서 검사하므로
-  // 버튼 자체는 숨기지 않는다.
-  const showAddPerson =
-    Boolean(onAddPerson) && visibleFilledCount === VISIBLE_SLOT_COUNT;
+  // +N 더보기 시트의 "친구 추가" CTA 노출 조건. Home 빈 슬롯 유무와 무관하게
+  // 항상 노출해, 사용자가 새 친구를 Home(visible) 대신 +N(hidden)에 직접 넣는
+  // 경로를 고를 수 있게 한다. onAddPerson 핸들러가 없는 화면(invite/dashboard 등)
+  // 에서는 자동으로 렌더되지 않는다. cap 도달은 누른 뒤 onAddPerson 에서 검사한다.
+  const showAddPerson = Boolean(onAddPerson);
 
   return (
     <>
@@ -438,17 +443,6 @@ export default function LayerBottomSheet({
           </button>
         </div>
 
-        {showAddPerson ? (
-          <button
-            type="button"
-            onClick={() => onAddPerson?.(layer.id)}
-            className="mb-3 flex h-[48px] w-full items-center justify-center gap-1 rounded-[16px] bg-[#0F172A] text-[14px] font-bold text-white active:scale-[0.98]"
-          >
-            <span className="text-[17px] leading-none">+</span>
-            친구 추가
-          </button>
-        ) : null}
-
         {dragState ? (
           <QuickLayerDropRail
             activeLayerId={layer.id}
@@ -497,6 +491,18 @@ export default function LayerBottomSheet({
                 .reduce((sum, entityId) => {
                   return sum + getEntityRealCount(entityId as string, folders);
                 }, 0)}
+              action={
+                showAddPerson ? (
+                  <button
+                    type="button"
+                    onClick={() => onAddPerson?.(layer.id)}
+                    className="inline-flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 active:scale-95"
+                  >
+                    <span className="text-[15px] leading-none">+</span>
+                    친구 추가
+                  </button>
+                ) : undefined
+              }
             />
 
             <SheetSectionShell
