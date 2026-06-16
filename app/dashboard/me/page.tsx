@@ -514,11 +514,7 @@ export default function DashboardMePage() {
   return (
     <main className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-y-auto bg-[#F5F3EE] px-4 pb-[120px] pt-5 text-[#0F172A] [overscroll-behavior-y:contain]">
       <section className="rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
-        <p className="text-[12px] font-semibold tracking-[0.22em] text-[#8D99AE]">
-          내 정보
-        </p>
-
-        <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[24px] font-bold leading-tight tracking-[-0.04em]">
               {profile.name.trim() || "나"}
@@ -583,9 +579,6 @@ export default function DashboardMePage() {
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">이름</h2>
-        <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
-          이름 입력 후 초대·신호를 쓸 수 있어요.
-        </p>
         <div className="mt-2">
           <CompactField
             label="이름"
@@ -614,10 +607,7 @@ export default function DashboardMePage() {
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">추가 정보</h2>
-        <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
-          나머지는 필요할 때 입력해도 돼요.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-2">
+        <div className="mt-2 grid grid-cols-1 gap-2">
           <CompactField label="전화번호" value={profile.phone} onChange={(value) => updateProfile("phone", value)} placeholder="휴대폰 번호" checked={profile.phonePublic} onPublicChange={(next) => updateProfile("phonePublic", next)} />
           <CompactField label="이메일" value={profile.email} onChange={(value) => updateProfile("email", value)} placeholder="이메일" checked={profile.emailPublic} onPublicChange={(next) => updateProfile("emailPublic", next)} />
           <CompactField label="주소" value={profile.address} onChange={(value) => updateProfile("address", value)} placeholder="주소" checked={profile.addressPublic} onPublicChange={(next) => updateProfile("addressPublic", next)} />
@@ -631,7 +621,7 @@ export default function DashboardMePage() {
       </section>
 
       <p className="mt-2 text-center text-[12px] font-medium leading-5 text-[#8D99AE]">
-        입력 내용은 자동 저장돼요.
+        입력 내용은 자동 저장됩니다.
       </p>
 
       <button
