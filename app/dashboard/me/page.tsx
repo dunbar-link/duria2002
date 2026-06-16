@@ -583,9 +583,9 @@ export default function DashboardMePage() {
       </section>
 
       <section className="mt-3 rounded-[28px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
-        <h2 className="text-[18px] font-bold">필수 정보</h2>
+        <h2 className="text-[18px] font-bold">이름</h2>
         <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
-          이름이 있어야 초대와 신호를 쓸 수 있어요. 먼저 이름을 입력해 주세요.
+          먼저 이름을 입력해 주세요. 이름을 입력하면 초대와 신호를 사용할 수 있어요.
         </p>
         <div className="mt-3">
           <CompactField
@@ -595,24 +595,6 @@ export default function DashboardMePage() {
             placeholder="이름"
             required
           />
-        </div>
-      </section>
-
-      <section className="mt-3 rounded-[28px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
-        <h2 className="text-[18px] font-bold">선택 정보</h2>
-        <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
-          나머지는 나중에 입력해도 돼요.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          <CompactField label="전화번호" value={profile.phone} onChange={(value) => updateProfile("phone", value)} placeholder="휴대폰 번호" checked={profile.phonePublic} onPublicChange={(next) => updateProfile("phonePublic", next)} />
-          <CompactField label="이메일" value={profile.email} onChange={(value) => updateProfile("email", value)} placeholder="이메일" checked={profile.emailPublic} onPublicChange={(next) => updateProfile("emailPublic", next)} />
-          <CompactField label="주소" value={profile.address} onChange={(value) => updateProfile("address", value)} placeholder="주소" checked={profile.addressPublic} onPublicChange={(next) => updateProfile("addressPublic", next)} />
-          <CompactField label="생일" type="date" value={profile.birthday} onChange={(value) => updateProfile("birthday", value)} placeholder="생일" checked={profile.birthdayPublic} onPublicChange={(next) => updateProfile("birthdayPublic", next)} />
-          <CompactField label="초등학교" value={profile.elementarySchool} onChange={(value) => updateProfile("elementarySchool", value)} placeholder="초등학교" checked={profile.elementarySchoolPublic} onPublicChange={(next) => updateProfile("elementarySchoolPublic", next)} />
-          <CompactField label="중학교" value={profile.middleSchool} onChange={(value) => updateProfile("middleSchool", value)} placeholder="중학교" checked={profile.middleSchoolPublic} onPublicChange={(next) => updateProfile("middleSchoolPublic", next)} />
-          <CompactField label="고등학교" value={profile.highSchool} onChange={(value) => updateProfile("highSchool", value)} placeholder="고등학교" checked={profile.highSchoolPublic} onPublicChange={(next) => updateProfile("highSchoolPublic", next)} />
-          <CompactField label="대학교/전공" value={profile.universityMajor} onChange={(value) => updateProfile("universityMajor", value)} placeholder="대학교 / 전공" checked={profile.universityMajorPublic} onPublicChange={(next) => updateProfile("universityMajorPublic", next)} />
-          <CompactField label="회사" value={profile.company} onChange={(value) => updateProfile("company", value)} placeholder="회사" checked={profile.companyPublic} onPublicChange={(next) => updateProfile("companyPublic", next)} />
         </div>
       </section>
 
@@ -631,8 +613,26 @@ export default function DashboardMePage() {
         </div>
       </section>
 
+      <section className="mt-3 rounded-[28px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+        <h2 className="text-[18px] font-bold">추가 정보</h2>
+        <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
+          나머지는 필요할 때 입력해도 돼요.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-2">
+          <CompactField label="전화번호" value={profile.phone} onChange={(value) => updateProfile("phone", value)} placeholder="휴대폰 번호" checked={profile.phonePublic} onPublicChange={(next) => updateProfile("phonePublic", next)} />
+          <CompactField label="이메일" value={profile.email} onChange={(value) => updateProfile("email", value)} placeholder="이메일" checked={profile.emailPublic} onPublicChange={(next) => updateProfile("emailPublic", next)} />
+          <CompactField label="주소" value={profile.address} onChange={(value) => updateProfile("address", value)} placeholder="주소" checked={profile.addressPublic} onPublicChange={(next) => updateProfile("addressPublic", next)} />
+          <CompactField label="생일" type="date" value={profile.birthday} onChange={(value) => updateProfile("birthday", value)} placeholder="생일" checked={profile.birthdayPublic} onPublicChange={(next) => updateProfile("birthdayPublic", next)} />
+          <CompactField label="초등학교" value={profile.elementarySchool} onChange={(value) => updateProfile("elementarySchool", value)} placeholder="초등학교" checked={profile.elementarySchoolPublic} onPublicChange={(next) => updateProfile("elementarySchoolPublic", next)} />
+          <CompactField label="중학교" value={profile.middleSchool} onChange={(value) => updateProfile("middleSchool", value)} placeholder="중학교" checked={profile.middleSchoolPublic} onPublicChange={(next) => updateProfile("middleSchoolPublic", next)} />
+          <CompactField label="고등학교" value={profile.highSchool} onChange={(value) => updateProfile("highSchool", value)} placeholder="고등학교" checked={profile.highSchoolPublic} onPublicChange={(next) => updateProfile("highSchoolPublic", next)} />
+          <CompactField label="대학교/전공" value={profile.universityMajor} onChange={(value) => updateProfile("universityMajor", value)} placeholder="대학교 / 전공" checked={profile.universityMajorPublic} onPublicChange={(next) => updateProfile("universityMajorPublic", next)} />
+          <CompactField label="회사" value={profile.company} onChange={(value) => updateProfile("company", value)} placeholder="회사" checked={profile.companyPublic} onPublicChange={(next) => updateProfile("companyPublic", next)} />
+        </div>
+      </section>
+
       <p className="mt-3 text-center text-[12px] font-medium leading-5 text-[#8D99AE]">
-        입력하는 동안 자동으로 저장돼요. 저장하기를 누르면 연결된 사람에게도 바로 반영돼요.
+        입력 내용은 자동 저장되며, 저장하기를 누르면 이름과 사진이 즉시 반영돼요.
       </p>
 
       <button
