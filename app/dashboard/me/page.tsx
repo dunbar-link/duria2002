@@ -518,11 +518,32 @@ export default function DashboardMePage() {
           내 정보
         </p>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="mt-2 flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[24px] font-bold leading-tight tracking-[-0.04em]">
               {profile.name.trim() || "나"}
             </h1>
+            {photoNotice ? (
+              <p
+                className={`mt-1 text-[12px] font-semibold ${
+                  photoNotice.tone === "success"
+                    ? "text-[#079863]"
+                    : photoNotice.tone === "error"
+                      ? "text-[#D94848]"
+                      : "text-[#8D99AE]"
+                }`}
+              >
+                {photoNotice.text}
+              </p>
+            ) : (
+              <p className="mt-1 text-[12px] font-medium text-[#8D99AE]">
+                {profile.imageUrl
+                  ? "사진 저장됨 · 다른 기기에도 표시 가능"
+                  : profile.imageDataUrl
+                    ? "이 기기에만 임시 표시 중 · 사진을 다시 선택하면 다른 기기에도 보여요"
+                    : "프로필 사진을 추가해 보세요"}
+              </p>
+            )}
           </div>
 
           <div className="flex shrink-0 flex-col items-center gap-1">
@@ -558,28 +579,6 @@ export default function DashboardMePage() {
 
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
         </div>
-
-        {photoNotice ? (
-          <p
-            className={`mt-2 text-[12px] font-semibold ${
-              photoNotice.tone === "success"
-                ? "text-[#079863]"
-                : photoNotice.tone === "error"
-                  ? "text-[#D94848]"
-                  : "text-[#8D99AE]"
-            }`}
-          >
-            {photoNotice.text}
-          </p>
-        ) : (
-          <p className="mt-2 text-[12px] font-medium text-[#8D99AE]">
-            {profile.imageUrl
-              ? "사진 저장됨 · 다른 기기에도 표시 가능"
-              : profile.imageDataUrl
-                ? "이 기기에만 임시 표시 중 · 사진을 다시 선택하면 다른 기기에도 보여요"
-                : "프로필 사진을 추가해 보세요"}
-          </p>
-        )}
       </section>
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
