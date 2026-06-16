@@ -1127,7 +1127,7 @@ export function CompactMoreIcon({
 
       <button
         type="button"
-        aria-label={`더보기 ${hiddenCount <= 0 ? "꽉 참" : `+${hiddenCount}명`}`}
+        aria-label={hiddenCount <= 0 ? "친구 더 추가하기" : `더보기 +${hiddenCount}명`}
         onClick={onClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -1145,7 +1145,7 @@ export function CompactMoreIcon({
               : "0 4px 10px rgba(15,23,42,0.04)",
           }}
         >
-          {hiddenCount <= 0 ? "✓" : `+${hiddenCount}`}
+          {hiddenCount <= 0 ? "+" : `+${hiddenCount}`}
         </div>
       </button>
     </div>

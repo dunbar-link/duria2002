@@ -429,26 +429,25 @@ export default function LayerBottomSheet({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            {showAddPerson ? (
-              <button
-                type="button"
-                onClick={() => onAddPerson?.(layer.id)}
-                className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors duration-150 hover:bg-slate-50 active:scale-95"
-              >
-                사람 추가
-              </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:bg-slate-50"
-            >
-              닫기
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:bg-slate-50"
+          >
+            닫기
+          </button>
         </div>
+
+        {showAddPerson ? (
+          <button
+            type="button"
+            onClick={() => onAddPerson?.(layer.id)}
+            className="mb-3 flex h-[48px] w-full items-center justify-center gap-1 rounded-[16px] bg-[#0F172A] text-[14px] font-bold text-white active:scale-[0.98]"
+          >
+            <span className="text-[17px] leading-none">+</span>
+            친구 추가
+          </button>
+        ) : null}
 
         {dragState ? (
           <QuickLayerDropRail

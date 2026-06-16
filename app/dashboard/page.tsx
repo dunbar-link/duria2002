@@ -2296,7 +2296,7 @@ useEffect(() => {
     }
 
     setSelectedHomePersonId(created.id);
-    setPersonActionFeedback("사람을 추가했어요.");
+    setPersonActionFeedback("친구를 추가했어요.");
 
     handleCloseAddSheet();
   }
