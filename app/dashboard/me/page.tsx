@@ -513,14 +513,14 @@ export default function DashboardMePage() {
 
   return (
     <main className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-y-auto bg-[#F5F3EE] px-4 pb-[120px] pt-5 text-[#0F172A] [overscroll-behavior-y:contain]">
-      <section className="rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
+      <section className="rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
         <p className="text-[12px] font-semibold tracking-[0.22em] text-[#8D99AE]">
           내 정보
         </p>
 
-        <div className="mt-3 flex items-center justify-between gap-4">
+        <div className="mt-3 flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[30px] font-bold leading-tight tracking-[-0.04em]">
+            <h1 className="truncate text-[24px] font-bold leading-tight tracking-[-0.04em]">
               {profile.name.trim() || "나"}
             </h1>
           </div>
@@ -529,7 +529,7 @@ export default function DashboardMePage() {
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] text-[26px] font-bold shadow-[0_8px_18px_rgba(15,23,42,0.05)] active:scale-95"
+              className="relative flex h-[56px] w-[56px] shrink-0 items-center justify-center overflow-hidden rounded-[18px] text-[20px] font-bold shadow-[0_8px_18px_rgba(15,23,42,0.05)] active:scale-95"
               style={{ background: PROFILE_BG, color: PROFILE_TEXT, border: `2.5px solid ${PROFILE_BORDER}` }}
               aria-label="프로필 사진 변경"
             >
@@ -538,7 +538,7 @@ export default function DashboardMePage() {
               ) : (
                 getInitial(profile.name)
               )}
-              <span className="absolute bottom-[-1px] right-[-1px] flex h-[27px] w-[27px] items-center justify-center rounded-full bg-[#2C2C2A] text-[#F1EFE8] ring-2 ring-[#FAFAF8]">
+              <span className="absolute bottom-[-1px] right-[-1px] flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#2C2C2A] text-[#F1EFE8] ring-2 ring-[#FAFAF8]">
                 <IconCamera />
               </span>
             </button>
@@ -561,7 +561,7 @@ export default function DashboardMePage() {
 
         {photoNotice ? (
           <p
-            className={`mt-3 text-[12px] font-semibold ${
+            className={`mt-2 text-[12px] font-semibold ${
               photoNotice.tone === "success"
                 ? "text-[#079863]"
                 : photoNotice.tone === "error"
@@ -572,7 +572,7 @@ export default function DashboardMePage() {
             {photoNotice.text}
           </p>
         ) : (
-          <p className="mt-3 text-[12px] font-medium text-[#8D99AE]">
+          <p className="mt-2 text-[12px] font-medium text-[#8D99AE]">
             {profile.imageUrl
               ? "사진 저장됨 · 다른 기기에도 표시 가능"
               : profile.imageDataUrl
@@ -582,12 +582,12 @@ export default function DashboardMePage() {
         )}
       </section>
 
-      <section className="mt-2 rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
+      <section className="mt-2 rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">이름</h2>
         <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
-          먼저 이름을 입력해 주세요. 이름을 입력하면 초대와 신호를 사용할 수 있어요.
+          이름 입력 후 초대·신호를 쓸 수 있어요.
         </p>
-        <div className="mt-3">
+        <div className="mt-2">
           <CompactField
             label="이름"
             value={profile.name}
@@ -599,15 +599,15 @@ export default function DashboardMePage() {
       </section>
 
       <section className="mt-2 grid grid-cols-3 gap-2">
-        <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-3 shadow-sm ring-1 ring-[#D3D1C7]">
+        <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">친구들</p>
           <p className="mt-1 text-[22px] font-bold">{people.length}</p>
         </div>
-        <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-3 shadow-sm ring-1 ring-[#D3D1C7]">
+        <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">초대 성공</p>
           <p className="mt-1 text-[22px] font-bold">{acceptedInviteCount}</p>
         </div>
-        <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-3 shadow-sm ring-1 ring-[#D3D1C7]">
+        <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">Point</p>
           <p className="mt-1 text-[22px] font-bold">{linkPoint}</p>
         </div>
@@ -632,7 +632,7 @@ export default function DashboardMePage() {
       </section>
 
       <p className="mt-2 text-center text-[12px] font-medium leading-5 text-[#8D99AE]">
-        입력 내용은 자동 저장되며, 저장하기를 누르면 이름과 사진이 즉시 반영돼요.
+        입력 내용은 자동 저장돼요.
       </p>
 
       <button
