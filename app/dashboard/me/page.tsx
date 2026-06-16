@@ -41,34 +41,61 @@ type MeProfile = {
   middleSchoolPublic: boolean;
   highSchool: string;
   highSchoolPublic: boolean;
+  // universityMajor / company 는 레거시 단일 필드(즉시 삭제하지 않고 복원 fallback 용으로 유지).
   universityMajor: string;
   universityMajorPublic: boolean;
   company: string;
   companyPublic: boolean;
+  schoolName: string;
+  schoolNamePublic: boolean;
+  major: string;
+  majorPublic: boolean;
+  studentId: string;
+  studentIdPublic: boolean;
+  companyName: string;
+  companyNamePublic: boolean;
+  jobTitle: string;
+  jobTitlePublic: boolean;
+  department: string;
+  departmentPublic: boolean;
   imageUrl: string;
   imageDataUrl: string;
 };
 
+// 신규 프로필은 모든 추가정보가 기본 공개(true). 기존 프로필은 buildProfileFromUnknown 이
+// 저장된 값을 그대로 복원하므로 이 기본값의 영향을 받지 않는다(자동 공개 없음).
 const defaultProfile: MeProfile = {
   name: "",
   phone: "",
-  phonePublic: false,
+  phonePublic: true,
   email: "",
-  emailPublic: false,
+  emailPublic: true,
   address: "",
-  addressPublic: false,
+  addressPublic: true,
   birthday: "",
-  birthdayPublic: false,
+  birthdayPublic: true,
   elementarySchool: "",
-  elementarySchoolPublic: false,
+  elementarySchoolPublic: true,
   middleSchool: "",
-  middleSchoolPublic: false,
+  middleSchoolPublic: true,
   highSchool: "",
-  highSchoolPublic: false,
+  highSchoolPublic: true,
   universityMajor: "",
-  universityMajorPublic: false,
+  universityMajorPublic: true,
   company: "",
-  companyPublic: false,
+  companyPublic: true,
+  schoolName: "",
+  schoolNamePublic: true,
+  major: "",
+  majorPublic: true,
+  studentId: "",
+  studentIdPublic: true,
+  companyName: "",
+  companyNamePublic: true,
+  jobTitle: "",
+  jobTitlePublic: true,
+  department: "",
+  departmentPublic: true,
   imageUrl: "",
   imageDataUrl: "",
 };
@@ -81,34 +108,88 @@ function toBoolean(value: unknown) {
   return value === true;
 }
 
+// 공개 boolean 복원 규칙(true=공개):
+// 1) 저장된 boolean 이 있으면 그대로 보존 → 기존 공개/비공개 상태 유지(자동 공개 금지)
+// 2) boolean 이 없고 값이 이미 있으면 false → 기존 데이터 보호(비공개)
+// 3) boolean 도 값도 없으면 true → 새로 입력할 빈 필드는 기본 공개
+function resolvePublicValue(value: string, ...sources: unknown[]): boolean {
+  for (const source of sources) {
+    if (typeof source === "boolean") return source;
+  }
+  return value.trim() === "";
+}
+
 function buildProfileFromUnknown(source: Partial<MeProfile> & Record<string, unknown>): MeProfile {
   const university = toText(source.university);
-  const major = toText(source.major);
+  const legacyMajor = toText(source.major);
   const universityMajor =
     toText(source.universityMajor) ||
-    [university, major].filter(Boolean).join(" / ");
+    [university, legacyMajor].filter(Boolean).join(" / ");
+  const company = toText(source.company);
+
+  // 단일 → 분리 fallback. 기존 단일 값을 학교명/회사명에 통째로 보존(임의 분리 금지).
+  const schoolName = toText(source.schoolName) || universityMajor;
+  const major = toText(source.major);
+  const studentId = toText(source.studentId);
+  const companyName = toText(source.companyName) || company;
+  const jobTitle = toText(source.jobTitle);
+  const department = toText(source.department);
+
+  const phone = toText(source.phone) || toText(source.contact);
+  const email = toText(source.email);
+  const address = toText(source.address);
+  const birthday = toText(source.birthday);
+  const elementarySchool = toText(source.elementarySchool);
+  const middleSchool = toText(source.middleSchool);
+  const highSchool = toText(source.highSchool);
 
   return {
     name: toText(source.name),
-    phone: toText(source.phone) || toText(source.contact),
-    phonePublic: toBoolean(source.phonePublic),
-    email: toText(source.email),
-    emailPublic: toBoolean(source.emailPublic),
-    address: toText(source.address),
-    addressPublic: toBoolean(source.addressPublic),
-    birthday: toText(source.birthday),
-    birthdayPublic: toBoolean(source.birthdayPublic),
-    elementarySchool: toText(source.elementarySchool),
-    elementarySchoolPublic: toBoolean(source.elementarySchoolPublic),
-    middleSchool: toText(source.middleSchool),
-    middleSchoolPublic: toBoolean(source.middleSchoolPublic),
-    highSchool: toText(source.highSchool),
-    highSchoolPublic: toBoolean(source.highSchoolPublic),
+    phone,
+    phonePublic: resolvePublicValue(phone, source.phonePublic),
+    email,
+    emailPublic: resolvePublicValue(email, source.emailPublic),
+    address,
+    addressPublic: resolvePublicValue(address, source.addressPublic),
+    birthday,
+    birthdayPublic: resolvePublicValue(birthday, source.birthdayPublic),
+    elementarySchool,
+    elementarySchoolPublic: resolvePublicValue(elementarySchool, source.elementarySchoolPublic),
+    middleSchool,
+    middleSchoolPublic: resolvePublicValue(middleSchool, source.middleSchoolPublic),
+    highSchool,
+    highSchoolPublic: resolvePublicValue(highSchool, source.highSchoolPublic),
     universityMajor,
-    universityMajorPublic:
-      toBoolean(source.universityMajorPublic) || toBoolean(source.universityPublic),
-    company: toText(source.company),
-    companyPublic: toBoolean(source.companyPublic),
+    universityMajorPublic: resolvePublicValue(
+      universityMajor,
+      source.universityMajorPublic,
+      source.universityPublic,
+    ),
+    company,
+    companyPublic: resolvePublicValue(company, source.companyPublic),
+    schoolName,
+    // 기존 universityMajorPublic 을 학교명 공개 상태의 fallback 으로 계승.
+    schoolNamePublic: resolvePublicValue(
+      schoolName,
+      source.schoolNamePublic,
+      source.universityMajorPublic,
+      source.universityPublic,
+    ),
+    major,
+    majorPublic: resolvePublicValue(major, source.majorPublic),
+    studentId,
+    studentIdPublic: resolvePublicValue(studentId, source.studentIdPublic),
+    companyName,
+    // 기존 companyPublic 을 회사명 공개 상태의 fallback 으로 계승.
+    companyNamePublic: resolvePublicValue(
+      companyName,
+      source.companyNamePublic,
+      source.companyPublic,
+    ),
+    jobTitle,
+    jobTitlePublic: resolvePublicValue(jobTitle, source.jobTitlePublic),
+    department,
+    departmentPublic: resolvePublicValue(department, source.departmentPublic),
     imageUrl: toText(source.imageUrl),
     imageDataUrl: toText(source.imageDataUrl),
   };
@@ -175,11 +256,11 @@ function CompactField({
             <label className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-[#64748B]">
               <input
                 type="checkbox"
-                checked={Boolean(checked)}
-                onChange={(event) => onPublicChange(event.target.checked)}
+                checked={!checked}
+                onChange={(event) => onPublicChange(!event.target.checked)}
                 className="h-3.5 w-3.5 accent-[#4B2E83]"
               />
-              공개
+              비공개
             </label>
           ) : null}
         </div>
@@ -627,8 +708,14 @@ export default function DashboardMePage() {
           <CompactField label="초등학교" value={profile.elementarySchool} onChange={(value) => updateProfile("elementarySchool", value)} placeholder="초등학교" checked={profile.elementarySchoolPublic} onPublicChange={(next) => updateProfile("elementarySchoolPublic", next)} />
           <CompactField label="중학교" value={profile.middleSchool} onChange={(value) => updateProfile("middleSchool", value)} placeholder="중학교" checked={profile.middleSchoolPublic} onPublicChange={(next) => updateProfile("middleSchoolPublic", next)} />
           <CompactField label="고등학교" value={profile.highSchool} onChange={(value) => updateProfile("highSchool", value)} placeholder="고등학교" checked={profile.highSchoolPublic} onPublicChange={(next) => updateProfile("highSchoolPublic", next)} />
-          <CompactField label="대학교/전공" value={profile.universityMajor} onChange={(value) => updateProfile("universityMajor", value)} placeholder="대학교 / 전공" checked={profile.universityMajorPublic} onPublicChange={(next) => updateProfile("universityMajorPublic", next)} />
-          <CompactField label="회사" value={profile.company} onChange={(value) => updateProfile("company", value)} placeholder="회사" checked={profile.companyPublic} onPublicChange={(next) => updateProfile("companyPublic", next)} />
+          <p className="mt-1 text-[12px] font-semibold text-[#64748B]">대학교</p>
+          <CompactField label="학교명" value={profile.schoolName} onChange={(value) => updateProfile("schoolName", value)} placeholder="학교명" checked={profile.schoolNamePublic} onPublicChange={(next) => updateProfile("schoolNamePublic", next)} />
+          <CompactField label="학과" value={profile.major} onChange={(value) => updateProfile("major", value)} placeholder="학과" checked={profile.majorPublic} onPublicChange={(next) => updateProfile("majorPublic", next)} />
+          <CompactField label="학번" value={profile.studentId} onChange={(value) => updateProfile("studentId", value)} placeholder="학번" checked={profile.studentIdPublic} onPublicChange={(next) => updateProfile("studentIdPublic", next)} />
+          <p className="mt-1 text-[12px] font-semibold text-[#64748B]">회사</p>
+          <CompactField label="회사명" value={profile.companyName} onChange={(value) => updateProfile("companyName", value)} placeholder="회사명" checked={profile.companyNamePublic} onPublicChange={(next) => updateProfile("companyNamePublic", next)} />
+          <CompactField label="직위" value={profile.jobTitle} onChange={(value) => updateProfile("jobTitle", value)} placeholder="직위" checked={profile.jobTitlePublic} onPublicChange={(next) => updateProfile("jobTitlePublic", next)} />
+          <CompactField label="부서" value={profile.department} onChange={(value) => updateProfile("department", value)} placeholder="부서" checked={profile.departmentPublic} onPublicChange={(next) => updateProfile("departmentPublic", next)} />
         </div>
       </section>
 
