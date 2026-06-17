@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { isIncompleteMeName, readMeProfileImageUrl } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../people/store";
+import { AccountSection } from "./account-section";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const LEGACY_PROFILE_STORAGE_KEY_V2 = "dunbar-link-me-profile-v2";
@@ -697,6 +698,8 @@ export default function DashboardMePage() {
           <p className="mt-1 text-[22px] font-bold">{linkPoint}</p>
         </div>
       </section>
+
+      <AccountSection />
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">추가 정보</h2>
