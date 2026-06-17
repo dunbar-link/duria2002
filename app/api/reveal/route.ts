@@ -10,6 +10,11 @@ function requireEnv(name: string) {
 }
 
 export async function POST(req: Request) {
+  // 인증·소유권 검증이 없어 client userId 로 타인 코인을 차감할 수 있는 실험용
+  // route. 진짜 인증(OTP) 도입 전까지 production 에서 차단한다. (개발 환경 유지)
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ ok: false, error: "disabled in production" }, { status: 403 });
+  }
   try {
     const supabase = getSupabaseAdmin();
     const body = await req.json().catch(() => ({}));

@@ -14,6 +14,11 @@ function readText(value: unknown) {
 }
 
 export async function POST(req: Request) {
+  // demo 코인(DL_DEMO_USER_ID)을 소모하는 실험용 route. 인증이 없어 누구나
+  // 호출 가능하므로 진짜 인증(OTP) 도입 전까지 production 에서 차단한다. (개발 환경 유지)
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ ok: false, error: "disabled in production" }, { status: 403 });
+  }
   const supabase = getSupabaseAdmin();
   const startedAt = nowIso();
   let testerName = "";
