@@ -22,6 +22,41 @@ const KAKAO_BTN =
   "inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#FEE500] px-5 text-sm font-semibold text-[#191919] active:scale-[0.98] disabled:opacity-50";
 const LINK_BTN = "text-[13px] font-semibold text-[#4B2E83] underline";
 
+type AuthErrInfo = { status: number | null; message: string; name: string; code: string };
+
+// Supabase auth error 에서 안전한 필드만 추출한다(원문 전체를 화면에 노출하지 않는다).
+function readAuthError(err: unknown): AuthErrInfo {
+  const e = (err ?? {}) as Record<string, unknown>;
+  return {
+    status: typeof e.status === "number" ? e.status : null,
+    message: typeof e.message === "string" ? e.message : "",
+    name: typeof e.name === "string" ? e.name : "",
+    code: typeof e.code === "string" ? e.code : "",
+  };
+}
+
+// OTP 발송 실패를 status 기준으로 안전 분기한다(사용자에 Supabase 원문 비노출).
+function otpRequestErrorMessage(info: AuthErrInfo): string {
+  const msg = info.message.toLowerCase();
+  if (info.status === 429 || msg.includes("rate limit") || msg.includes("too many")) {
+    return "요청이 많아요. 잠시 후 다시 시도하거나 카카오로 로그인해 주세요.";
+  }
+  if (info.status !== null && info.status >= 400 && info.status < 500) {
+    return "이메일 주소를 확인해 주세요.";
+  }
+  // 500 이상 또는 status 불명 → 발송 불안정 안내(기존 일반 문구를 대체하는 fallback).
+  return "지금 코드 발송이 불안정해요. 카카오로 계속하기를 권장해요.";
+}
+
+// development 에서만 상세를 남긴다. 이메일/코드/토큰/세션/쿠키 등 민감정보는 남기지 않는다.
+function logAuthErrorDev(scope: string, info: AuthErrInfo): void {
+  if (process.env.NODE_ENV === "development") {
+    console.error(
+      `[auth:${scope}] status=${info.status} name=${info.name} code=${info.code} message=${info.message}`,
+    );
+  }
+}
+
 export function LoginForm() {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
@@ -173,7 +208,9 @@ export function LoginForm() {
         options: { shouldCreateUser: true },
       });
       if (otpError) {
-        setError("코드를 보내지 못했어요. 잠시 후 다시 시도해 주세요");
+        const info = readAuthError(otpError);
+        logAuthErrorDev("otp-request", info);
+        setError(otpRequestErrorMessage(info));
         return;
       }
       setStep("otp");
@@ -199,7 +236,8 @@ export function LoginForm() {
         type: "email",
       });
       if (verifyError) {
-        setError("코드가 올바르지 않거나 만료됐어요");
+        logAuthErrorDev("otp-verify", readAuthError(verifyError));
+        setError("코드가 올바르지 않거나 만료됐어요. 다시 확인해 주세요.");
         return;
       }
       // 인증 성공 → 자동 연결 + Me 이동(중간 화면 없음).
