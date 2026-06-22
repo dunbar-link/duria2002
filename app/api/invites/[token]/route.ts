@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getInviteSession } from "@/lib/auth/invite-auth";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
   const { token } = await params;
+
+  // 초대 조회도 로그인 후에만 허용한다(페이지 proxy 만으로 보호 간주하지 않음).
+  const session = await getInviteSession();
+  if (!session.ok) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
   if (!token) {
     return NextResponse.json({ error: "token required" }, { status: 400 });

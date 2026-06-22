@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getInviteSession } from "@/lib/auth/invite-auth";
 
 export async function POST(req: Request) {
   try {
+    const session = await getInviteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    }
+
     const body = (await req.json()) as {
       token?: string;
       acceptedPersonId?: string;
@@ -22,6 +28,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false }, { status: 400 });
     }
 
+    // 수락자 owner 는 client 값이 아니라 세션 legacy 집합으로 강제한다(타인 대신 수락 차단).
+    const legacyIds = session.legacyIds;
+    if (legacyIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "ACCOUNT_LINK_REQUIRED" },
+        { status: 403 },
+      );
+    }
+    // client 가 보낸 acceptedPersonId 가 내 legacy 집합에 없으면 위조로 보고 차단.
+    if (!legacyIds.includes(acceptedPersonId)) {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
+    const accepterLegacyId = acceptedPersonId;
+
     const supabase = createAdminClient();
 
     const { data: invite } = await supabase
@@ -36,7 +56,7 @@ export async function POST(req: Request) {
 
     const baseUpdate = {
       status: "accepted",
-      accepted_person_id: acceptedPersonId,
+      accepted_person_id: accepterLegacyId,
       accepted_person_name: acceptedPersonName,
       accepted_at: acceptedAt,
     };

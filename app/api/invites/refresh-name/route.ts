@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getInviteSession } from "@/lib/auth/invite-auth";
 
 const SAFE_USER_ID = /^[A-Za-z0-9_-]+$/;
 const MAX_NAME_LENGTH = 60;
@@ -18,6 +19,11 @@ type RefreshBody = {
  */
 export async function POST(req: Request) {
   try {
+    const session = await getInviteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    }
+
     const body = (await req.json().catch(() => null)) as RefreshBody | null;
 
     if (!body || typeof body !== "object") {
@@ -32,6 +38,19 @@ export async function POST(req: Request) {
         { ok: false, message: "invalid userId" },
         { status: 400 },
       );
+    }
+
+    // owner 는 client userId 가 아니라 세션에 연결된 legacy 집합으로 강제한다.
+    const legacyIds = session.legacyIds;
+    if (legacyIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "ACCOUNT_LINK_REQUIRED" },
+        { status: 403 },
+      );
+    }
+    // client 가 보낸 userId 가 내 legacy 집합에 없으면 위조로 보고 차단.
+    if (!legacyIds.includes(userId)) {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
 
     if (!name || name.length > MAX_NAME_LENGTH) {

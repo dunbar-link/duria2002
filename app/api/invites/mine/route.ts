@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getInviteSession } from "@/lib/auth/invite-auth";
 
 // 연결된 상대의 최신 이름(inviter_name / accepted_person_name)을 항상 최신으로
 // 내려야 하므로 절대 캐시하지 않는다.
@@ -12,6 +13,11 @@ const SAFE_USER_ID = /^[A-Za-z0-9_-]+$/;
 
 export async function GET(req: Request) {
   try {
+    const session = await getInviteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const userId = (searchParams.get("userId") ?? "").trim();
     const statusParam = (searchParams.get("status") ?? "").trim();
@@ -29,6 +35,17 @@ export async function GET(req: Request) {
         { ok: false, message: "invalid userId" },
         { status: 400 },
       );
+    }
+
+    // 권한 기준은 client 가 보낸 userId 가 아니라 세션에 연결된 legacy 집합이다.
+    const legacyIds = session.legacyIds;
+    if (legacyIds.length === 0) {
+      // 기기 연결 전(직행 등)이면 조회 가능한 초대가 없다(graceful, 403 아님).
+      return NextResponse.json({ ok: true, invites: [] });
+    }
+    // client 가 보낸 userId 가 내 legacy 집합에 없으면 위조로 보고 차단.
+    if (!legacyIds.includes(userId)) {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
 
     if (statusParam && !ALLOWED_STATUS.has(statusParam)) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getInviteSession } from "@/lib/auth/invite-auth";
 
 // 정확한 invite token 기준으로만 dl_invites 를 삭제한다. 이름(invitee_name/
 // accepted_person_name)·local person.id 로는 절대 삭제하지 않는다(이름이 같은
@@ -34,6 +35,14 @@ function getSupabaseAdminClient() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getInviteSession();
+    if (!session.ok) {
+      return NextResponse.json(
+        { ok: false, deleted: 0, message: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json().catch(() => ({}))) as DeleteInviteRequestBody;
 
     const rawTokens = Array.isArray(body.tokens) ? body.tokens : [];
@@ -64,9 +73,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const ownerUserIdRaw =
-      typeof body.ownerUserId === "string" ? body.ownerUserId.trim() : "";
-    const ownerUserId = SAFE_OWNER_ID.test(ownerUserIdRaw) ? ownerUserIdRaw : "";
+    // owner 스코프는 client 값이 아니라 세션 legacy 집합으로 강제한다(타인 초대 삭제 차단).
+    const ownerUserIds = session.legacyIds.filter((id) => SAFE_OWNER_ID.test(id));
+    if (ownerUserIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, deleted: 0, message: "FORBIDDEN" },
+        { status: 403 },
+      );
+    }
 
     const supabase = getSupabaseAdminClient();
 
@@ -75,13 +89,12 @@ export async function POST(request: Request) {
       .delete({ count: "exact" })
       .in("token", tokens);
 
-    // 가능하면 호출자(초대자/수락자) 소유권으로도 한정한다(방어적). 형식이
-    // 안전하지 않으면 owner 스코프는 건너뛰되, token exact match 는 유지한다.
-    if (ownerUserId) {
-      query = query.or(
-        `inviter_user_id.eq.${ownerUserId},accepted_person_id.eq.${ownerUserId}`,
-      );
-    }
+    // 호출자(초대자/수락자) 소유권으로도 한정한다(방어적). 내 legacy 집합 전체를
+    // owner 스코프로 OR 한정한다(token exact match 와 함께 fail-closed 유지).
+    const ownerList = ownerUserIds.join(",");
+    query = query.or(
+      `inviter_user_id.in.(${ownerList}),accepted_person_id.in.(${ownerList})`,
+    );
 
     const { count, error } = await query;
 

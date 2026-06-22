@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { getInviteSession } from "@/lib/auth/invite-auth";
 
 type InviteUpsertBody = {
   token?: string;
@@ -56,6 +57,11 @@ function createAdminClient() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getInviteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: "UNAUTHORIZED" }, { status: 401 });
+    }
+
     const body = (await request.json()) as InviteUpsertBody;
 
     const sourcePersonId = cleanText(body.sourcePersonId) || null;
@@ -128,7 +134,21 @@ export async function POST(request: Request) {
     const token = cleanText(body.token) || createInviteToken();
     const invitePath = cleanText(body.invitePath) || `/invite/${token}`;
 
-    const inviterUserId = cleanText(body.inviterUserId) || null;
+    // 생성자 owner 는 client 값이 아니라 세션 legacy 집합으로 강제한다(타인 명의 생성 차단).
+    const legacyIds = session.legacyIds;
+    if (legacyIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "ACCOUNT_LINK_REQUIRED" },
+        { status: 403 },
+      );
+    }
+    // client 가 보낸 inviterUserId 가 내 legacy 집합에 있으면 그 값을, 안 보냈으면
+    // 집합의 첫 legacy 를 owner 로 쓴다. 집합에 없는 값은 위조로 보고 차단.
+    const clientInviterUserId = cleanText(body.inviterUserId);
+    if (clientInviterUserId && !legacyIds.includes(clientInviterUserId)) {
+      return NextResponse.json({ ok: false, message: "FORBIDDEN" }, { status: 403 });
+    }
+    const inviterUserId = clientInviterUserId || legacyIds[0];
     const inviterName = cleanText(body.inviterName) || null;
     // 초대 생성 snapshot: inviter 의 현재 Me 프로필 사진 public URL(빈 값=null).
     const inviterPhotoUrl = cleanText(body.inviterPhotoUrl) || null;
