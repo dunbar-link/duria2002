@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { getCurrentUserId } from "@/lib/auth/current-user";
 
 type Props = {
   children: ReactNode;
@@ -58,6 +61,62 @@ function TabIcon({ type }: { type: TabItem["icon"] }) {
 
 export default function DashboardLayout({ children }: Props) {
   const pathname = usePathname();
+
+  // 로그인 세션이 있는데 이 기기가 계정에 아직 연결 안 됐으면(예: /login 의 finishLogin
+  // 을 거치지 않고 기존 세션으로 dashboard 직행) identity-link 연결을 "완료"한 뒤에야
+  // children(People 등)을 렌더한다. 그래야 invite mine 이 연결 전에 호출되어 빈 결과가
+  // 되는 첫 진입 race 가 사라진다(새로고침 불필요). idempotent(200/201).
+  const [identityReady, setIdentityReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (cancelled) return;
+      if (!data.user) {
+        // 비로그인은 proxy 가 막지만, 방어적으로 렌더는 허용한다.
+        setIdentityReady(true);
+        return;
+      }
+      let res: Response | null = null;
+      try {
+        res = await fetch("/api/account/identity-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ legacyUserId: getCurrentUserId() }),
+        });
+      } catch {
+        res = null;
+      }
+      if (cancelled) return;
+      if (res && res.status === 409) {
+        // 이 기기 데이터가 다른 계정에 연결됨 → 자동 로그아웃, 이전하지 않음.
+        await supabase.auth.signOut();
+        window.location.replace("/login?reason=account_conflict");
+        return;
+      }
+      if (res && res.status === 401) {
+        await supabase.auth.signOut();
+        window.location.replace("/login?reason=signed_out");
+        return;
+      }
+      // 200/201/400/500/network: 세션은 유효 → 렌더(미연결이면 초대만 graceful 제한).
+      setIdentityReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!identityReady) {
+    return (
+      <div className="min-h-[100dvh] bg-[#F5F3EE]">
+        <div className="mx-auto flex h-[100dvh] w-full max-w-md items-center justify-center bg-[#FAFAF8] text-sm font-medium text-[#8D99AE]">
+          계정 준비 중…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] bg-[#F5F3EE]">

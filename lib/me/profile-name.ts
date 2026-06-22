@@ -118,3 +118,77 @@ export function writeMeProfileNameIfEmpty(name: string): boolean {
   window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
   return true;
 }
+
+/** 현재 Me 사진(public URL 또는 이 기기 임시 base64)이 하나라도 있는지. */
+export function hasMeProfileImage(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { imageUrl?: unknown; imageDataUrl?: unknown };
+    const imageUrl = typeof parsed.imageUrl === "string" ? parsed.imageUrl.trim() : "";
+    const imageDataUrl =
+      typeof parsed.imageDataUrl === "string" ? parsed.imageDataUrl.trim() : "";
+    return Boolean(imageUrl || imageDataUrl);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Me 사진이 비어 있을 때만 public https URL 을 채운다(예: 카카오 프로필 사진).
+ * - 기존 imageUrl 또는 imageDataUrl 이 있으면 절대 덮어쓰지 않는다.
+ * - https URL 만 허용한다(외부 javascript:/data: 등 차단).
+ * 반환: 실제로 채웠으면 true.
+ */
+export function writeMeProfileImageUrlIfEmpty(imageUrl: string): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const trimmed = imageUrl.trim();
+  if (!trimmed) {
+    return false;
+  }
+  try {
+    if (new URL(trimmed).protocol !== "https:") {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  let profile: Record<string, unknown> = {};
+  try {
+    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        profile = parsed as Record<string, unknown>;
+      }
+    }
+  } catch {
+    profile = {};
+  }
+
+  const existingUrl =
+    typeof profile.imageUrl === "string" ? profile.imageUrl.trim() : "";
+  const existingData =
+    typeof profile.imageDataUrl === "string" ? profile.imageDataUrl.trim() : "";
+  if (existingUrl || existingData) {
+    return false;
+  }
+
+  profile.imageUrl = trimmed;
+
+  try {
+    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  } catch {
+    return false;
+  }
+
+  window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
+  return true;
+}

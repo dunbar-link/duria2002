@@ -604,36 +604,16 @@ export default function DashboardMePage() {
 
   return (
     <main className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-y-auto bg-[#F5F3EE] px-4 pb-[120px] pt-5 text-[#0F172A] [overscroll-behavior-y:contain]">
-      <section className="rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
+      <section className="rounded-[28px] bg-[#FAFAF8] px-3 py-2.5 shadow-sm ring-1 ring-[#D3D1C7]">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[24px] font-bold leading-tight tracking-[-0.04em]">
+            <h1 className="truncate text-[20px] font-bold leading-[1.2] tracking-[-0.04em]">
               {profile.name.trim() || "나"}
             </h1>
-            {photoNotice ? (
-              <p
-                className={`mt-1 text-[12px] font-semibold ${
-                  photoNotice.tone === "success"
-                    ? "text-[#079863]"
-                    : photoNotice.tone === "error"
-                      ? "text-[#D94848]"
-                      : "text-[#8D99AE]"
-                }`}
-              >
-                {photoNotice.text}
-              </p>
-            ) : (
-              <p className="mt-1 text-[12px] font-medium text-[#8D99AE]">
-                {profile.imageUrl
-                  ? "사진 저장됨 · 다른 기기에도 표시 가능"
-                  : profile.imageDataUrl
-                    ? "이 기기에만 임시 표시 중 · 사진을 다시 선택하면 다른 기기에도 보여요"
-                    : "프로필 사진을 추가해 보세요"}
-              </p>
-            )}
+            <AccountSection />
           </div>
 
-          <div className="flex shrink-0 flex-col items-center gap-1">
+          <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
@@ -655,17 +635,20 @@ export default function DashboardMePage() {
               <button
                 type="button"
                 onClick={handleResetImage}
-                className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[#8D99AE] transition-colors duration-150 hover:text-[#0F172A] active:scale-95"
-                aria-label="프로필 사진 기본으로 되돌리기"
-                title="프로필 사진 기본으로 되돌리기"
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-[#D3D1C7] bg-white text-[12px] font-bold leading-none text-[#64748B] active:scale-95"
+                aria-label="사진 초기화"
+                title="사진 초기화"
               >
-                사진 초기화
+                ×
               </button>
             ) : null}
-          </div>
 
-          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+            <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+          </div>
         </div>
+        {photoNotice?.tone === "error" ? (
+          <p className="mt-2 text-[12px] font-medium text-[#D94848]">{photoNotice.text}</p>
+        ) : null}
       </section>
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
@@ -698,8 +681,6 @@ export default function DashboardMePage() {
           <p className="mt-1 text-[22px] font-bold">{linkPoint}</p>
         </div>
       </section>
-
-      <AccountSection />
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">추가 정보</h2>
