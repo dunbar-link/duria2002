@@ -484,6 +484,19 @@ export default function DashboardPeoplePage() {
   const [isChannelSubmitting, setIsChannelSubmitting] = useState(false);
   const [remoteInvites, setRemoteInvites] = useState<RemoteInviteRow[]>([]);
 
+  // 초대 수락 직후 People 로 이동해 오면(?accepted=1) 완료 화면 대신 여기서
+  // 짧은 성공 toast 를 띄운다(대장 피드백). URL 쿼리는 즉시 정리해 새로고침/
+  // 뒤로가기 시 toast 가 다시 뜨지 않게 한다.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("accepted") === "1") {
+      setActionMessageTone("success");
+      setActionMessage("초대 수락이 완료됐어요.");
+      window.history.replaceState(null, "", "/dashboard/people");
+    }
+  }, []);
+
   useEffect(() => {
     setIsHydrated(true);
 

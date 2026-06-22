@@ -394,6 +394,23 @@ ${latestInviteUrl}`;
               {isSubmitting ? "생성 중..." : "설치형 초대 링크 생성"}
             </button>
           </form>
+
+          {latestInviteUrl ? (
+            <div className="mt-5 rounded-2xl bg-slate-100 p-4 ring-1 ring-slate-200">
+              <p className="text-xs font-semibold text-slate-500">초대 링크</p>
+              <p className="mt-1 break-all text-[13px] text-slate-700">
+                {latestInviteUrl}
+              </p>
+              {/* navigator.share 지원 여부와 무관하게 항상 보이는 명시적 링크 복사 버튼 */}
+              <button
+                type="button"
+                onClick={() => copyText(latestInviteUrl, "초대 링크를 복사했어요")}
+                className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-white text-sm font-semibold text-slate-700 ring-1 ring-slate-200 active:scale-[0.98]"
+              >
+                링크 복사
+              </button>
+            </div>
+          ) : null}
         </section>
       </div>
     </main>

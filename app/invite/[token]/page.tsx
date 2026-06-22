@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
@@ -64,6 +64,8 @@ export default function InviteEntryPage() {
   const params = useParams<{ token: string }>();
   const token = typeof params?.token === "string" ? params.token : "";
 
+  const router = useRouter();
+
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
   const getInviteDraftByToken = usePeopleStore((state) => state.getInviteDraftByToken);
   const acceptInvite = usePeopleStore((state) => state.acceptInvite);
@@ -78,6 +80,7 @@ export default function InviteEntryPage() {
   const [feedbackTone, setFeedbackTone] = useState<"success" | "error" | "neutral">("neutral");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedInviteToken, setSavedInviteToken] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -234,8 +237,13 @@ export default function InviteEntryPage() {
         accepted_at: now,
       } : prev);
 
-      setFeedbackTone("success");
-      setFeedback("연결됐어요.");
+      // 수락 성공 직후 바로 People 로 이동한다(대장 피드백: 완료 화면에
+      // 머물지 않음). 완료 화면(아래 status==="accepted" 분기)은 navigating
+      // 동안 가려지고, redirect 가 끝내 진행되지 않을 때만 fallback 으로 뜬다.
+      setIsNavigating(true);
+      router.replace("/dashboard/people?accepted=1");
+      // redirect 가 어떤 이유로든 동작하지 않으면 완료 화면을 fallback 으로 복구.
+      window.setTimeout(() => setIsNavigating(false), 2500);
     } finally {
       setIsSubmitting(false);
     }
@@ -269,6 +277,11 @@ export default function InviteEntryPage() {
   }
 
   if (invite.status === "accepted") {
+    // 정상 수락 직후에는 People 로 이동 중이라 완료 화면을 띄우지 않는다.
+    // redirect 가 실패할 때만 아래 완료 화면(수동 이동 버튼)이 fallback 으로 뜬다.
+    if (isNavigating) {
+      return <LoadingScreen />;
+    }
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-md px-4 pt-10">
