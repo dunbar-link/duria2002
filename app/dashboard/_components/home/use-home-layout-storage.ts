@@ -15,6 +15,7 @@ import {
   upsertDynamicConnectableCandidate,
 } from "./home-page-types";
 import { normalizeHiddenSlots, normalizeStoredState } from "./home-page-utils";
+import { HOME_LAYOUT_SAVED_EVENT } from "@/lib/sync/snapshot-client";
 
 type PersistedConnectableStateRecord = {
   entityId?: string;
@@ -383,6 +384,12 @@ function writeStoragePayload(payload: StoredHomePayload): string {
   const serialized = JSON.stringify(payload);
 
   window.localStorage.setItem(STORAGE_KEY, serialized);
+  // P2-4: 같은 탭 Home 배치 변경을 write sync 훅이 감지하도록 알린다.
+  try {
+    window.dispatchEvent(new Event(HOME_LAYOUT_SAVED_EVENT));
+  } catch {
+    // ignore dispatch errors
+  }
 
   return serialized;
 }

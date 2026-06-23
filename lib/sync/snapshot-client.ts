@@ -306,3 +306,31 @@ export function restoreToLocal(
 
   return { ok: true, applied };
 }
+
+// === P2-4 write sync 보조 ===
+
+// Home 배치(useHomeLayoutStorage)가 localStorage 에 저장될 때 dispatch 되는
+// 커스텀 이벤트. 같은 탭 변경은 storage 이벤트가 안 오므로 이걸로 감지한다.
+export const HOME_LAYOUT_SAVED_EVENT = "dunbar-link-home-layout-saved";
+
+// "이 기기 데이터 유지"(복원 거부) 선택 시 자동 write sync 를 멈추는 flag.
+// 서버가 다른 기기 snapshot 인 상태에서 이 기기 변경이 자동으로 서버를 덮지
+// 않도록 한다. "서버에 백업"/"서버 데이터로 복원" 성공 시 해제된다.
+const SYNC_PAUSED_KEY = "dunbar-link-sync-paused-v1";
+
+export function readSyncPaused(): boolean {
+  try {
+    return localStorage.getItem(SYNC_PAUSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeSyncPaused(paused: boolean): void {
+  try {
+    // 삭제 대신 "0"/"1" 로 기록(localStorage 삭제 금지 원칙).
+    localStorage.setItem(SYNC_PAUSED_KEY, paused ? "1" : "0");
+  } catch {
+    // ignore quota/availability errors
+  }
+}

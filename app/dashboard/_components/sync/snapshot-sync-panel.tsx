@@ -13,6 +13,7 @@ import {
   summarizeLocal,
   summarizeServer,
   writeBaseUpdatedAt,
+  writeSyncPaused,
   type LocalSnapshot,
   type ServerSnapshotState,
   type SnapshotSummary,
@@ -36,6 +37,7 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
   const [phase, setPhase] = useState<Phase>("checking");
   const [local, setLocal] = useState<LocalSnapshot | null>(null);
   const [serverState, setServerState] = useState<ServerSnapshotState | null>(null);
+  const [serverUpdatedAt, setServerUpdatedAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -81,9 +83,12 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
         return;
       }
 
-      // 서버에 저장 데이터 있음. baseUpdatedAt 보관 후 복원 확인 UI(자동 복원 안 함).
+      // 서버에 저장 데이터 있음. updatedAt 은 표시/복원용으로만 보관하고,
+      // baseUpdatedAt(자동 sync 소유권)은 여기서 저장하지 않는다 — "백업"/"복원"
+      // 성공 시에만 base 를 잡아야 "이 기기 데이터 유지" 케이스가 자동 write
+      // sync 로 다른 기기 데이터를 덮어쓰지 않는다.
       setServerState(payload.state);
-      if (payload.updatedAt) writeBaseUpdatedAt(payload.updatedAt);
+      setServerUpdatedAt(payload.updatedAt ?? null);
       setPhase("restore");
     })();
 
@@ -112,7 +117,9 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
       const p = (await res.json().catch(() => null)) as
         | { updatedAt?: string }
         | null;
+      // 백업 성공 = 이 기기가 서버 snapshot 소유자 → base 저장 + 자동 sync 활성.
       if (p?.updatedAt) writeBaseUpdatedAt(p.updatedAt);
+      writeSyncPaused(false);
       setPhase("hidden");
       return;
     }
@@ -129,6 +136,9 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
     setMessage(null);
     const result = restoreToLocal(serverState, local);
     if (result.ok) {
+      // 복원 성공 = 이 기기가 서버 snapshot 기준이 됨 → base 저장 + 자동 sync 활성.
+      if (serverUpdatedAt) writeBaseUpdatedAt(serverUpdatedAt);
+      writeSyncPaused(false);
       // 복원 반영 후 전체 재hydrate.
       window.location.reload();
       return;
@@ -193,7 +203,12 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
             <div className="mt-1 flex gap-2">
               <button
                 type="button"
-                onClick={() => setPhase("hidden")}
+                onClick={() => {
+                  // "이 기기 데이터 유지" = 서버(다른 기기) 기준을 따르지 않음.
+                  // 자동 write sync 를 멈춰 이 기기 변경이 서버를 덮지 않게 한다.
+                  writeSyncPaused(true);
+                  setPhase("hidden");
+                }}
                 disabled={busy}
                 className="flex-1 rounded-[16px] bg-[#ECEAE3] py-3 text-[14px] font-semibold text-[#5C5C58] active:scale-[0.98] disabled:opacity-50"
               >

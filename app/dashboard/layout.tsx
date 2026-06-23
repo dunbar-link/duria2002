@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { SnapshotSyncPanel } from "@/app/dashboard/_components/sync/snapshot-sync-panel";
+import { useSnapshotWriteSync } from "@/lib/sync/use-snapshot-write-sync";
 
 type Props = {
   children: ReactNode;
@@ -68,6 +69,8 @@ export default function DashboardLayout({ children }: Props) {
   // children(People 등)을 렌더한다. 그래야 invite mine 이 연결 전에 호출되어 빈 결과가
   // 되는 첫 진입 race 가 사라진다(새로고침 불필요). idempotent(200/201).
   const [identityReady, setIdentityReady] = useState(false);
+  // P2-4a: people/Home 변경을 감지해 조건 충족 시 자동으로 서버 snapshot 갱신.
+  const writeSyncStatus = useSnapshotWriteSync({ ready: identityReady });
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +156,14 @@ export default function DashboardLayout({ children }: Props) {
         </div>
       </div>
       <SnapshotSyncPanel ready={identityReady} />
+      {writeSyncStatus !== "idle" && (
+        <div className="pointer-events-none fixed left-1/2 top-[max(12px,env(safe-area-inset-top))] z-40 -translate-x-1/2 rounded-full bg-[#2C2C2A]/90 px-3 py-1 text-[12px] font-medium text-[#F1EFE8] shadow-[0_4px_12px_rgba(44,44,42,0.18)]">
+          {writeSyncStatus === "saving" && "백업 중…"}
+          {writeSyncStatus === "saved" && "서버에 백업됨"}
+          {writeSyncStatus === "error" && "저장 실패"}
+          {writeSyncStatus === "conflict" && "다른 기기 데이터가 더 최신"}
+        </div>
+      )}
     </div>
   );
 }
