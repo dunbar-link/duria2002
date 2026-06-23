@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
+import { SnapshotSyncPanel } from "@/app/dashboard/_components/sync/snapshot-sync-panel";
 
 type Props = {
   children: ReactNode;
@@ -151,6 +152,7 @@ export default function DashboardLayout({ children }: Props) {
           </nav>
         </div>
       </div>
+      <SnapshotSyncPanel ready={identityReady} />
     </div>
   );
 }
