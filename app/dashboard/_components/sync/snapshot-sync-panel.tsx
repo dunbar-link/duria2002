@@ -15,8 +15,11 @@
 //       는 valid + (base 불일치) 조건에서만. 409 후 pause 는 write sync 훅이 유지.
 
 import { useEffect, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   buildUploadPayload,
+  canAutoRestore,
+  currentLocalHash,
   isServerStateValid,
   localHasAnyData,
   readBaseUpdatedAt,
@@ -24,11 +27,28 @@ import {
   restoreToLocal,
   sameUpdatedAt,
   writeBaseUpdatedAt,
+  writeSyncMeta,
   writeSyncPaused,
   type ServerSnapshotState,
 } from "@/lib/sync/snapshot-client";
 
-export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
+// 현재 로그인 authUserId(sync meta 기록용). 실패 시 null.
+async function readAuthUserId(): Promise<string | null> {
+  try {
+    const { data } = await createClient().auth.getUser();
+    return data.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function SnapshotSyncPanel({
+  ready,
+  onConflict,
+}: {
+  ready: boolean;
+  onConflict?: () => void;
+}) {
   // StrictMode 재마운트에도 자동 로드/저장이 중복 reload/PUT 되지 않도록
   // 1회만 수행한다(첫 effect 가 cleanup 으로 버려지면 두 번째가 실행).
   const doneRef = useRef(false);
@@ -68,14 +88,32 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
           return;
         }
 
-        // base 없음(첫 로그인) 또는 다름(다른 기기가 더 최신) → 서버 우선 자동 로드.
-        // restoreToLocal 이 쓰기 전 backup key 를 만들고(실패 시 중단), 빈값/필드별
-        // 가드와 person.id 통짜 보존을 적용한다.
+        // base 없음(첫 로그인) 또는 다름(다른 기기). P2-4c: 무조건 덮지 않는다.
+        // 이 기기 로컬이 직전 서버 snapshot 그대로(또는 비어있음)일 때만 자동 restore.
+        // 그 외(이 기기 고유 변경 있음)는 로컬 유지 + 자동 sync 중단 + 충돌 안내로
+        // local-only 사람/배치가 다른 기기 snapshot 으로 사라지는 것을 막는다.
         doneRef.current = true;
+        if (!canAutoRestore(local)) {
+          writeSyncPaused(true);
+          onConflict?.();
+          return;
+        }
         const result = restoreToLocal(payload.state, local);
         if (cancelled) return;
         if (result.ok) {
+          // 복원 직후 실제 로컬 hash 를 기록(restoreToLocal 필드별 가드로 서버 state
+          // 와 완전히 같지 않을 수 있어 복원된 로컬을 다시 읽는다). 이후 이 기기에서
+          // 변경이 없으면 다음 로그인 때 canAutoRestore 가 허용한다.
+          const restored = readLocalSnapshot();
+          const authUserId = await readAuthUserId();
+          if (cancelled) return;
           if (serverUpdatedAt) writeBaseUpdatedAt(serverUpdatedAt);
+          writeSyncMeta({
+            authUserId,
+            baseUpdatedAt: serverUpdatedAt,
+            lastSyncedHash: currentLocalHash(restored),
+            lastSyncedAt: new Date().toISOString(),
+          });
           writeSyncPaused(false);
           window.location.reload();
         }
@@ -103,7 +141,16 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
       const p = (await putRes.json().catch(() => null)) as
         | { updatedAt?: string }
         | null;
+      const authUserId = await readAuthUserId();
+      if (cancelled) return;
       if (p?.updatedAt) writeBaseUpdatedAt(p.updatedAt);
+      // 최초 저장 = 이 기기 로컬이 곧 서버 snapshot → 현재 로컬 hash 를 기록한다.
+      writeSyncMeta({
+        authUserId,
+        baseUpdatedAt: p?.updatedAt ?? null,
+        lastSyncedHash: currentLocalHash(local),
+        lastSyncedAt: new Date().toISOString(),
+      });
       writeSyncPaused(false);
     })();
 

@@ -356,3 +356,105 @@ export function sameUpdatedAt(a: string | null, b: string | null): boolean {
   if (Number.isNaN(ta) || Number.isNaN(tb)) return false;
   return ta === tb;
 }
+
+// === P2-4c 다중기기 충돌/덮어쓰기 방지: sync meta + snapshot hash ===
+
+// 자동 restore 가 로컬을 덮기 전에 "이 로컬이 직전 서버 snapshot 그대로(이 기기에서
+// 변경 없음)인지" 판정하기 위한 메타. hash 가 현재 로컬과 다르면 이 기기 고유 변경이
+// 있다고 보고 자동 restore 를 막는다(local-only 사람/배치 손실 방지).
+export const SYNC_META_KEY = "dunbar-link-sync-meta-v1";
+
+export type SyncMeta = {
+  authUserId: string | null;
+  baseUpdatedAt: string | null;
+  lastSyncedHash: string | null;
+  lastSyncedAt: string | null;
+};
+
+// 키 정렬 기반 안정 stringify(JSON 키 순서에 영향받지 않는 hash 용).
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`)
+    .join(",")}}`;
+}
+
+// djb2 변형 32bit hash(동일성 판정용, 보안용 아님).
+function hashString(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (Math.imul(h, 33) + s.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+// 서버 저장 기준(buildUploadPayload)과 동일하게 정규화한 snapshot hash.
+// imageDataUrl 은 제거(서버에 저장되지 않으므로 hash 에서도 제외해 일치성 유지).
+export function computeSnapshotHash(input: {
+  people: unknown;
+  homeLayout: unknown;
+  meProfile: unknown;
+  schemaVersion: number;
+}): string {
+  const meProfile = isPlainObject(input.meProfile)
+    ? stripImageDataUrl(input.meProfile)
+    : {};
+  return hashString(
+    stableStringify({
+      people: input.people,
+      homeLayout: input.homeLayout,
+      meProfile,
+      schemaVersion: input.schemaVersion,
+    }),
+  );
+}
+
+// 현재 로컬 snapshot 의 hash(서버 payload 와 동일 정규화).
+export function currentLocalHash(local: LocalSnapshot): string {
+  return computeSnapshotHash({
+    people: local.people,
+    homeLayout: local.homeLayout,
+    meProfile: local.meProfile,
+    schemaVersion: SYNC_SCHEMA_VERSION,
+  });
+}
+
+export function readSyncMeta(): SyncMeta | null {
+  const parsed = safeParse(localStorage.getItem(SYNC_META_KEY));
+  return isPlainObject(parsed) ? (parsed as unknown as SyncMeta) : null;
+}
+
+// 부분 갱신(기존 값 merge). authUserId 는 panel 이, hash/base 는 write sync·panel 이
+// 기록한다. 삭제 없이 항상 4개 필드를 가진 객체로 덮어쓴다.
+export function writeSyncMeta(patch: Partial<SyncMeta>): void {
+  try {
+    const prev = readSyncMeta();
+    const next: SyncMeta = {
+      authUserId: patch.authUserId ?? prev?.authUserId ?? null,
+      baseUpdatedAt: patch.baseUpdatedAt ?? prev?.baseUpdatedAt ?? null,
+      lastSyncedHash: patch.lastSyncedHash ?? prev?.lastSyncedHash ?? null,
+      lastSyncedAt: patch.lastSyncedAt ?? prev?.lastSyncedAt ?? null,
+    };
+    localStorage.setItem(SYNC_META_KEY, JSON.stringify(next));
+  } catch {
+    // ignore quota/availability errors
+  }
+}
+
+// 자동 restore 허용 판정(데이터 손실 방지 핵심).
+//   - 로컬에 의미있는 데이터 없음        → 허용(잃을 것 없음)
+//   - 로컬 hash == 직전 sync hash        → 허용(이 기기는 직전 서버 snapshot 그대로)
+//   - 그 외(meta 없음 / hash 불일치)     → 금지(이 기기 고유 변경 있음 → 덮으면 손실)
+export function canAutoRestore(local: LocalSnapshot): boolean {
+  if (!localHasAnyData(local)) return true;
+  const meta = readSyncMeta();
+  if (!meta || !meta.lastSyncedHash) return false;
+  return meta.lastSyncedHash === currentLocalHash(local);
+}

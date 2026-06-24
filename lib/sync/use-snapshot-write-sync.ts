@@ -1,7 +1,7 @@
 "use client";
 
 // P2-4a write sync 훅.
-// people 변경(tier 포함)과 Home 배치 변경을 감지해서, 조건이 맞을 때만 2초
+// people 변경(tier 포함)/Home 배치/Me 프로필 변경을 감지해서, 조건이 맞을 때만 2초
 // debounce 후 PUT /api/me/sync-state 로 서버 snapshot 을 갱신한다.
 //
 // 자동 write sync 는 아래를 모두 만족할 때만 실행한다(설계 P2-4):
@@ -18,12 +18,15 @@ import { useEffect, useRef, useState } from "react";
 import { usePeopleStore } from "@/app/dashboard/people/store";
 import {
   buildUploadPayload,
+  currentLocalHash,
   readBaseUpdatedAt,
   readLocalSnapshot,
   readSyncPaused,
   writeBaseUpdatedAt,
+  writeSyncMeta,
   HOME_LAYOUT_SAVED_EVENT,
 } from "@/lib/sync/snapshot-client";
+import { PROFILE_UPDATED_EVENT } from "@/lib/me/profile-name";
 
 export type WriteSyncStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 
@@ -73,6 +76,13 @@ export function useSnapshotWriteSync({
           | { updatedAt?: string }
           | null;
         if (payload?.updatedAt) writeBaseUpdatedAt(payload.updatedAt);
+        // P2-4c: 방금 올린 payload = 서버 최신 = 이 기기 로컬. hash 를 meta 에 기록해
+        // 다음 로그인 자동 restore 판정(canAutoRestore)이 이 기기를 unchanged 로 본다.
+        writeSyncMeta({
+          baseUpdatedAt: payload?.updatedAt ?? null,
+          lastSyncedHash: currentLocalHash(local),
+          lastSyncedAt: new Date().toISOString(),
+        });
         setStatus("saved");
         // 잠깐 "서버에 백업됨" 표시 후 사라진다(P2-4a 최소 UI).
         window.setTimeout(() => {
@@ -111,11 +121,19 @@ export function useSnapshotWriteSync({
     const homeHandler = () => schedule();
     window.addEventListener(HOME_LAYOUT_SAVED_EVENT, homeHandler);
 
+    // P2-5: Me 프로필 변경(이름/사진 등 저장 시 dispatch)도 같은 sync 루프로.
+    // payload(buildUploadPayload)에 meProfile 이 이미 포함되고 imageDataUrl 은
+    // 제거되므로 trigger 만 추가하면 된다. 복원(restoreToLocal)도 이 이벤트를
+    // dispatch 하지만, 복원 직후 호출부가 reload 하므로 타이머는 무효화된다.
+    const profileHandler = () => schedule();
+    window.addEventListener(PROFILE_UPDATED_EVENT, profileHandler);
+
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
       window.removeEventListener(HOME_LAYOUT_SAVED_EVENT, homeHandler);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, profileHandler);
       unsubPeople();
     };
   }, [ready]);
