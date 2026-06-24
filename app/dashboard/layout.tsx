@@ -156,12 +156,10 @@ export default function DashboardLayout({ children }: Props) {
         </div>
       </div>
       <SnapshotSyncPanel ready={identityReady} />
-      {writeSyncStatus !== "idle" && (
-        <div className="pointer-events-none fixed left-1/2 top-[max(12px,env(safe-area-inset-top))] z-40 -translate-x-1/2 rounded-full bg-[#2C2C2A]/90 px-3 py-1 text-[12px] font-medium text-[#F1EFE8] shadow-[0_4px_12px_rgba(44,44,42,0.18)]">
-          {writeSyncStatus === "saving" && "백업 중…"}
-          {writeSyncStatus === "saved" && "서버에 백업됨"}
-          {writeSyncStatus === "error" && "저장 실패"}
-          {writeSyncStatus === "conflict" && "다른 기기 데이터가 더 최신"}
+      {(writeSyncStatus === "error" || writeSyncStatus === "conflict") && (
+        <div className="pointer-events-none fixed left-1/2 top-[max(12px,env(safe-area-inset-top))] z-40 -translate-x-1/2 rounded-full bg-[#B4524E]/92 px-3 py-1 text-[11px] font-medium text-[#FBEAE8] shadow-[0_4px_12px_rgba(44,44,42,0.18)]">
+          {writeSyncStatus === "error" && "저장하지 못했어요"}
+          {writeSyncStatus === "conflict" && "다른 기기 데이터가 더 최신이에요"}
         </div>
       )}
     </div>

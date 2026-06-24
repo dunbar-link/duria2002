@@ -35,9 +35,23 @@ function syncPersonTierForLayer(
   targetLayerId: string,
   folders: FolderMap,
 ) {
-  const personIds = getEntityPersonIdsForTierSync(entityId, folders);
+  let personIds = getEntityPersonIdsForTierSync(entityId, folders);
   if (personIds.length === 0) {
-    return;
+    // 초대 수락(remote sync)으로 연결된 사람의 store id 는
+    // provisionalPersonId(invite-pending-<token>) 라서 isPersonEntityId 가
+    // person 으로 인정하지 않는다 → getEntityPersonIdsForTierSync 가 빈 배열을
+    // 반환해 tier sync 가 누락됐다. 그 결과 Home cross-layer 이동이 people.tier
+    // 를 못 바꾸고, reconcile 이 기존 tier 로 되돌리는 revert 버그가 생겼다
+    // (예: 강병구 핵심→신뢰 이동이 안 먹고 핵심으로 복귀).
+    // store.people 에 실재하는 id 면 그 사람의 tier 를 갱신한다
+    // (folder/connectable/family-me 는 store.people 에 없으므로 자동 제외).
+    const exists = usePeopleStore
+      .getState()
+      .people.some((person) => person.id === entityId);
+    if (!exists) {
+      return;
+    }
+    personIds = [entityId];
   }
   const nextTier = getTierByLayerId(targetLayerId);
   const updatePersonTier = usePeopleStore.getState().updatePersonTier;

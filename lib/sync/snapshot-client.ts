@@ -334,3 +334,25 @@ export function writeSyncPaused(paused: boolean): void {
     // ignore quota/availability errors
   }
 }
+
+// 서버 snapshot 이 자동 로드 대상으로 valid 한지 판정.
+// - people 도 비어있고 Home 배치도 비어있으면 invalid(빈 서버로 로컬 덮어쓰기 금지)
+// - data:image/;base64/imageDataUrl 포함 시 invalid(오염 snapshot 자동 적용 금지)
+export function isServerStateValid(state: ServerSnapshotState): boolean {
+  const people = Array.isArray(state.people) ? state.people : [];
+  const hasPeople = people.length > 0;
+  const hasHome = homeLayoutHasContent(state.homeLayout);
+  if (!hasPeople && !hasHome) return false;
+  if (containsBase64(state)) return false;
+  return true;
+}
+
+// 두 timestamptz 가 같은 시점인지(ms 비교). 로컬 base == 서버 updatedAt 판정용
+// (= 이 기기가 이미 서버 snapshot 의 소유자/최신 상태인지).
+export function sameUpdatedAt(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return false;
+  return ta === tb;
+}
