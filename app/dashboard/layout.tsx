@@ -69,8 +69,6 @@ export default function DashboardLayout({ children }: Props) {
   // children(People 등)을 렌더한다. 그래야 invite mine 이 연결 전에 호출되어 빈 결과가
   // 되는 첫 진입 race 가 사라진다(새로고침 불필요). idempotent(200/201).
   const [identityReady, setIdentityReady] = useState(false);
-  // P2-4c: 자동 로드가 충돌로 차단됐을 때(이 기기 데이터 유지) 작은 안내 표시용.
-  const [loadConflict, setLoadConflict] = useState(false);
   // P2-4a: people/Home 변경을 감지해 조건 충족 시 자동으로 서버 snapshot 갱신.
   const writeSyncStatus = useSnapshotWriteSync({ ready: identityReady });
 
@@ -157,19 +155,11 @@ export default function DashboardLayout({ children }: Props) {
           </nav>
         </div>
       </div>
-      <SnapshotSyncPanel
-        ready={identityReady}
-        onConflict={() => setLoadConflict(true)}
-      />
-      {(writeSyncStatus === "error" ||
-        writeSyncStatus === "conflict" ||
-        loadConflict) && (
+      <SnapshotSyncPanel ready={identityReady} />
+      {/* 저장 실패만 작게 안내. 다중기기 충돌은 SnapshotSyncPanel 의 선택 카드(P2-4d)로 일원화. */}
+      {writeSyncStatus === "error" && (
         <div className="pointer-events-none fixed left-1/2 top-[max(12px,env(safe-area-inset-top))] z-40 -translate-x-1/2 rounded-full bg-[#B4524E]/92 px-3 py-1 text-[11px] font-medium text-[#FBEAE8] shadow-[0_4px_12px_rgba(44,44,42,0.18)]">
-          {writeSyncStatus === "error"
-            ? "저장하지 못했어요"
-            : writeSyncStatus === "conflict"
-              ? "다른 기기 데이터가 더 최신이에요"
-              : "다른 기기 데이터와 충돌 — 이 기기 데이터는 유지했어요"}
+          저장하지 못했어요
         </div>
       )}
     </div>
