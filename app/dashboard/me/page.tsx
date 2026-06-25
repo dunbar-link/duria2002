@@ -279,14 +279,16 @@ function CompactField({
 
 export default function DashboardMePage() {
   const people = usePeopleStore((state) => state.people);
-  const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
   // P2-4e-1: "초대 성공"/Point 는 기기별 localStorage(inviteDrafts) 가 아니라
   // 서버 /api/me/stats(계정 전체 dl_invites accepted) 기준으로 통일한다.
-  // 로딩/실패 동안에는 깜빡임 방지를 위해 로컬값을 fallback 으로 쓴다.
-  const [serverAcceptedCount, setServerAcceptedCount] = useState<number | null>(
-    null,
-  );
+  // P2-4e-1b: 서버값 도착 전에는 로컬 fallback 을 쓰지 않고 "—"(로딩)/실패 안내로
+  // 둔다. local inviteDrafts 가 기기별로 달라 초대성공 9→8 깜빡임을 유발했음.
+  const [stats, setStats] = useState<
+    | { status: "loading" }
+    | { status: "ready"; acceptedCount: number }
+    | { status: "error" }
+  >({ status: "loading" });
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   // Step G5: monotonic upload token. Increments on every new upload start
@@ -367,37 +369,36 @@ export default function DashboardMePage() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      let next:
+        | { status: "ready"; acceptedCount: number }
+        | { status: "error" };
       try {
         const res = await fetch("/api/me/stats", { cache: "no-store" });
-        if (!res.ok) return; // 401/500 → 로컬 fallback 유지
-        const data = (await res.json().catch(() => null)) as
-          | { ok?: boolean; acceptedInvitesCount?: number }
-          | null;
-        if (
-          !cancelled &&
-          data?.ok &&
-          typeof data.acceptedInvitesCount === "number"
-        ) {
-          setServerAcceptedCount(data.acceptedInvitesCount);
+        const data = res.ok
+          ? ((await res.json().catch(() => null)) as
+              | { ok?: boolean; acceptedInvitesCount?: number }
+              | null)
+          : null;
+        if (data?.ok && typeof data.acceptedInvitesCount === "number") {
+          next = { status: "ready", acceptedCount: data.acceptedInvitesCount };
+        } else {
+          // 401/500/형식오류 → 로컬값으로 대체하지 않고 "확인 실패"로 둔다.
+          next = { status: "error" };
         }
       } catch {
-        // 네트워크 실패 → 로컬 fallback 유지
+        next = { status: "error" };
       }
+      if (!cancelled) setStats(next);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // 로컬 inviteDrafts 기반 fallback(서버 stats 로딩/실패 시에만 사용).
-  const localAcceptedCount = useMemo(() => {
-    return inviteDrafts.filter((draft) => draft.status === "accepted").length;
-  }, [inviteDrafts]);
-
-  // 표시값: 서버 stats 가 오면 서버 기준(기기 무관), 아니면 로컬 fallback.
-  const acceptedInviteCount = serverAcceptedCount ?? localAcceptedCount;
-
+  // Point 는 서버 acceptedCount 가 도착(ready)했을 때만 계산한다(서버 SoT).
+  // 로딩/실패면 null → UI 는 "—". local 기반 point 를 잠깐도 보여주지 않는다.
   const linkPoint = useMemo(() => {
+    if (stats.status !== "ready") return null;
     const filled = [
       profile.name,
       profile.phone,
@@ -413,8 +414,8 @@ export default function DashboardMePage() {
       profile.imageDataUrl,
     ].some((value) => value.trim());
 
-    return acceptedInviteCount * 10 + people.length * 3 + (filled ? 5 : 0);
-  }, [acceptedInviteCount, people.length, profile]);
+    return stats.acceptedCount * 10 + people.length * 3 + (filled ? 5 : 0);
+  }, [stats, people.length, profile]);
 
   function updateProfile<K extends keyof MeProfile>(key: K, value: MeProfile[K]) {
     setProfile((prev) => ({ ...prev, [key]: value }));
@@ -709,13 +710,20 @@ export default function DashboardMePage() {
         </div>
         <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">초대 성공</p>
-          <p className="mt-1 text-[22px] font-bold">{acceptedInviteCount}</p>
+          <p className="mt-1 text-[22px] font-bold">
+            {stats.status === "ready" ? stats.acceptedCount : "—"}
+          </p>
         </div>
         <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">Point</p>
-          <p className="mt-1 text-[22px] font-bold">{linkPoint}</p>
+          <p className="mt-1 text-[22px] font-bold">{linkPoint ?? "—"}</p>
         </div>
       </section>
+      {stats.status === "error" && (
+        <p className="mt-1 px-1 text-[11px] text-[#8D99AE]">
+          통계를 불러오지 못했어요. 잠시 후 다시 확인해 주세요.
+        </p>
+      )}
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#D3D1C7]">
         <h2 className="text-[18px] font-bold">추가 정보</h2>
