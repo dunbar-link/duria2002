@@ -281,6 +281,12 @@ export default function DashboardMePage() {
   const people = usePeopleStore((state) => state.people);
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
+  // P2-4e-1: "초대 성공"/Point 는 기기별 localStorage(inviteDrafts) 가 아니라
+  // 서버 /api/me/stats(계정 전체 dl_invites accepted) 기준으로 통일한다.
+  // 로딩/실패 동안에는 깜빡임 방지를 위해 로컬값을 fallback 으로 쓴다.
+  const [serverAcceptedCount, setServerAcceptedCount] = useState<number | null>(
+    null,
+  );
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   // Step G5: monotonic upload token. Increments on every new upload start
@@ -358,9 +364,38 @@ export default function DashboardMePage() {
     return () => window.clearTimeout(t);
   }, [photoNotice]);
 
-  const acceptedInviteCount = useMemo(() => {
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/me/stats", { cache: "no-store" });
+        if (!res.ok) return; // 401/500 → 로컬 fallback 유지
+        const data = (await res.json().catch(() => null)) as
+          | { ok?: boolean; acceptedInvitesCount?: number }
+          | null;
+        if (
+          !cancelled &&
+          data?.ok &&
+          typeof data.acceptedInvitesCount === "number"
+        ) {
+          setServerAcceptedCount(data.acceptedInvitesCount);
+        }
+      } catch {
+        // 네트워크 실패 → 로컬 fallback 유지
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 로컬 inviteDrafts 기반 fallback(서버 stats 로딩/실패 시에만 사용).
+  const localAcceptedCount = useMemo(() => {
     return inviteDrafts.filter((draft) => draft.status === "accepted").length;
   }, [inviteDrafts]);
+
+  // 표시값: 서버 stats 가 오면 서버 기준(기기 무관), 아니면 로컬 fallback.
+  const acceptedInviteCount = serverAcceptedCount ?? localAcceptedCount;
 
   const linkPoint = useMemo(() => {
     const filled = [
