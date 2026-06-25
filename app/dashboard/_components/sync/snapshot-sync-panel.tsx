@@ -46,9 +46,15 @@ type ConflictState = {
   serverUpdatedAt: string | null;
 };
 
+// P2-4e-2: focus/visibility pull throttle(과도한 GET 방지).
+const FOCUS_PULL_THROTTLE_MS = 25_000;
+
 export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
   // StrictMode 재마운트에도 자동 로드/저장이 중복 reload/PUT 되지 않도록 1회만.
   const doneRef = useRef(false);
+  // P2-4e-2: focus/탭 복귀 pull 의 inFlight(중복 GET 방지)와 throttle 타임스탬프.
+  const checkingRef = useRef(false);
+  const lastFocusPullRef = useRef(0);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [working, setWorking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -152,8 +158,80 @@ export function SnapshotSyncPanel({ ready }: { ready: boolean }) {
       writeSyncPaused(false);
     })();
 
+    // P2-4e-2: 포커스 복귀/탭 활성화 시 서버 최신 snapshot 을 확인한다(GET 만).
+    // clean 이면 자동 반영(restore+reload), dirty 면 P2-4e-3 서버복구 카드.
+    // throttle(25초) + inFlight 로 GET 폭주를 막는다. 서버 null 이면 아무것도
+    // 안 한다(최초 저장 PUT 은 mount/write-sync 만 담당).
+    const pullLatestFromServer = async () => {
+      if (cancelled || checkingRef.current) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState !== "visible"
+      )
+        return;
+      const now = Date.now();
+      if (now - lastFocusPullRef.current < FOCUS_PULL_THROTTLE_MS) return;
+      lastFocusPullRef.current = now;
+      checkingRef.current = true;
+      try {
+        const local = readLocalSnapshot();
+        let res: Response | null = null;
+        try {
+          res = await fetch("/api/me/sync-state", { cache: "no-store" });
+        } catch {
+          res = null;
+        }
+        if (cancelled || !res || !res.ok) return; // 401/500/network → 조용히 중단
+        const payload = (await res.json().catch(() => null)) as
+          | { ok?: boolean; state?: ServerSnapshotState | null; updatedAt?: string }
+          | null;
+        // 서버 null/형식오류 → GET 만이므로 PUT 안 함(로컬 유지).
+        if (cancelled || !payload?.ok || !payload.state) return;
+        if (!isServerStateValid(payload.state)) return;
+
+        const base = readBaseUpdatedAt();
+        const serverUpdatedAt = payload.updatedAt ?? null;
+        // 이미 이 기기 = 서버 최신 → 아무것도 안 한다(카드/restore 불필요).
+        if (base && sameUpdatedAt(base, serverUpdatedAt)) return;
+
+        if (!canAutoRestore(local)) {
+          // dirty(이 기기 고유 변경) → 자동 덮어쓰기 금지, 서버복구 카드.
+          writeSyncPaused(true);
+          if (!cancelled) {
+            setConflict({ serverState: payload.state, serverUpdatedAt });
+          }
+          return;
+        }
+        // clean → 서버 최신 자동 반영(restore 전 backup key, 성공 후 meta+reload).
+        const result = restoreToLocal(payload.state, local);
+        if (cancelled || !result.ok) return;
+        const restored = readLocalSnapshot();
+        const authUserId = await readAuthUserId();
+        if (cancelled) return;
+        if (serverUpdatedAt) writeBaseUpdatedAt(serverUpdatedAt);
+        writeSyncMeta({
+          authUserId,
+          baseUpdatedAt: serverUpdatedAt,
+          lastSyncedHash: currentLocalHash(restored),
+          lastSyncedAt: new Date().toISOString(),
+        });
+        writeSyncPaused(false);
+        window.location.reload();
+      } finally {
+        checkingRef.current = false;
+      }
+    };
+
+    const handleVisibility = () => {
+      void pullLatestFromServer();
+    };
+    window.addEventListener("focus", handleVisibility);
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", handleVisibility);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [ready]);
 
