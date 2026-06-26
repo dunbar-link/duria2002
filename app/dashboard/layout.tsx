@@ -137,8 +137,20 @@ export default function DashboardLayout({ children }: Props) {
                   <Link
                     key={tab.href}
                     href={tab.href}
+                    // P2-4h-b: Android long-press 시 브라우저 기본 링크 컨텍스트
+                    // 메뉴/미리보기/콜아웃을 차단한다. +N·폴더 사람을 long-press
+                    // drag 로 빼는 도중 시트가 닫히며 손가락이 이 하단 nav 링크
+                    // 위에 오면 native 링크 메뉴가 떠 테스트가 막혔다.
+                    draggable={false}
+                    onDragStart={(event) => event.preventDefault()}
+                    onContextMenu={(event) => event.preventDefault()}
+                    style={{
+                      WebkitTouchCallout: "none",
+                      WebkitUserSelect: "none",
+                      userSelect: "none",
+                    }}
                     className={[
-                      "flex h-[60px] flex-col items-center justify-center rounded-[22px] text-center transition active:scale-[0.98]",
+                      "flex h-[60px] flex-col items-center justify-center rounded-[22px] text-center transition active:scale-[0.98] select-none",
                       active
                         ? "bg-[#444441] text-[#F1EFE8]"
                         : "bg-transparent text-[#A8A59D] hover:text-[#F1EFE8]",
