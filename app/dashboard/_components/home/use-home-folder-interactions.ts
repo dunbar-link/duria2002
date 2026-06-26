@@ -35,9 +35,21 @@ function syncPersonTierForLayer(
   targetLayerId: string,
   folders: FolderMap,
 ) {
-  const personIds = getEntityPersonIdsForTierSync(entityId, folders);
+  let personIds = getEntityPersonIdsForTierSync(entityId, folders);
   if (personIds.length === 0) {
-    return;
+    // 초대수락(remote sync)으로 연결된 사람의 store id 는 invite-pending-<token>
+    // 라서 isPersonEntityId 가 person 으로 인정하지 않는다 →
+    // getEntityPersonIdsForTierSync 가 빈 배열을 반환해 폴더에서 꺼낼 때 tier
+    // sync 가 누락된다(use-home-drag-drop 의 동일 fallback 과 같은 의미).
+    // store.people 에 실재하는 id 면 그 사람 tier 를 갱신한다(folder/connectable/
+    // family-me 는 store.people 에 없어 자동 제외).
+    const exists = usePeopleStore
+      .getState()
+      .people.some((person) => person.id === entityId);
+    if (!exists) {
+      return;
+    }
+    personIds = [entityId];
   }
   const nextTier = getTierByLayerId(targetLayerId);
   const updatePersonTier = usePeopleStore.getState().updatePersonTier;

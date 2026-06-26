@@ -136,6 +136,7 @@ function BottomSheetGrid({
   suppressDragSource = false,
   onPromote,
   canPromote = false,
+  onRequestMove,
 }: {
   layer: LayerBlueprint;
   ids: Array<string | null>;
@@ -176,6 +177,10 @@ function BottomSheetGrid({
   // this hook is wired up (Step F2).
   onPromote?: (entityId: string) => void;
   canPromote?: boolean;
+  // When provided and area === "hidden", each non-me tile gets a small "이동"
+  // button that opens the layer move menu (다른 단계로 꺼내기). Button-based so
+  // it works on PC and mobile without drag hit-test.
+  onRequestMove?: (entityId: string) => void;
 }) {
   const isDragActive = dragState !== null;
 
@@ -232,6 +237,10 @@ function BottomSheetGrid({
           area === "hidden" &&
           !isFolder &&
           entityId !== "family-me";
+        const showMoveButton =
+          Boolean(onRequestMove) &&
+          area === "hidden" &&
+          entityId !== "family-me";
 
         const tile = (
           <PersonTile
@@ -262,40 +271,57 @@ function BottomSheetGrid({
           />
         );
 
-        if (!showPromoteButton) {
+        if (!showPromoteButton && !showMoveButton) {
           return tile;
         }
 
         return (
           <div
             key={`${layer.id}-${area}-${entityId}`}
-            className="relative shrink-0 overflow-visible"
+            className="flex shrink-0 flex-col items-center overflow-visible"
             style={{ width: SHEET_TILE_WIDTH }}
           >
-            {tile}
-            <button
-              type="button"
-              aria-label="홈으로 올리기"
-              aria-disabled={!canPromote}
-              disabled={!canPromote}
-              onClick={(event) => {
-                event.stopPropagation();
-                if (!canPromote) return;
-                onPromote?.(entityId);
-              }}
-              // Sit just inside the face's bottom-right corner so the button
-              // is never clipped by the outer overflow-y-auto scroll
-              // container (which transparently promotes overflow-x to clip).
-              className={cn(
-                "pointer-events-auto absolute z-20 flex h-[22px] w-[22px] items-center justify-center rounded-full border text-[12px] font-semibold leading-none shadow-[0_4px_10px_rgba(15,23,42,0.18)] transition-colors duration-150",
-                canPromote
-                  ? "border-slate-300 bg-white text-slate-600 active:scale-95 hover:bg-slate-50"
-                  : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-40",
-              )}
-              style={{ right: 6, bottom: 24 }}
-            >
-              ↑
-            </button>
+            <div className="relative w-full overflow-visible">
+              {tile}
+              {showPromoteButton ? (
+                <button
+                  type="button"
+                  aria-label="홈으로 올리기"
+                  aria-disabled={!canPromote}
+                  disabled={!canPromote}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!canPromote) return;
+                    onPromote?.(entityId);
+                  }}
+                  // Sit just inside the face's bottom-right corner so the button
+                  // is never clipped by the outer overflow-y-auto scroll
+                  // container (which transparently promotes overflow-x to clip).
+                  className={cn(
+                    "pointer-events-auto absolute z-20 flex h-[22px] w-[22px] items-center justify-center rounded-full border text-[12px] font-semibold leading-none shadow-[0_4px_10px_rgba(15,23,42,0.18)] transition-colors duration-150",
+                    canPromote
+                      ? "border-slate-300 bg-white text-slate-600 active:scale-95 hover:bg-slate-50"
+                      : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-40",
+                  )}
+                  style={{ right: 6, bottom: 24 }}
+                >
+                  ↑
+                </button>
+              ) : null}
+            </div>
+
+            {showMoveButton ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRequestMove?.(entityId);
+                }}
+                className="mt-[2px] rounded-full border border-slate-200 bg-white px-[8px] py-[2px] text-[9px] font-semibold leading-none text-slate-500 active:scale-95"
+              >
+                이동
+              </button>
+            ) : null}
           </div>
         );
       })}
@@ -351,6 +377,8 @@ type LayerBottomSheetProps = {
   // section. When provided, the hidden grid loses its long-press drag and
   // each non-folder, non-me tile gets a small "↑" button.
   onPromoteHiddenToVisible?: (entityId: string) => void;
+  // +N(hidden) 안의 사람을 다른 단계(layer)로 꺼내는 이동 메뉴를 연다.
+  onRequestMove?: (entityId: string) => void;
   // 홈 visible 4칸이 모두 찬 layer 에서만 헤더에 "사람 추가" 버튼을 노출하고,
   // 누르면 현재 layer 의 hidden 에 새 사람을 추가하도록 상위에 알린다.
   onAddPerson?: (layerId: string) => void;
@@ -378,6 +406,7 @@ export default function LayerBottomSheet({
   onLongPressDragStart,
   suppressDragSource = false,
   onPromoteHiddenToVisible,
+  onRequestMove,
   onAddPerson,
 }: LayerBottomSheetProps) {
   // 홈으로 올리기 활성 조건: visible 에 빈자리가 있거나(빈자리 승격),
@@ -530,6 +559,7 @@ export default function LayerBottomSheet({
                 suppressDragSource
                 onPromote={onPromoteHiddenToVisible}
                 canPromote={canPromoteHidden}
+                onRequestMove={onRequestMove}
               />
             </SheetSectionShell>
           </section>

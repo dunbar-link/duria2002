@@ -91,6 +91,7 @@ import {
   getEntityPersonIdsForTierSync,
   getFirstEmptyIndex,
   getHomeLayerDerivedStateMap,
+  getLayerById,
   getLayerCapMessage,
   getLayerCapViolation,
   getSuppressedConnectableEntityIds,
@@ -1957,6 +1958,132 @@ useEffect(() => {
     [openLayerId, setLayoutState, folders],
   );
 
+  // P2-4g: +N(더보기/hidden) 안의 사람을 다른 단계(layer)로 꺼내는 버튼 기반
+  // 이동 메뉴. 폴더 이동 메뉴(HomeMoveMenu)와 같은 컴포넌트를 재사용하되,
+  // +N 은 folder 추출이 필요 없으므로 layout 직접 이동(moveEntityToTarget)으로
+  // 처리한다. 드래그 hit-test 의존 없이 PC·모바일 공통으로 동작한다.
+  const [layerMoveMenuState, setLayerMoveMenuState] = useState<{
+    entityId: string;
+    sourceLayerId: string;
+  } | null>(null);
+
+  const layerMoveEntityLabel = layerMoveMenuState
+    ? getEntityLabel(layerMoveMenuState.entityId, folders)
+    : "";
+
+  const layerMoveCurrentLabel = layerMoveMenuState
+    ? getLayerById(layerMoveMenuState.sourceLayerId)?.label ?? "현재"
+    : "현재";
+
+  const layerMoveTargets = useMemo(
+    () =>
+      layerBlueprints.map((layer) => ({
+        layerKey: layer.id,
+        layerLabel: layer.label,
+        canSendHome: getFirstEmptyIndex(layoutState[layer.id].visibleSlotIds) >= 0,
+        canSendMore: true,
+      })),
+    [layoutState],
+  );
+
+  const handleRequestLayerMoveMenu = useCallback(
+    (entityId: string) => {
+      if (!openLayerId) {
+        return;
+      }
+      setLayerMoveMenuState({ entityId, sourceLayerId: openLayerId });
+    },
+    [openLayerId],
+  );
+
+  const closeLayerMoveMenu = useCallback(() => {
+    setLayerMoveMenuState(null);
+  }, []);
+
+  const moveLayerEntityToLayer = useCallback(
+    (targetLayerId: string, targetArea: "visible" | "hidden") => {
+      const menu = layerMoveMenuState;
+      if (!menu) {
+        return;
+      }
+
+      const { entityId } = menu;
+      const location = findEntityLocation(layoutState, entityId);
+      if (!location) {
+        setLayerMoveMenuState(null);
+        return;
+      }
+
+      // 홈(visible) 으로 보낼 땐 rail 규칙으로 첫 빈 visible(없으면 hidden)로,
+      // 더보기(hidden) 로 보낼 땐 첫 빈 hidden 으로 보낸다(데스크탑 rail-drop 과 동일).
+      let dropArea: "visible" | "hidden" = targetArea;
+      let dropIndex: number | undefined;
+      if (targetArea === "visible") {
+        const railTarget = resolveRailTarget(layoutState, targetLayerId);
+        dropArea = railTarget.targetArea;
+        dropIndex = railTarget.targetIndex;
+      }
+
+      // 원래 자리로 보내는 경우는 no-op.
+      if (
+        location.layerId === targetLayerId &&
+        location.area === dropArea &&
+        (typeof dropIndex !== "number" || location.index === dropIndex)
+      ) {
+        setLayerMoveMenuState(null);
+        return;
+      }
+
+      // Dunbar cap: 빈 슬롯/ hidden 으로만 들어가므로 displaced 없음.
+      const capBlockedLayerId = getLayerCapViolation({
+        layout: layoutState,
+        folders,
+        entityId,
+        targetLayerId,
+        sourceLayerId: location.layerId,
+      });
+      if (capBlockedLayerId) {
+        notifyCapBlocked(capBlockedLayerId);
+        setLayerMoveMenuState(null);
+        return;
+      }
+
+      setLayoutState((current) =>
+        moveEntityToTarget(
+          current,
+          {
+            sourceLayerId: location.layerId,
+            sourceIndex: location.index,
+            entityId,
+            sourceArea: location.area,
+          },
+          targetLayerId,
+          dropArea,
+          dropIndex,
+        ),
+      );
+
+      // people.tier 동기화. person/folder 멤버 + invite-pending fallback 모두 포함.
+      const updatePersonTier = usePeopleStore.getState().updatePersonTier;
+      let personIds = getEntityPersonIdsForTierSync(entityId, folders);
+      if (personIds.length === 0) {
+        const exists = usePeopleStore
+          .getState()
+          .people.some((person) => person.id === entityId);
+        if (exists) {
+          personIds = [entityId];
+        }
+      }
+      const nextTier = getTierByLayerId(targetLayerId);
+      for (const personId of personIds) {
+        updatePersonTier(personId, nextTier);
+      }
+
+      setLayerMoveMenuState(null);
+    },
+    [layerMoveMenuState, layoutState, folders, notifyCapBlocked, setLayoutState],
+  );
+
   const {
     dragState: homeMainLongPressDragState,
     beginDrag: beginHomeMainLongPressDrag,
@@ -3238,6 +3365,7 @@ const isJoined =
           // second drag source.
           suppressDragSource={Boolean(folderLongPressDragState)}
           onPromoteHiddenToVisible={handlePromoteHiddenToVisible}
+          onRequestMove={handleRequestLayerMoveMenu}
           onAddPerson={handleOpenAddToHidden}
         />
       ) : null}
@@ -3259,11 +3387,12 @@ const isJoined =
           onOpenFolder={handleOpenFolder}
           onLongPressDragStart={handleFolderLongPressDragStart}
           onPersonClick={handleHomePersonClick}
+          onRequestMove={handleRequestFolderMoveMenu}
         />
       ) : null}
 
       <HomeMoveMenu
-        open={false}
+        open={folderMoveMenuState !== null}
         personName={folderMoveEntityLabel}
         currentLayerLabel={openFolderTopLayer?.label ?? "현재"}
         targets={folderMoveTargets}
@@ -3272,6 +3401,32 @@ const isJoined =
         onMoveToLayerHome={handleMoveMenuToLayerHome}
         onMoveToLayerMore={handleMoveMenuToLayerMore}
         onClose={closeFolderMoveMenu}
+      />
+
+      <HomeMoveMenu
+        open={layerMoveMenuState !== null}
+        personName={layerMoveEntityLabel}
+        currentLayerLabel={layerMoveCurrentLabel}
+        targets={layerMoveTargets}
+        onSendToCurrentHome={() =>
+          moveLayerEntityToLayer(
+            layerMoveMenuState?.sourceLayerId ?? "",
+            "visible",
+          )
+        }
+        onSendToCurrentMore={() =>
+          moveLayerEntityToLayer(
+            layerMoveMenuState?.sourceLayerId ?? "",
+            "hidden",
+          )
+        }
+        onMoveToLayerHome={(layerKey) =>
+          moveLayerEntityToLayer(layerKey, "visible")
+        }
+        onMoveToLayerMore={(layerKey) =>
+          moveLayerEntityToLayer(layerKey, "hidden")
+        }
+        onClose={closeLayerMoveMenu}
       />
 
       <LongPressGhost state={folderLongPressDragState} />

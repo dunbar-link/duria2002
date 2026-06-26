@@ -268,28 +268,30 @@ function getCtaClass(kind: EnrichedPerson["ctaKind"]) {
   return "bg-blue-50 text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100";
 }
 
+// People 목록은 가나다(한국어 로케일) 순으로 정렬한다. 전체/가족/핵심/신뢰/
+// 친밀/친근 모든 tier 필터는 이 enrichedPeople 정렬 결과를 필터만 하므로 한 곳을
+// 바꾸면 모든 필터에 동일하게 적용된다(필터별로 순서가 흔들리지 않는다).
 function comparePeople(a: EnrichedPerson, b: EnrichedPerson) {
-  const needOrder: Record<NeedFilter, number> = {
-    all: 99,
-    need: 0,
-    ok: 1,
-    later: 2,
-    done: 3,
-  };
+  const aName = a.name?.trim() ?? "";
+  const bName = b.name?.trim() ?? "";
 
-  if (needOrder[a.needBucket] !== needOrder[b.needBucket]) {
-    return needOrder[a.needBucket] - needOrder[b.needBucket];
+  // 이름 없는 항목은 항상 뒤로 보낸다.
+  const aEmpty = aName.length === 0;
+  const bEmpty = bName.length === 0;
+  if (aEmpty !== bEmpty) {
+    return aEmpty ? 1 : -1;
   }
 
-  if (a.tierValue !== b.tierValue) {
-    return a.tierValue - b.tierValue;
+  const byName = aName.localeCompare(bName, "ko-KR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+  if (byName !== 0) {
+    return byName;
   }
 
-  if (b.score !== a.score) {
-    return b.score - a.score;
-  }
-
-  return a.name.localeCompare(b.name);
+  // 동명이인은 안정적인 tie-breaker(id)로 순서를 고정한다.
+  return a.id.localeCompare(b.id);
 }
 
 function EmptyState({
