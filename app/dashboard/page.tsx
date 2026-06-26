@@ -1607,7 +1607,16 @@ useEffect(() => {
     beginDrag: beginLayerSheetLongPressDrag,
   } = useFolderLongPressDrag({
     onDrop: ({ entityId, layerId, area, index }) => {
-      if (!isPersonEntityId(entityId)) {
+      // P2-4f-b: drop 처리 가드도 drag-start 가드와 동일하게 완화한다.
+      // isPersonEntityId 는 invite-pending-<token>(초대수락 연결사람) 을 person
+      // 으로 인정하지 않아, ghost 는 떴지만(start 가드는 b437683 에서 완화됨)
+      // drop 시 여기서 early-return 되어 이동/tier 업데이트가 안 됐다.
+      // store.people 에 실재하는 id 면 허용(family-me/connectable:/folder- 는
+      // store.people 에 없어 자동 제외).
+      const isDroppablePerson =
+        isPersonEntityId(entityId) ||
+        usePeopleStore.getState().people.some((p) => p.id === entityId);
+      if (!isDroppablePerson) {
         return;
       }
 
@@ -1953,7 +1962,16 @@ useEffect(() => {
     beginDrag: beginHomeMainLongPressDrag,
   } = useFolderLongPressDrag({
     onDrop: ({ entityId, layerId, area, index }) => {
-      if (!isPersonEntityId(entityId)) {
+      // P2-4f-b: drop 처리 가드도 drag-start 가드와 동일하게 완화한다.
+      // isPersonEntityId 는 invite-pending-<token>(초대수락 연결사람) 을 person
+      // 으로 인정하지 않아, ghost 는 떴지만(start 가드는 b437683 에서 완화됨)
+      // drop 시 여기서 early-return 되어 이동/tier 업데이트가 안 됐다.
+      // store.people 에 실재하는 id 면 허용(family-me/connectable:/folder- 는
+      // store.people 에 없어 자동 제외).
+      const isDroppablePerson =
+        isPersonEntityId(entityId) ||
+        usePeopleStore.getState().people.some((p) => p.id === entityId);
+      if (!isDroppablePerson) {
         return;
       }
 
