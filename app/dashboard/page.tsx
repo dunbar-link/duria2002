@@ -1807,7 +1807,11 @@ useEffect(() => {
         return;
       }
 
-      if (!isPersonEntityId(entityId)) {
+      // P2-4f: invite-pending 연결사람도 long-press drag 허용(home-main 과 동일).
+      const isDraggablePerson =
+        isPersonEntityId(entityId) ||
+        usePeopleStore.getState().people.some((p) => p.id === entityId);
+      if (!isDraggablePerson) {
         return;
       }
 
@@ -2146,7 +2150,16 @@ useEffect(() => {
 
   const handleHomeMainLongPressDragStart = useCallback(
     (entityId: string, point: { x: number; y: number }) => {
-      if (!isPersonEntityId(entityId)) {
+      // P2-4f: isPersonEntityId 는 invite-pending-<token>(초대수락 연결사람) 을
+      // person 으로 인정하지 않아 모바일 long-press drag 가 시작되지 않았다
+      // (진동만, ghost 없음 → tier 이동 불가). desktop HTML5 drag 는 이 가드가
+      // 없어 PC 는 정상이었다. P2-4a tier fallback 과 동일하게 store.people 에
+      // 실재하는 id 면 허용한다(family-me/connectable:/folder- 는 store.people
+      // 에 없어 자동 제외).
+      const isDraggablePerson =
+        isPersonEntityId(entityId) ||
+        usePeopleStore.getState().people.some((p) => p.id === entityId);
+      if (!isDraggablePerson) {
         return;
       }
 
