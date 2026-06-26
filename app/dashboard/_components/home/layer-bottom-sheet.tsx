@@ -13,7 +13,7 @@ import {
   VISIBLE_SLOT_COUNT,
   layerBlueprints,
 } from "./home-page-types";
-import { cn, getEntityRealCount, isPersonEntityId } from "./home-page-utils";
+import { cn, getEntityRealCount } from "./home-page-utils";
 import { EmptyDropSlot, PersonTile } from "./home-entity-components";
 
 function SheetSectionTitle({
@@ -134,9 +134,6 @@ function BottomSheetGrid({
   onOpenFolder,
   onLongPressDragStart,
   suppressDragSource = false,
-  onPromote,
-  canPromote = false,
-  onRequestMove,
 }: {
   layer: LayerBlueprint;
   ids: Array<string | null>;
@@ -171,16 +168,6 @@ function BottomSheetGrid({
     point: { x: number; y: number },
   ) => void;
   suppressDragSource?: boolean;
-  // When provided and area === "hidden", each non-folder, non-me tile gets a
-  // small "↑" button at its bottom-right that promotes the entity to the
-  // first empty visible slot. Drag inside this grid is fully disabled when
-  // this hook is wired up (Step F2).
-  onPromote?: (entityId: string) => void;
-  canPromote?: boolean;
-  // When provided and area === "hidden", each non-me tile gets a small "이동"
-  // button that opens the layer move menu (다른 단계로 꺼내기). Button-based so
-  // it works on PC and mobile without drag hit-test.
-  onRequestMove?: (entityId: string) => void;
 }) {
   const isDragActive = dragState !== null;
 
@@ -231,17 +218,6 @@ function BottomSheetGrid({
           );
         }
 
-        const isFolder = Boolean(folders[entityId]);
-        const showPromoteButton =
-          Boolean(onPromote) &&
-          area === "hidden" &&
-          !isFolder &&
-          entityId !== "family-me";
-        const showMoveButton =
-          Boolean(onRequestMove) &&
-          area === "hidden" &&
-          entityId !== "family-me";
-
         const tile = (
           <PersonTile
             key={`${layer.id}-${area}-${entityId}`}
@@ -271,59 +247,7 @@ function BottomSheetGrid({
           />
         );
 
-        if (!showPromoteButton && !showMoveButton) {
-          return tile;
-        }
-
-        return (
-          <div
-            key={`${layer.id}-${area}-${entityId}`}
-            className="flex shrink-0 flex-col items-center overflow-visible"
-            style={{ width: SHEET_TILE_WIDTH }}
-          >
-            <div className="relative w-full overflow-visible">
-              {tile}
-              {showPromoteButton ? (
-                <button
-                  type="button"
-                  aria-label="홈으로 올리기"
-                  aria-disabled={!canPromote}
-                  disabled={!canPromote}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (!canPromote) return;
-                    onPromote?.(entityId);
-                  }}
-                  // Sit just inside the face's bottom-right corner so the button
-                  // is never clipped by the outer overflow-y-auto scroll
-                  // container (which transparently promotes overflow-x to clip).
-                  className={cn(
-                    "pointer-events-auto absolute z-20 flex h-[22px] w-[22px] items-center justify-center rounded-full border text-[12px] font-semibold leading-none shadow-[0_4px_10px_rgba(15,23,42,0.18)] transition-colors duration-150",
-                    canPromote
-                      ? "border-slate-300 bg-white text-slate-600 active:scale-95 hover:bg-slate-50"
-                      : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-40",
-                  )}
-                  style={{ right: 6, bottom: 24 }}
-                >
-                  ↑
-                </button>
-              ) : null}
-            </div>
-
-            {showMoveButton ? (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRequestMove?.(entityId);
-                }}
-                className="mt-[2px] rounded-full border border-slate-200 bg-white px-[8px] py-[2px] text-[9px] font-semibold leading-none text-slate-500 active:scale-95"
-              >
-                이동
-              </button>
-            ) : null}
-          </div>
-        );
+        return tile;
       })}
     </div>
   );
@@ -373,12 +297,6 @@ type LayerBottomSheetProps = {
   // or long-press drag. Used to lock out the +N sheet as a drag source
   // while a folder ghost drag is already in flight.
   suppressDragSource?: boolean;
-  // Step F2: button-based promotion for entities sitting in the hidden
-  // section. When provided, the hidden grid loses its long-press drag and
-  // each non-folder, non-me tile gets a small "↑" button.
-  onPromoteHiddenToVisible?: (entityId: string) => void;
-  // +N(hidden) 안의 사람을 다른 단계(layer)로 꺼내는 이동 메뉴를 연다.
-  onRequestMove?: (entityId: string) => void;
   // 홈 visible 4칸이 모두 찬 layer 에서만 헤더에 "사람 추가" 버튼을 노출하고,
   // 누르면 현재 layer 의 hidden 에 새 사람을 추가하도록 상위에 알린다.
   onAddPerson?: (layerId: string) => void;
@@ -405,18 +323,8 @@ export default function LayerBottomSheet({
   onOpenFolder,
   onLongPressDragStart,
   suppressDragSource = false,
-  onPromoteHiddenToVisible,
-  onRequestMove,
   onAddPerson,
 }: LayerBottomSheetProps) {
-  // 홈으로 올리기 활성 조건: visible 에 빈자리가 있거나(빈자리 승격),
-  // 빈자리가 없어도 교체 가능한 "비-Me 사람" 슬롯이 있으면(full swap) 활성.
-  // Me 슬롯과 폴더(비-person)는 교체 대상이 아니므로 둘만 있으면 비활성 유지.
-  const canPromoteHidden =
-    visibleSlotIds.some((id) => id === null) ||
-    visibleSlotIds.some(
-      (id) => id !== null && id !== "family-me" && isPersonEntityId(id),
-    );
   const visibleFilledCount = visibleSlotIds.filter(Boolean).length;
   // +N 더보기 시트의 "친구 추가" CTA 노출 조건. Home 빈 슬롯 유무와 무관하게
   // 항상 노출해, 사용자가 새 친구를 Home(visible) 대신 +N(hidden)에 직접 넣는
@@ -554,12 +462,11 @@ export default function LayerBottomSheet({
                 onDragOver={onDragOver}
                 onDrop={onDrop}
                 onOpenFolder={onOpenFolder}
-                // Step F2: +N hidden section is button-only — no long-press
-                // drag, and HTML5 drag also blocked on these tiles.
-                suppressDragSource
-                onPromote={onPromoteHiddenToVisible}
-                canPromote={canPromoteHidden}
-                onRequestMove={onRequestMove}
+                // P2-4h: +N hidden 사람도 drag source 로 통일한다. long-press
+                // ghost(모바일) / 길게 눌러 드래그(PC)로 시트가 닫히며 Home 의
+                // layer/slot 으로 직접 끌어 이동한다. 화살표/이동 버튼 제거.
+                onLongPressDragStart={onLongPressDragStart}
+                suppressDragSource={suppressDragSource}
               />
             </SheetSectionShell>
           </section>

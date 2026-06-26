@@ -166,7 +166,6 @@ function FolderMemberTile({
   onOpenFolder,
   onLongPressDragStart,
   onPersonClick,
-  onRequestMove,
   people,
 }: {
   entityId: string;
@@ -187,9 +186,6 @@ function FolderMemberTile({
     point: { x: number; y: number },
   ) => void;
   onPersonClick?: (entityId: string) => void;
-  // 버튼 기반 "이동" 진입점. 폴더 안 사람을 다른 단계(layer)로 꺼내는 메뉴를
-  // 연다. 드래그 hit-test 의존 없이 PC·모바일 공통으로 동작한다.
-  onRequestMove?: (entityId: string) => void;
   people: DashboardPerson[];
 }) {
   const folder = folders[entityId];
@@ -293,24 +289,9 @@ function FolderMemberTile({
         {getEntityLabel(entityId, folders)}
       </span>
 
-      {onRequestMove ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            cancelLongPress();
-            onRequestMove(entityId);
-          }}
-          className="mt-[6px] rounded-full border border-slate-200 bg-white px-[8px] py-[2px] text-[9px] font-semibold leading-none text-slate-500 active:scale-95"
-        >
-          이동
-        </button>
-      ) : (
-        <span className="mt-[6px] text-[9px] font-medium leading-none text-slate-300">
-          길게 눌러 이동
-        </span>
-      )}
+      <span className="mt-[6px] text-[9px] font-medium leading-none text-slate-300">
+        길게 눌러 이동
+      </span>
     </div>
   );
 }
@@ -334,7 +315,6 @@ type FolderBottomSheetProps = {
     point: { x: number; y: number },
   ) => void;
   onPersonClick?: (entityId: string) => void;
-  onRequestMove?: (entityId: string) => void;
 };
 
 export default function FolderBottomSheet({
@@ -353,7 +333,6 @@ export default function FolderBottomSheet({
   onOpenFolder,
   onLongPressDragStart,
   onPersonClick,
-  onRequestMove,
 }: FolderBottomSheetProps) {
   const people = usePeopleStore((state) => state.people);
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
@@ -605,7 +584,7 @@ export default function FolderBottomSheet({
           <div className="mb-[10px] text-[11px] leading-relaxed text-slate-400">
             클릭하면 상세로 이동
             <br />
-            &apos;이동&apos; 버튼으로 다른 단계로 보내기
+            길게 누르면 레이어 밖으로 이동
           </div>
 
           <div
@@ -665,7 +644,6 @@ export default function FolderBottomSheet({
                   onOpenFolder={onOpenFolder}
                   onLongPressDragStart={onLongPressDragStart}
                   onPersonClick={onPersonClick}
-                  onRequestMove={onRequestMove}
                   people={people}
                 />
               );
