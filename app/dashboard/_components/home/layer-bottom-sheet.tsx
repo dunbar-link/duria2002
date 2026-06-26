@@ -10,7 +10,6 @@ import {
   SHEET_GRID_COLUMN_COUNT,
   SHEET_GRID_GAP_X,
   SHEET_TILE_WIDTH,
-  VISIBLE_SLOT_COUNT,
   layerBlueprints,
 } from "./home-page-types";
 import { cn, getEntityRealCount } from "./home-page-utils";
@@ -134,6 +133,7 @@ function BottomSheetGrid({
   onOpenFolder,
   onLongPressDragStart,
   suppressDragSource = false,
+  deferPointerCaptureUntilLongPress = false,
 }: {
   layer: LayerBlueprint;
   ids: Array<string | null>;
@@ -168,6 +168,11 @@ function BottomSheetGrid({
     point: { x: number; y: number },
   ) => void;
   suppressDragSource?: boolean;
+  // Home rail 과 동일하게 long-press 발화 시점까지 pointer capture 를 미루고
+  // 타일 touch-action 을 none 으로 만든다. 이게 false(=manipulation)면 모바일
+  // Chrome 이 ghost 생성 후 터치를 스크롤로 가져가 pointercancel → 추적이
+  // 끊긴다(+N 시트 drag-out 이 안 되던 원인). 시트 타일에 true 로 넘긴다.
+  deferPointerCaptureUntilLongPress?: boolean;
 }) {
   const isDragActive = dragState !== null;
 
@@ -244,6 +249,7 @@ function BottomSheetGrid({
             onDrop={onDrop}
             onOpenFolder={onOpenFolder}
             onLongPressDragStart={onLongPressDragStart}
+            deferPointerCaptureUntilLongPress={deferPointerCaptureUntilLongPress}
           />
         );
 
@@ -304,7 +310,6 @@ type LayerBottomSheetProps = {
 
 export default function LayerBottomSheet({
   layer,
-  visibleSlotIds,
   hiddenSlotIds,
   folders,
   dragState,
@@ -325,7 +330,6 @@ export default function LayerBottomSheet({
   suppressDragSource = false,
   onAddPerson,
 }: LayerBottomSheetProps) {
-  const visibleFilledCount = visibleSlotIds.filter(Boolean).length;
   // +N 더보기 시트의 "친구 추가" CTA 노출 조건. Home 빈 슬롯 유무와 무관하게
   // 항상 노출해, 사용자가 새 친구를 Home(visible) 대신 +N(hidden)에 직접 넣는
   // 경로를 고를 수 있게 한다. onAddPerson 핸들러가 없는 화면(invite/dashboard 등)
@@ -389,37 +393,10 @@ export default function LayerBottomSheet({
           />
         ) : null}
 
+        {/* P2-4h-c: "홈에 보이는 사람" preview 블럭 제거. 이동은 hidden 사람을
+            길게 눌러 Home 화면의 실제 tier/slot 으로 직접 drag-out 하는 UX로
+            일원화했으므로 시트 안 preview/ drop target 은 불필요하다. */}
         <div className="max-h-[60vh] space-y-3 overflow-y-auto pb-[2px]">
-          <section>
-            <SheetSectionTitle
-              title="홈에 보이는 사람"
-              count={visibleSlotIds
-                .filter(Boolean)
-                .reduce((sum, entityId) => {
-                  return sum + getEntityRealCount(entityId as string, folders);
-                }, 0)}
-              rightLabel={`${visibleFilledCount}/${VISIBLE_SLOT_COUNT}`}
-            />
-
-            <SheetSectionShell>
-              <BottomSheetGrid
-                layer={layer}
-                ids={visibleSlotIds}
-                area="visible"
-                folders={folders}
-                dragState={dragState}
-                dragOverState={dragOverState}
-                onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
-                onDragOver={onDragOver}
-                onDrop={onDrop}
-                onOpenFolder={onOpenFolder}
-                onLongPressDragStart={onLongPressDragStart}
-                suppressDragSource={suppressDragSource}
-              />
-            </SheetSectionShell>
-          </section>
-
           <section>
             <SheetSectionTitle
               title="더보기"
@@ -467,6 +444,10 @@ export default function LayerBottomSheet({
                 // layer/slot 으로 직접 끌어 이동한다. 화살표/이동 버튼 제거.
                 onLongPressDragStart={onLongPressDragStart}
                 suppressDragSource={suppressDragSource}
+                // P2-4h-c: Home rail 과 동일하게 touch-action:none + 지연 capture.
+                // manipulation 이면 ghost 생성 후 Chrome 이 스크롤로 가져가
+                // pointercancel 로 추적이 끊겨 ghost 가 손가락을 안 따라왔다.
+                deferPointerCaptureUntilLongPress
               />
             </SheetSectionShell>
           </section>
