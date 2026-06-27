@@ -1630,16 +1630,17 @@ useEffect(() => {
         const involvesMe =
           entityId === "family-me" || targetEntityId === "family-me";
         const sourceIsFolder = Boolean(folders[entityId]);
-        const targetIsFolder = Boolean(
-          targetEntityId && folders[targetEntityId],
-        );
 
+        // P2-4i: 대상이 기존 폴더여도 허용한다(person → folder add). 과거엔
+        // !targetIsFolder 로 막아 폴더가 2명에서 더 늘지 않았다.
+        // combineEntityIntoTarget 이 기존 폴더면 insertIntoFolderSlots 로 3·4명+
+        // 추가(중복은 normalizeFolderMemberSlots 가 제거), 사람이면 새 폴더 생성.
+        // me/소스폴더(폴더끼리 합치기)는 이번 범위에서 제외.
         if (
           targetEntityId &&
           targetEntityId !== entityId &&
           !involvesMe &&
-          !sourceIsFolder &&
-          !targetIsFolder
+          !sourceIsFolder
         ) {
           const location = findEntityLocation(layoutState, entityId);
           if (location) {
@@ -1881,16 +1882,17 @@ useEffect(() => {
         const involvesMe =
           entityId === "family-me" || targetEntityId === "family-me";
         const sourceIsFolder = Boolean(folders[entityId]);
-        const targetIsFolder = Boolean(
-          targetEntityId && folders[targetEntityId],
-        );
 
+        // P2-4i: 대상이 기존 폴더여도 허용한다(person → folder add). 과거엔
+        // !targetIsFolder 로 막아 폴더가 2명에서 더 늘지 않았다.
+        // combineEntityIntoTarget 이 기존 폴더면 insertIntoFolderSlots 로 3·4명+
+        // 추가(중복은 normalizeFolderMemberSlots 가 제거), 사람이면 새 폴더 생성.
+        // me/소스폴더(폴더끼리 합치기)는 이번 범위에서 제외.
         if (
           targetEntityId &&
           targetEntityId !== entityId &&
           !involvesMe &&
-          !sourceIsFolder &&
-          !targetIsFolder
+          !sourceIsFolder
         ) {
           const location = findEntityLocation(layoutState, entityId);
           if (location) {

@@ -467,6 +467,9 @@ export function FolderPreviewIcon({
   tileSize?: number;
 }) {
   const previewMembers = buildFolderPreviewMembers(folder);
+  // P2-4i: 폴더 미니 아이콘에 프로필 사진을 반영하기 위해 live people 을 구독한다.
+  // 사진이 있으면 썸네일, 없으면 기존 이니셜/이모지 텍스트(폴백)를 유지한다.
+  const people = usePeopleStore((state) => state.people);
 
   return (
     <div
@@ -504,13 +507,27 @@ export function FolderPreviewIcon({
             person?.initials ||
             person?.groupPreview?.[0] ||
             "•";
+          // 연결 상대의 최신 remote 프로필 사진(없으면 빈 값 → 텍스트 폴백).
+          // invite-pending 멤버도 people store 에 있어 같은 경로로 조회된다.
+          const livePerson = people.find((candidate) => candidate.id === memberId);
+          const photo = livePerson ? getPersonDisplayPhoto(livePerson) : "";
 
           return (
             <div
               key={`${folder.id}-${memberId}-${index}`}
-              className="flex items-center justify-center rounded-[6px] bg-white/82 text-[8px] font-semibold text-slate-700"
+              className="relative flex items-center justify-center overflow-hidden rounded-[6px] bg-white/82 text-[8px] font-semibold text-slate-700"
             >
               <span className="leading-none">{text}</span>
+              {photo ? (
+                <img
+                  src={photo}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : null}
             </div>
           );
         })}

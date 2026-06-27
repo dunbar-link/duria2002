@@ -30,6 +30,7 @@ import { BaseEntityVisual, UrgentBadge } from "./home-entity-components";
 import { personCatalog } from "./home-page-types";
 import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
+import { getPersonDisplayPhoto } from "../../people/data";
 import SignalBottomSheet from "./signal-bottom-sheet";
 
 // 폴더 "내부 구성원" 그리드 전용 타일 폭. 공유 SHEET_TILE_WIDTH(60)보다 작게 잡아
@@ -190,6 +191,12 @@ function FolderMemberTile({
 }) {
   const folder = folders[entityId];
   const person = folder ? null : personCatalog[entityId];
+  // P2-4i: 폴더 시트 멤버 미리보기도 연결 상대의 최신 remote 프로필 사진을
+  // 반영한다(없으면 BaseEntityVisual 의 기존 이니셜/이모지 폴백 유지).
+  const livePerson = folder
+    ? null
+    : people.find((candidate) => candidate.id === entityId) ?? null;
+  const liveImageUrl = livePerson ? getPersonDisplayPhoto(livePerson) : "";
 
   const showUrgentBadge = folder
     ? hasUnjoinedInFolder(folder, folders, people)
@@ -273,6 +280,7 @@ function FolderMemberTile({
           entityId={entityId}
           folders={folders}
           tintClass={tintClass}
+          liveImageUrl={liveImageUrl}
           tileSize={tileWidth - 4}
         />
 
