@@ -91,6 +91,7 @@ export default function SignalBottomSheet({
   const recipientMode = Boolean(recipients && onSendSignal);
   const [selected, setSelected] = useState<SignalRecipient[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
   // recipients/candidates 는 렌더마다 새 배열일 수 있어 open 전이 시점에만 초기화.
   const recipientsRef = useRef<SignalRecipient[] | undefined>(recipients);
   recipientsRef.current = recipients;
@@ -100,6 +101,7 @@ export default function SignalBottomSheet({
       setRecent(readRecentSignals());
       setSelected(dedupeRecipients(recipientsRef.current ?? []));
       setShowAdd(false);
+      setAddQuery("");
     }
   }, [open]);
 
@@ -112,6 +114,14 @@ export default function SignalBottomSheet({
     () => dedupeRecipients(candidates ?? []).filter((c) => !selectedIds.has(c.receiverId)),
     [candidates, selectedIds],
   );
+  // 이름 검색 필터(대소문자/공백 둔감).
+  const normalizedQuery = addQuery.trim().toLowerCase().replace(/\s+/g, "");
+  const filteredCandidates = useMemo(() => {
+    if (!normalizedQuery) return addableCandidates;
+    return addableCandidates.filter((c) =>
+      c.name.toLowerCase().replace(/\s+/g, "").includes(normalizedQuery),
+    );
+  }, [addableCandidates, normalizedQuery]);
 
   function addRecipient(r: SignalRecipient) {
     setSelected((prev) =>
@@ -232,17 +242,17 @@ export default function SignalBottomSheet({
               <span className="text-[12px] font-semibold text-slate-700">
                 받는 사람 {selected.length}명
               </span>
-              {addableCandidates.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAdd((v) => !v)}
-                  className="rounded-full border border-slate-200 bg-white px-[10px] py-[4px] text-[11px] font-semibold text-slate-600 active:scale-95"
-                >
-                  {showAdd ? "닫기" : "+ 사람 추가"}
-                </button>
-              ) : null}
+              {/* "사람 추가"는 항상 노출(후보 0명이어도 패널에서 안내). */}
+              <button
+                type="button"
+                onClick={() => setShowAdd((v) => !v)}
+                className="rounded-full border border-slate-200 bg-white px-[10px] py-[4px] text-[11px] font-semibold text-slate-600 active:scale-95"
+              >
+                {showAdd ? "닫기" : "+ 사람 추가"}
+              </button>
             </div>
 
+            {/* 받는 사람 이름표 */}
             {selected.length === 0 ? (
               <p className="text-[11px] text-slate-400">
                 받는 사람을 1명 이상 선택하면 신호를 보낼 수 있어요.
@@ -269,20 +279,39 @@ export default function SignalBottomSheet({
             )}
 
             {showAdd ? (
-              <div className="mt-[10px] max-h-[160px] overflow-y-auto rounded-[14px] border border-slate-100 bg-slate-50/60 p-[6px]">
-                {addableCandidates.map((c) => (
-                  <button
-                    key={c.receiverId}
-                    type="button"
-                    onClick={() => addRecipient(c)}
-                    className="flex w-full items-center justify-between rounded-[10px] px-[10px] py-[7px] text-left text-[13px] font-medium text-slate-700 hover:bg-white active:scale-[0.99]"
-                  >
-                    <span className="max-w-[200px] truncate">{c.name}</span>
-                    <span className="text-[12px] font-semibold text-slate-400">
-                      추가
-                    </span>
-                  </button>
-                ))}
+              <div className="mt-[10px]">
+                <input
+                  type="text"
+                  value={addQuery}
+                  onChange={(event) => setAddQuery(event.target.value)}
+                  placeholder="이름 검색"
+                  className="mb-[6px] h-[36px] w-full rounded-[12px] border border-slate-200 bg-white px-[10px] text-[13px] text-slate-700 outline-none placeholder:text-slate-300 focus:border-slate-400"
+                />
+                <div className="max-h-[160px] overflow-y-auto rounded-[14px] border border-slate-100 bg-slate-50/60 p-[6px]">
+                  {addableCandidates.length === 0 ? (
+                    <p className="px-[10px] py-[10px] text-[12px] text-slate-400">
+                      추가할 사람이 없어요.
+                    </p>
+                  ) : filteredCandidates.length === 0 ? (
+                    <p className="px-[10px] py-[10px] text-[12px] text-slate-400">
+                      검색 결과가 없어요.
+                    </p>
+                  ) : (
+                    filteredCandidates.map((c) => (
+                      <button
+                        key={c.receiverId}
+                        type="button"
+                        onClick={() => addRecipient(c)}
+                        className="flex w-full items-center justify-between rounded-[10px] px-[10px] py-[7px] text-left text-[13px] font-medium text-slate-700 hover:bg-white active:scale-[0.99]"
+                      >
+                        <span className="max-w-[200px] truncate">{c.name}</span>
+                        <span className="text-[12px] font-semibold text-slate-400">
+                          추가
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
             ) : null}
           </div>

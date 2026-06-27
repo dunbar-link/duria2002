@@ -88,6 +88,17 @@ function normalizeInviteTier(tier: number | null | undefined): InviteDraft["tier
   return 150;
 }
 
+// P2-5c: tier 색상(People getSimpleTierStyle 과 동일 매핑). 가족 보라 / 핵심 빨강
+// / 신뢰 파랑 / 친밀 주황 / 친근 초록. live tier 로 칩·아바타 색을 렌더한다.
+function getDetailTierColor(tier: number | null | undefined) {
+  const t = typeof tier === "number" ? tier : 150;
+  if (t <= 1) return { bg: "#EFE7FA", text: "#4B2E83", border: "#CDB7EE" };
+  if (t <= 5) return { bg: "#FAE0D8", text: "#A74726", border: "#F2A892" };
+  if (t <= 15) return { bg: "#E0EFFD", text: "#1467B3", border: "#9FCCF7" };
+  if (t <= 50) return { bg: "#FCE8C9", text: "#936018", border: "#F7B95C" };
+  return { bg: "#DDF7EE", text: "#0B7A5D", border: "#8EE5CA" };
+}
+
 function normalizeInviteRelationshipType(
   value: string | null | undefined,
 ): InviteDraft["relationshipType"] {
@@ -275,6 +286,7 @@ export default function PersonDetailClient({ person }: Props) {
   // 대신). PID 기준 연결 판정은 신호 후보에 사용.
   const effectiveTier =
     typeof displayPerson.tier === "number" ? displayPerson.tier : person.tier;
+  const tierColor = getDetailTierColor(effectiveTier);
   const connectedSignalPool = useMemo<SignalRecipient[]>(() => {
     const pick = (value: unknown) =>
       typeof value === "string" && value.trim() ? value.trim() : "";
@@ -813,7 +825,14 @@ export default function PersonDetailClient({ person }: Props) {
           </div>
 
           <div className="mt-5 flex items-center gap-3">
-            <div className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[2.5px] border-[#7E57C2] bg-[#EFE7FA] text-[20px] font-bold text-[#4B2E83]">
+            <div
+              className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[2.5px] text-[20px] font-bold"
+              style={{
+                borderColor: tierColor.border,
+                background: tierColor.bg,
+                color: tierColor.text,
+              }}
+            >
               {getPersonDisplayName(displayPerson).slice(0, 2) || "?"}
               {getPersonDisplayPhoto(displayPerson) ? (
                 <img
@@ -835,7 +854,10 @@ export default function PersonDetailClient({ person }: Props) {
                 {isJoined ? <span className="h-2 w-2 rounded-full bg-[#079863]" /> : null}
               </div>
               <div className="mt-1 flex items-center gap-2">
-                <span className="rounded-full bg-[#EFE7FA] px-2.5 py-1 text-[12px] font-semibold text-[#4B2E83]">
+                <span
+                  className="rounded-full px-2.5 py-1 text-[12px] font-semibold"
+                  style={{ background: tierColor.bg, color: tierColor.text }}
+                >
                   {getDashboardTierLabel(effectiveTier) || person.roleLabel || inviteStatusMeta.badge}
                 </span>
                 <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${inviteStatusMeta.badgeClass}`}>
