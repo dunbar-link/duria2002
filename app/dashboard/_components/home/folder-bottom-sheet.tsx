@@ -26,7 +26,11 @@ import {
   getEntityRealCount,
   getFolderDisplayName,
 } from "./home-page-utils";
-import { BaseEntityVisual, UrgentBadge } from "./home-entity-components";
+import {
+  BaseEntityVisual,
+  UrgentBadge,
+  useIsCoarsePointer,
+} from "./home-entity-components";
 import { personCatalog } from "./home-page-types";
 import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
@@ -197,6 +201,22 @@ function FolderMemberTile({
     ? null
     : people.find((candidate) => candidate.id === entityId) ?? null;
   const liveImageUrl = livePerson ? getPersonDisplayPhoto(livePerson) : "";
+  // P2-4j-b: 연결 테두리(실선)를 Home/People 과 동일하게 PID 존재 기준으로
+  // 판정한다(P2-4j connected count 와 같은 기준). local inviteDraft accepted 만
+  // 요구하지 않는다. 연결되면 PersonFace 가 solid border 로 렌더한다.
+  const isMemberConnected = (() => {
+    if (folder || !livePerson) return false;
+    const record = livePerson as unknown as Record<string, unknown>;
+    return [record.userId, record.dlUserId, record.acceptedPersonId].some(
+      (value) => typeof value === "string" && value.trim().length > 0,
+    );
+  })();
+  // P2-4j-b: 모바일(coarse)에서는 native HTML5 drag 를 끈다. native drag 가
+  // long-press 와 충돌하면 dragend 가 안 와 타일이 pressed 상태로 stuck → 화면
+  // freeze 됐다. 모바일은 long-press ghost(onLongPressDragStart)로만 이동하고,
+  // 데스크톱은 HTML5 drag(내부 재배치)를 그대로 쓴다. (Home PersonTile P2-4i-b
+  // 와 동일한 처리)
+  const isCoarsePointer = useIsCoarsePointer();
 
   const showUrgentBadge = folder
     ? hasUnjoinedInFolder(folder, folders, people)
@@ -249,8 +269,12 @@ function FolderMemberTile({
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
       }}
-      draggable
-      onDragStart={() => {
+      draggable={!isCoarsePointer}
+      onDragStart={(event) => {
+        if (isCoarsePointer) {
+          event.preventDefault();
+          return;
+        }
         cancelLongPress();
         onDragStart(index, entityId);
       }}
@@ -280,6 +304,7 @@ function FolderMemberTile({
           entityId={entityId}
           folders={folders}
           tintClass={tintClass}
+          isConnected={isMemberConnected}
           liveImageUrl={liveImageUrl}
           tileSize={tileWidth - 4}
         />

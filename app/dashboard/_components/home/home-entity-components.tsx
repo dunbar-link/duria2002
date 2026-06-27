@@ -31,7 +31,7 @@ const PROFILE_UPDATED_EVENT = "dunbar-link-me-profile-updated";
 // 그 onDragStart 가 cancelLongPress() 를 호출해 pointer 기반 long-press 고스트를
 // 가로챈다(=이동 고스트가 안 뜸). 이 값으로 터치에서는 person 타일 native drag 를
 // 꺼서 long-press 시스템이 터치를 전담하게 한다. SSR 안전을 위해 초기값은 false.
-function useIsCoarsePointer(): boolean {
+export function useIsCoarsePointer(): boolean {
   const [coarse, setCoarse] = useState(false);
 
   useEffect(() => {

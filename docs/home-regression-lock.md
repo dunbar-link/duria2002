@@ -39,8 +39,8 @@ npm run build
 | F1 | folder sheet | 폴더 세부창 모바일 중앙정렬(inset-x-0 + calc(100%-36px)) |
 | F2 | folder sheet | "폴더명" 유지 / 자동 이름·현재 레이어·이동 안내 문구 제거 |
 | F3 | folder sheet | 연결 수 PID 기준(로컬 inviteDraft 의존 제거) |
-| G1 | folder member tile | **(known-fail, P2-4j-b)** 폴더 멤버 모바일 native drag off(freeze 방지) |
-| G2 | folder member tile | **(known-fail, P2-4j-b)** 폴더 멤버 연결 실선(isConnected PID 기준) |
+| G1 | folder member tile | 폴더 멤버 모바일 native drag off(freeze 방지) — draggable={!isCoarsePointer} |
+| G2 | folder member tile | 폴더 멤버 연결 실선(isConnected PID 기준 전달) |
 | H1 | sync safety | snapshot-sync-panel 헤드리스 서버우선 구조 보존(return null + polling + paused 해제) |
 
 ## 수동 확인 1회 필요 (런타임 — 정적으로 못 잡음)
@@ -54,14 +54,15 @@ npm run build
 5. 기존 2명 폴더에 3·4명+ 추가, 같은 사람 중복 추가 안 됨
 6. 폴더 미니 아이콘/시트 멤버 사진 표시(없으면 이니셜)
 7. 폴더 long-press freeze 없음(Home 폴더 타일)
-8. **폴더 세부창 멤버 long-press freeze 없음 (G — P2-4j-b 후 PASS 기준)**
+8. 폴더 세부창 멤버 long-press freeze 없음 (G1 — required lock)
 9. 폴더 세부창 중앙정렬 + "연결됨 N명 · 전체 N명" 정확
 10. 로그인/새로고침 시 서버 최신 자동 반영(카드 없이), 모바일↔PC 자동 동기화
 11. 하단 nav 길게 눌러도 브라우저 링크 메뉴 안 뜸
 
-## known-fail → PASS 승격 절차 (P2-4j-b)
+## 승격 이력
 
-P2-4j-b(폴더 멤버 freeze + 연결 테두리) 적용 후:
-1. `npm run verify:home-regression` → G1/G2 가 `XPASS(flip)` 로 나옴
-2. `scripts/verify-home-regression.mjs` 에서 G1/G2 의 `knownFail: true` 줄 제거
-3. 다시 실행 → G1/G2 가 required PASS 로 잠김
+- P2-4j-b(폴더 멤버 freeze + 연결 테두리) 적용 완료 → G1/G2 를 required 로 승격
+  (knownFail 제거). 현재 required 14/14 PASS 가 잠금 기준이다.
+
+향후 known-fail 항목을 추가할 때는 해당 체크에 `knownFail: true` 를 달고,
+수정 완료 후 `XPASS(flip)` 가 뜨면 플래그를 제거해 required 로 승격한다.

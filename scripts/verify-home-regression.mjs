@@ -149,14 +149,13 @@ const CHECKS = [
     absent: ["latestInviteDraft"],
   },
 
-  // G. folder member tile — P2-4j-b 에서 수정 예정(현재 known failing)
+  // G. folder member tile — P2-4j-b 적용 완료(required 로 승격)
   {
     id: "G1",
     group: "G folder member tile",
     desc: "폴더 멤버 모바일 native drag off(freeze 방지) — draggable={!isCoarsePointer}",
     file: "app/dashboard/_components/home/folder-bottom-sheet.tsx",
     present: ["draggable={!isCoarsePointer}"],
-    knownFail: true,
   },
   {
     id: "G2",
@@ -164,7 +163,6 @@ const CHECKS = [
     desc: "폴더 멤버 연결 실선(BaseEntityVisual isConnected PID 기준 전달)",
     file: "app/dashboard/_components/home/folder-bottom-sheet.tsx",
     present: ["isConnected={isMemberConnected}"],
-    knownFail: true,
   },
 
   // H. sync safety (서버 우선 자동 동기화 헤드리스 구조 보존)
