@@ -430,7 +430,11 @@ export function PersonFace({
         <img
           src={effectiveImageUrl}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover"
+          // P2-4i-b: native 이미지 드래그/포인터 가로채기 방지(부모 타일이 제스처
+          // 처리). 폴더 시트 멤버 타일도 P2-4i 로 사진을 받으므로 함께 보강.
+          draggable={false}
+          onDragStart={(event) => event.preventDefault()}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
           onError={(event) => {
             event.currentTarget.style.display = "none";
           }}
@@ -522,7 +526,13 @@ export function FolderPreviewIcon({
                 <img
                   src={photo}
                   alt=""
-                  className="absolute inset-0 h-full w-full object-cover"
+                  // P2-4i-b: <img> 는 기본 draggable=true 라 길게 누르면 native
+                  // 이미지 드래그가 타일 pointer/drag lifecycle 을 가로채 Home 이
+                  // 멈출 수 있다. pointer-events-none + draggable=false 로 부모
+                  // 타일이 모든 제스처를 받게 한다.
+                  draggable={false}
+                  onDragStart={(event) => event.preventDefault()}
+                  className="pointer-events-none absolute inset-0 h-full w-full object-cover"
                   onError={(event) => {
                     event.currentTarget.style.display = "none";
                   }}
@@ -771,11 +781,13 @@ export function PersonTile({
   const isMeTile = entityId === "family-me";
   const dragSourceBlocked = suppressDragSource || isMeTile;
 
-  // 터치 기기에서는 person 타일의 native HTML5 drag 를 끈다. native drag 가
-  // 길게 누르기에서 시작되면 onDragStart→cancelLongPress 로 long-press 고스트를
-  // 가로채 이동 자체가 안 된다(모바일 Chrome). 폴더 타일은 기존 동작을 유지하고,
-  // 데스크톱(정밀 포인터)은 HTML5 drag 를 그대로 쓴다.
-  const nativeDragEnabled = !dragSourceBlocked && !(isCoarsePointer && !folder);
+  // 터치 기기(coarse pointer)에서는 person·folder 모두 native HTML5 drag 를 끈다.
+  // person 은 long-press ghost 를 쓰고, folder 는 탭으로 시트만 연다.
+  // P2-4i-b: 과거엔 folder 만 모바일 native drag 가 켜져 있었는데(`!folder`),
+  // 폴더 미니 아이콘에 사진(<img>)이 들어오자 길게 누르면 native drag 가 시작돼
+  // dragend/drop 이 안 와 dragState 가 stuck → Home freeze 가 됐다. 데스크톱
+  // (정밀 포인터)은 person·folder 모두 HTML5 drag 를 그대로 쓴다.
+  const nativeDragEnabled = !dragSourceBlocked && !isCoarsePointer;
 
   const longPressEnabled = Boolean(
     onLongPressDragStart && !folder && !dragSourceBlocked,
