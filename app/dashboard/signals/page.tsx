@@ -19,7 +19,9 @@ import {
   getPersonDisplayName,
   isConnectedSignalUserId,
 } from "@/app/dashboard/people/data";
-import SignalBottomSheet from "@/app/dashboard/_components/home/signal-bottom-sheet";
+import SignalBottomSheet, {
+  type SignalRecipient,
+} from "@/app/dashboard/_components/home/signal-bottom-sheet";
 
 type LoadStatus = "idle" | "loading" | "success" | "error";
 
@@ -116,6 +118,38 @@ export default function SignalsPage() {
     userId: string;
     name: string;
   } | null>(null);
+
+  // P2-5b: 신호함 "또 보내기/답신호" 받는 사람 선택용 연결된 사람 풀(PID 기준).
+  const connectedSignalPool = useMemo<SignalRecipient[]>(() => {
+    const pick = (value: unknown) =>
+      typeof value === "string" && value.trim() ? value.trim() : "";
+    const out: SignalRecipient[] = [];
+    const seen = new Set<string>();
+    for (const p of people) {
+      const rec = p as Record<string, unknown>;
+      const receiverId =
+        pick(rec.userId) || pick(rec.dlUserId) || pick(rec.acceptedPersonId);
+      if (!receiverId || receiverId === "me" || seen.has(receiverId)) continue;
+      seen.add(receiverId);
+      out.push({ receiverId, personId: p.id, name: getPersonDisplayName(p) });
+    }
+    return out;
+  }, [people]);
+
+  // 기본 받는 사람 = 이 신호의 상대 1명. personId 는 연결 풀에서 보강(없으면 빈값).
+  const replyRecipients = useMemo<SignalRecipient[]>(() => {
+    if (!replyTarget) return [];
+    const matched = connectedSignalPool.find(
+      (r) => r.receiverId === replyTarget.userId,
+    );
+    return [
+      {
+        receiverId: replyTarget.userId,
+        personId: matched?.personId ?? "",
+        name: replyTarget.name,
+      },
+    ];
+  }, [replyTarget, connectedSignalPool]);
   // me 이름 미완성으로 답신호가 차단된 카드의 signal.id. 상단 message 영역은
   // 스크롤 페이지 최상단에 있어 아래쪽 카드에서 버튼을 누르면 뷰포트 밖이라
   // 안내가 안 보였다(실기기 확인). 차단된 카드 바로 아래에 inline 안내를
@@ -362,8 +396,10 @@ export default function SignalsPage() {
   // 시트(onSelect)가 호출하며, 시트는 선택 직후 onClose 로 replyTarget 을
   // 비우므로 여기서는 전송 결과 메시지와 목록 갱신만 책임진다. (보낸 신호는
   // receiver 기준 realtime 구독에 안 잡히므로 loadSignals 로 직접 갱신.)
-  async function handleSendReply(emoji: string) {
-    if (!replyTarget || !currentUserId || currentUserId === "me") {
+  // P2-5b: 받는 사람 선택 모드. 시트에서 고른 receiverIds(기본=답신호 1명 +
+  // 추가한 연결된 사람)로 보낸다. 기존 sendSignal(다중 수신) 흐름 재사용.
+  async function handleSendReply(emoji: string, receiverIds: string[]) {
+    if (!currentUserId || currentUserId === "me") {
       return;
     }
 
@@ -374,14 +410,20 @@ export default function SignalsPage() {
       return;
     }
 
-    const success = await sendSignal(currentUserId, [replyTarget.userId], emoji);
+    const ids = Array.from(new Set(receiverIds.filter(Boolean)));
+    if (ids.length === 0) {
+      setMessage("받는 사람을 1명 이상 선택해 주세요.");
+      return;
+    }
+
+    const success = await sendSignal(currentUserId, ids, emoji);
 
     if (!success) {
       setMessage("신호 전송에 실패했어요.");
       return;
     }
 
-    setMessage(`${replyTarget.name}님에게 신호를 보냈어요.`);
+    setMessage(`${ids.length}명에게 신호를 보냈어요.`);
     void loadSignals();
   }
 
@@ -608,8 +650,10 @@ export default function SignalsPage() {
     <SignalBottomSheet
       open={replyTarget !== null}
       onClose={() => setReplyTarget(null)}
-      onSelect={(emoji) => {
-        void handleSendReply(emoji);
+      recipients={replyRecipients}
+      candidates={connectedSignalPool}
+      onSendSignal={(emoji, receiverIds) => {
+        void handleSendReply(emoji, receiverIds);
       }}
     />
     </>

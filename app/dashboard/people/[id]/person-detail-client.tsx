@@ -15,9 +15,12 @@ import {
   readMeProfileImageUrl,
   readMeProfileName,
 } from "@/lib/me/profile-name";
-import SignalBottomSheet from "../../_components/home/signal-bottom-sheet";
+import SignalBottomSheet, {
+  type SignalRecipient,
+} from "../../_components/home/signal-bottom-sheet";
 import {
   DashboardPerson,
+  getDashboardTierLabel,
   getPersonDisplayName,
   getPersonDisplayPhoto,
 } from "../data";
@@ -255,6 +258,38 @@ export default function PersonDetailClient({ person }: Props) {
     (state) => state.syncInviteDraftsFromRemote,
   );
   const updatePersonAlias = usePeopleStore((state) => state.updatePersonAlias);
+  // P2-5b: 상세 표시는 route prop(과거 snapshot)이 아니라 live people store 를
+  // 우선한다. tier 변경(드래그/이동)이 상세에도 즉시 반영되도록 한다.
+  const storePeople = usePeopleStore((state) => state.people);
+  const livePerson = useMemo(
+    () => storePeople.find((p) => p.id === person.id) ?? null,
+    [storePeople, person.id],
+  );
+  // 표시용 person: prop 위에 live store 필드를 덮어 최신 tier/이름/사진을 쓴다
+  // (prop-only 필드는 보존). 식별/초대 로직은 기존 person 을 그대로 쓴다.
+  const displayPerson = useMemo<DashboardPerson>(
+    () => (livePerson ? { ...person, ...livePerson } : person),
+    [livePerson, person],
+  );
+  // tier 칩은 People 과 동일하게 live tier 숫자에서 라벨을 도출한다(stale roleLabel
+  // 대신). PID 기준 연결 판정은 신호 후보에 사용.
+  const effectiveTier =
+    typeof displayPerson.tier === "number" ? displayPerson.tier : person.tier;
+  const connectedSignalPool = useMemo<SignalRecipient[]>(() => {
+    const pick = (value: unknown) =>
+      typeof value === "string" && value.trim() ? value.trim() : "";
+    const out: SignalRecipient[] = [];
+    const seen = new Set<string>();
+    for (const p of storePeople) {
+      const rec = p as Record<string, unknown>;
+      const receiverId =
+        pick(rec.userId) || pick(rec.dlUserId) || pick(rec.acceptedPersonId);
+      if (!receiverId || receiverId === "me" || seen.has(receiverId)) continue;
+      seen.add(receiverId);
+      out.push({ receiverId, personId: p.id, name: getPersonDisplayName(p) });
+    }
+    return out;
+  }, [storePeople]);
 
   const [note, setNote] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
@@ -402,6 +437,29 @@ export default function PersonDetailClient({ person }: Props) {
       ""
     );
   }, [person, latestInviteDraft]);
+
+  // P2-5b: 상세 신호 기본 받는 사람 = 이 사람 1명(연결됐을 때). + 사람 추가 후보는
+  // 연결 풀에서, 이미 선택된 사람은 시트가 자동 제외.
+  const detailSignalRecipients = useMemo<SignalRecipient[]>(
+    () =>
+      receiverUserId
+        ? [
+            {
+              receiverId: receiverUserId,
+              personId: person.id,
+              name: getPersonDisplayName(displayPerson),
+            },
+          ]
+        : [],
+    [receiverUserId, person.id, displayPerson],
+  );
+
+  const detailPersonIdByReceiver = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of connectedSignalPool) map.set(r.receiverId, r.personId);
+    if (receiverUserId) map.set(receiverUserId, person.id);
+    return map;
+  }, [connectedSignalPool, receiverUserId, person.id]);
 
   // 진입/상대 변경 시 나 ↔ 이 상대의 최근 신호 5건을 pair query 로 1회 조회한다.
   // 상대 user id 가 없으면(연결 전/생성 상태) 서버 요청하지 않고 빈 기록으로 둔다.
@@ -756,10 +814,10 @@ export default function PersonDetailClient({ person }: Props) {
 
           <div className="mt-5 flex items-center gap-3">
             <div className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[2.5px] border-[#7E57C2] bg-[#EFE7FA] text-[20px] font-bold text-[#4B2E83]">
-              {getPersonDisplayName(person).slice(0, 2) || "?"}
-              {getPersonDisplayPhoto(person) ? (
+              {getPersonDisplayName(displayPerson).slice(0, 2) || "?"}
+              {getPersonDisplayPhoto(displayPerson) ? (
                 <img
-                  src={getPersonDisplayPhoto(person)}
+                  src={getPersonDisplayPhoto(displayPerson)}
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover"
                   onError={(event) => {
@@ -772,13 +830,13 @@ export default function PersonDetailClient({ person }: Props) {
               <div className="flex items-center gap-2">
                 {/* 헤더 큰 이름 = 표시 이름(localAlias > remoteProfileName > name) */}
                 <h1 className="truncate text-[28px] font-bold tracking-[-0.04em]">
-                  {getPersonDisplayName(person)}
+                  {getPersonDisplayName(displayPerson)}
                 </h1>
                 {isJoined ? <span className="h-2 w-2 rounded-full bg-[#079863]" /> : null}
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <span className="rounded-full bg-[#EFE7FA] px-2.5 py-1 text-[12px] font-semibold text-[#4B2E83]">
-                  {person.roleLabel || inviteStatusMeta.badge}
+                  {getDashboardTierLabel(effectiveTier) || person.roleLabel || inviteStatusMeta.badge}
                 </span>
                 <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${inviteStatusMeta.badgeClass}`}>
                   {isJoined ? "가입 완료" : inviteStatusMeta.badge}
@@ -953,14 +1011,16 @@ export default function PersonDetailClient({ person }: Props) {
       <SignalBottomSheet
         open={signalOpen}
         onClose={() => setSignalOpen(false)}
-        onSelect={async (emoji) => {
-          if (!receiverUserId) {
+        recipients={detailSignalRecipients}
+        candidates={connectedSignalPool}
+        onSendSignal={async (emoji, receiverIds) => {
+          if (receiverIds.length === 0) {
             setSavedMessageTone("neutral");
-            setSavedMessage("상대 사용자 ID가 아직 연결되지 않았어요.");
+            setSavedMessage("받는 사람을 1명 이상 선택해 주세요.");
             return;
           }
 
-          const success = await sendSignal(getCurrentUserId(), [receiverUserId], emoji);
+          const success = await sendSignal(getCurrentUserId(), receiverIds, emoji);
 
           if (!success) {
             setSavedMessageTone("neutral");
@@ -968,23 +1028,29 @@ export default function PersonDetailClient({ person }: Props) {
             return;
           }
 
-          markContacted(person.id);
-          setRelationshipCompleted(person.id);
+          for (const receiverId of receiverIds) {
+            const targetPersonId = detailPersonIdByReceiver.get(receiverId);
+            if (!targetPersonId) continue;
+            markContacted(targetPersonId);
+            setRelationshipCompleted(targetPersonId);
+          }
           setSavedMessageTone("success");
-          setSavedMessage("신호를 보냈어요.");
+          setSavedMessage(`신호를 보냈어요. (${receiverIds.length}명)`);
           setSignalOpen(false);
           setRefreshKey((value) => value + 1);
 
-          // 방금 보낸 신호를 "최근 신호"에 즉시 반영(같은 pair query 재사용).
-          void readSignalsBetweenUsers(getCurrentUserId(), receiverUserId, 5).then(
-            (rows) => setRecentSignals(rows),
-          );
+          // 방금 보낸 신호를 "최근 신호"에 즉시 반영(이 상대와의 pair query 재사용).
+          if (receiverUserId) {
+            void readSignalsBetweenUsers(getCurrentUserId(), receiverUserId, 5).then(
+              (rows) => setRecentSignals(rows),
+            );
+          }
 
           void fetch("/api/push/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              receiverIds: [receiverUserId],
+              receiverIds,
               title: "새 신호가 도착했어요",
               body: `${emoji} 신호가 왔어요.`,
               url: "/dashboard/signals",
