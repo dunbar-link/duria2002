@@ -297,9 +297,6 @@ function FolderMemberTile({
         {getEntityLabel(entityId, folders)}
       </span>
 
-      <span className="mt-[6px] text-[9px] font-medium leading-none text-slate-300">
-        길게 눌러 이동
-      </span>
     </div>
   );
 }
@@ -328,7 +325,6 @@ type FolderBottomSheetProps = {
 export default function FolderBottomSheet({
   folder,
   folders,
-  topLayerLabel,
   isVisible,
   folderDragState,
   folderDragOverState,
@@ -343,7 +339,6 @@ export default function FolderBottomSheet({
   onPersonClick,
 }: FolderBottomSheetProps) {
   const people = usePeopleStore((state) => state.people);
-  const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
   const markContacted = usePeopleStore((state) => state.markContacted);
 
   const [nameInput, setNameInput] = useState(folder.customName ?? "");
@@ -363,37 +358,27 @@ export default function FolderBottomSheet({
     return collectFolderPersonIds(folder, folders);
   }, [folder, folders]);
 
+  // P2-4j: 연결 판정을 Home/People 과 동일하게 "remote PID(userId/dlUserId/
+  // acceptedPersonId) 존재" 기준으로 통일한다. 과거엔 로컬 inviteDraft(status
+  // accepted)를 추가로 요구해서, remote sync 로만 연결된 사람(로컬 draft 없음)이
+  // 폴더 세부창에서 "연결된 0명"으로 잘못 표시됐다. PID 가 곧 신호 수신자 id.
   const connectedMembers = useMemo(() => {
+    const pick = (value: unknown) =>
+      typeof value === "string" && value.trim() ? value.trim() : "";
     return allFolderPersonIds
       .map((personId) => {
         const person = people.find((item) => item.id === personId);
-
         if (!person) {
           return null;
         }
-
-        const latestInviteDraft = inviteDrafts
-          .filter((draft) => draft.sourcePersonId === personId)
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-
-        if (latestInviteDraft?.status !== "accepted") {
-          return null;
-        }
-
         const personRecord = person as Record<string, unknown>;
         const receiverUserId =
-          typeof personRecord.userId === "string"
-            ? personRecord.userId
-            : typeof personRecord.dlUserId === "string"
-              ? personRecord.dlUserId
-              : typeof personRecord.acceptedPersonId === "string"
-                ? personRecord.acceptedPersonId
-                : latestInviteDraft.acceptedPersonId;
-
+          pick(personRecord.userId) ||
+          pick(personRecord.dlUserId) ||
+          pick(personRecord.acceptedPersonId);
         if (!receiverUserId) {
           return null;
         }
-
         return {
           personId,
           receiverUserId,
@@ -403,7 +388,7 @@ export default function FolderBottomSheet({
         (item): item is { personId: string; receiverUserId: string } =>
           Boolean(item),
       );
-  }, [allFolderPersonIds, inviteDrafts, people]);
+  }, [allFolderPersonIds, people]);
 
   const connectedMemberIds = useMemo(() => {
     return connectedMembers.map((item) => item.receiverUserId);
@@ -472,12 +457,14 @@ export default function FolderBottomSheet({
 
       <section
         className={cn(
-          "fixed inset-x-[18px] bottom-[18px] z-[70] mx-auto rounded-[28px] border border-slate-200/85 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-[16px] pb-4 pt-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)] transition-all duration-200 ease-out",
+          "fixed inset-x-0 bottom-[18px] z-[70] mx-auto rounded-[28px] border border-slate-200/85 bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-[16px] pb-4 pt-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)] transition-all duration-200 ease-out",
           isVisible
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-[18px] opacity-0",
         )}
-        style={{ width: "min(100%, 380px)" }}
+        // P2-4j: inset-x-0 + mx-auto + 좌우 18px 대칭 여백으로 모바일 중앙 정렬
+        // (기존 inset-x-[18px] + 고정 width 조합이 오른쪽으로 치우쳐 보였다).
+        style={{ width: "calc(100% - 36px)", maxWidth: "380px" }}
       >
         <div className="mx-auto mb-[10px] h-[4px] w-[56px] rounded-full bg-slate-200" />
 
@@ -492,21 +479,14 @@ export default function FolderBottomSheet({
                 <h2 className="truncate text-[16px] font-semibold text-slate-900">
                   {getFolderDisplayName(folder.id, folders)}
                 </h2>
-                <p className="mt-[3px] text-[11px] text-slate-400">
-                  {folder.customName?.trim()
-                    ? `직접 지정한 이름 · 실제 ${getEntityRealCount(folder.id, folders)}명`
-                    : `자동 이름 · 실제 ${getEntityRealCount(folder.id, folders)}명`}
-                </p>
-                <p className="mt-[4px] text-[11px] text-slate-300">
-                  현재 레이어 · {topLayerLabel}
-                </p>
+                <p className="mt-[3px] text-[11px] text-slate-400">폴더명</p>
               </button>
             ) : (
               <div>
                 <input
                   value={nameInput}
                   onChange={(event) => setNameInput(event.target.value)}
-                  placeholder="비우면 자동 이름으로 돌아가요"
+                  placeholder="폴더명 (비우면 기본값)"
                   className="h-[38px] w-full rounded-[14px] border border-slate-200 bg-white px-3 text-[12px] text-slate-700 outline-none placeholder:text-slate-300"
                   autoFocus
                 />
@@ -589,14 +569,8 @@ export default function FolderBottomSheet({
             </span>
           </div>
 
-          <div className="mb-[10px] text-[11px] leading-relaxed text-slate-400">
-            클릭하면 상세로 이동
-            <br />
-            길게 누르면 레이어 밖으로 이동
-          </div>
-
           <div
-            className="grid w-full justify-items-center gap-y-[14px]"
+            className="mb-[10px] grid w-full justify-items-center gap-y-[14px]"
             style={{
               // 고정 px(5×60=340) 대신 카드 폭을 5등분(minmax(0,1fr))해 항상 카드 안에
               // 들어오게 한다. 타일은 MEMBER_TILE_WIDTH(50)로 셀 안에 중앙 정렬되어
