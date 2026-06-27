@@ -26,7 +26,8 @@
     "seed:run": "node dist-scripts/scripts/seed_org_graph.js",
     "seed:all": "npm run seed:build && npm run seed:gen:kr && npm run seed:gen:univ-company && npm run seed:gen:celebrity && npm run seed:run",
     "claude:wait-dev": "powershell -ExecutionPolicy Bypass -File scripts/claude-wait-dev-ready.ps1",
-    "claude:smoke-sync-unauth": "powershell -ExecutionPolicy Bypass -File scripts/claude-smoke-sync-unauth.ps1"
+    "claude:smoke-sync-unauth": "powershell -ExecutionPolicy Bypass -File scripts/claude-smoke-sync-unauth.ps1",
+    "verify:home-regression": "node scripts/verify-home-regression.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
