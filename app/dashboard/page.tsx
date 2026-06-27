@@ -1596,7 +1596,7 @@ useEffect(() => {
     dragState: layerSheetLongPressDragState,
     beginDrag: beginLayerSheetLongPressDrag,
   } = useFolderLongPressDrag({
-    onDrop: ({ entityId, layerId, area, index }) => {
+    onDrop: ({ entityId, layerId, area, index, action }) => {
       // P2-4f-b: drop 처리 가드도 drag-start 가드와 동일하게 완화한다.
       // isPersonEntityId 는 invite-pending-<token>(초대수락 연결사람) 을 person
       // 으로 인정하지 않아, ghost 는 떴지만(start 가드는 b437683 에서 완화됨)
@@ -1610,13 +1610,10 @@ useEffect(() => {
         return;
       }
 
-      // Step F1 (mobile MVP): combine disabled. The incoming action from
-      // useFolderLongPressDrag is intentionally ignored — every drop is
-      // treated as "swap" so the combine branch below never fires. This
-      // keeps combineEntityIntoTarget intact for desktop (D2) and for
-      // future re-enablement, while mobile long-press only does
-      // swap/move/noop on occupied slots / empty slots / me / folders.
-      const action = "swap" as "swap" | "combine";
+      // P2-4h-d: 모바일도 overlap 강도로 move/swap/folder 를 구분한다. findDropTarget
+      // 가 슬롯 중앙 band(FOLDER_HOVER_CENTER_MIN/MAX) 안이면 action="combine"
+      // (강한 겹침=폴더), 가장자리/레일/빈자리면 "swap"/move 를 준다. 이 action 을
+      // 그대로 사용한다(과거엔 강제 "swap" 으로 폴더 합치기가 막혀 있었음).
 
       // Mobile combine: only when the long-press drag landed in the centre
       // band of an occupied visible slot (action==="combine"). All other
@@ -1787,10 +1784,25 @@ useEffect(() => {
 
       if (swappedTargetEntityId) {
         const swappedTier = getTierByLayerId(sourceOldLayerId);
-        for (const pid of getEntityPersonIdsForTierSync(
+        // P2-4h-d: invite-pending(초대연결) occupant 는
+        // getEntityPersonIdsForTierSync 가 person 으로 인정하지 않아 빈 배열을
+        // 반환한다. 그러면 밀려난 occupant 의 people.tier 가 target(예: 핵심)으로
+        // 남고, reconcile 이 occupant 를 다시 핵심으로 끌어와 dragged 와 함께
+        // 6/5 가 된다(겉보기엔 "swap 실패 → 추가 이동"). store.people 에 실재
+        // 하는 id 면 직접 갱신하는 fallback 으로 swap 의 count 중립을 보장한다.
+        let swappedIds = getEntityPersonIdsForTierSync(
           swappedTargetEntityId,
           folders,
-        )) {
+        );
+        if (swappedIds.length === 0) {
+          const occupantExists = usePeopleStore
+            .getState()
+            .people.some((p) => p.id === swappedTargetEntityId);
+          if (occupantExists) {
+            swappedIds = [swappedTargetEntityId];
+          }
+        }
+        for (const pid of swappedIds) {
           updatePersonTier(pid, swappedTier);
         }
       }
@@ -1837,7 +1849,7 @@ useEffect(() => {
     dragState: homeMainLongPressDragState,
     beginDrag: beginHomeMainLongPressDrag,
   } = useFolderLongPressDrag({
-    onDrop: ({ entityId, layerId, area, index }) => {
+    onDrop: ({ entityId, layerId, area, index, action }) => {
       // P2-4f-b: drop 처리 가드도 drag-start 가드와 동일하게 완화한다.
       // isPersonEntityId 는 invite-pending-<token>(초대수락 연결사람) 을 person
       // 으로 인정하지 않아, ghost 는 떴지만(start 가드는 b437683 에서 완화됨)
@@ -1851,11 +1863,8 @@ useEffect(() => {
         return;
       }
 
-      // Step F1 (mobile MVP): combine disabled — same policy as the
-      // layer-sheet path above. Force-downgrade to "swap" so the combine
-      // branch never fires. Desktop HTML5 path (use-home-drag-drop) keeps
-      // its own combine behavior untouched (D2).
-      const action = "swap" as "swap" | "combine";
+      // P2-4h-d: layer-sheet 경로와 동일하게 findDropTarget 의 action 을 그대로
+      // 사용한다(강한 겹침=combine→폴더, 약한 겹침/빈자리=swap/move).
 
       // Mobile combine: identical gate to the layer-sheet path above —
       // action==="combine" + occupied visible slot + neither side is me/folder.
@@ -2029,10 +2038,25 @@ useEffect(() => {
 
       if (swappedTargetEntityId) {
         const swappedTier = getTierByLayerId(sourceOldLayerId);
-        for (const pid of getEntityPersonIdsForTierSync(
+        // P2-4h-d: invite-pending(초대연결) occupant 는
+        // getEntityPersonIdsForTierSync 가 person 으로 인정하지 않아 빈 배열을
+        // 반환한다. 그러면 밀려난 occupant 의 people.tier 가 target(예: 핵심)으로
+        // 남고, reconcile 이 occupant 를 다시 핵심으로 끌어와 dragged 와 함께
+        // 6/5 가 된다(겉보기엔 "swap 실패 → 추가 이동"). store.people 에 실재
+        // 하는 id 면 직접 갱신하는 fallback 으로 swap 의 count 중립을 보장한다.
+        let swappedIds = getEntityPersonIdsForTierSync(
           swappedTargetEntityId,
           folders,
-        )) {
+        );
+        if (swappedIds.length === 0) {
+          const occupantExists = usePeopleStore
+            .getState()
+            .people.some((p) => p.id === swappedTargetEntityId);
+          if (occupantExists) {
+            swappedIds = [swappedTargetEntityId];
+          }
+        }
+        for (const pid of swappedIds) {
           updatePersonTier(pid, swappedTier);
         }
       }

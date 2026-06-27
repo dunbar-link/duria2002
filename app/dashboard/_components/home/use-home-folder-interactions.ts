@@ -320,6 +320,26 @@ export function useHomeFolderInteractions({
     setLayoutState(nextLayout);
     setFolders(nextFolders);
     syncPersonTierForLayer(entityId, targetLayerId, folders);
+
+    // P2-4h-d: occupied visible 슬롯에 떨어뜨려 swap 된 occupant 는 folder top
+    // layer(insertedLocation.layerId)로 밀려난다. occupant 의 people.tier 를 그
+    // layer tier 로 동기화하지 않으면 reconcile 이 occupant 를 원래 target layer
+    // 로 되돌려 cap 초과(6/5)를 만든다(모바일 onDrop swap fallback 과 동일 의미).
+    // syncPersonTierForLayer 는 invite-pending fallback 을 포함한다.
+    if (
+      targetArea === "visible" &&
+      capDisplacedEntityId &&
+      capDisplacedEntityId !== entityId &&
+      capDisplacedEntityId !== "family-me" &&
+      insertedLocation.layerId !== targetLayerId
+    ) {
+      syncPersonTierForLayer(
+        capDisplacedEntityId,
+        insertedLocation.layerId,
+        folders,
+      );
+    }
+
     closeFolderMoveMenu();
   }
 
