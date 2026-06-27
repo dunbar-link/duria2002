@@ -70,7 +70,9 @@ import LayerBottomSheet from "./_components/home/layer-bottom-sheet";
 import LayerStrip from "./_components/home/layer-strip";
 import LongPressGhost from "./_components/home/LongPressGhost";
 import HomeConnectableSearchSheet from "./_components/home/home-connectable-search-sheet";
-import SignalBottomSheet from "./_components/home/signal-bottom-sheet";
+import SignalBottomSheet, {
+  type SignalRecipient,
+} from "./_components/home/signal-bottom-sheet";
 import {
   CONNECTABLE_CANDIDATE_STATE_STORAGE_KEY,
   CONNECTABLE_SOURCE_LAYER_ID,
@@ -984,6 +986,53 @@ useEffect(() => {
     personId: string;
     name: string;
   } | null>(null);
+
+  // P2-5: 신호 받는 사람 선택용 연결된 사람 풀(PID 기준 = Home/People/P2-4j 와 동일).
+  // userId/dlUserId/acceptedPersonId 중 하나라도 있으면 연결로 본다(미연결/me 제외).
+  const connectedSignalPool = useMemo<SignalRecipient[]>(() => {
+    const pick = (value: unknown) =>
+      typeof value === "string" && value.trim() ? value.trim() : "";
+    const out: SignalRecipient[] = [];
+    const seen = new Set<string>();
+    for (const p of people) {
+      const rec = p as Record<string, unknown>;
+      const receiverId =
+        pick(rec.userId) || pick(rec.dlUserId) || pick(rec.acceptedPersonId);
+      if (!receiverId || receiverId === "me" || seen.has(receiverId)) {
+        continue;
+      }
+      seen.add(receiverId);
+      out.push({ receiverId, personId: p.id, name: getPersonDisplayName(p) });
+    }
+    return out;
+  }, [people]);
+
+  // 개인 신호 기본 받는 사람 1명(현재 탭한 사람).
+  const personalSignalRecipients = useMemo<SignalRecipient[]>(
+    () =>
+      signalTarget
+        ? [
+            {
+              receiverId: signalTarget.id,
+              personId: signalTarget.personId,
+              name: signalTarget.name,
+            },
+          ]
+        : [],
+    [signalTarget],
+  );
+
+  // 보낸 뒤 markContacted/urgent 해제를 위해 receiverId(PID) → 로컬 personId 매핑.
+  const personIdByReceiver = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of connectedSignalPool) {
+      map.set(r.receiverId, r.personId);
+    }
+    if (signalTarget) {
+      map.set(signalTarget.id, signalTarget.personId);
+    }
+    return map;
+  }, [connectedSignalPool, signalTarget]);
 
   // 받은 미확인 신호의 sender userId 목록(서버 기준). 신호함 배지는 이 중
   // "현재 연결된 sender" 가 하나라도 있을 때만 켜진다(파생 hasUnreadSignal).
@@ -3213,24 +3262,28 @@ const isJoined =
         onClose={() => {
           setSignalOpen(false);
         }}
-        onSelect={async (emoji) => {
-          if (!signalTarget) return;
+        recipients={personalSignalRecipients}
+        candidates={connectedSignalPool}
+        onSendSignal={async (emoji, receiverIds) => {
+          if (receiverIds.length === 0) return;
 
           const senderId = getCurrentUserId();
-
-          const success = await sendSignal(senderId, [signalTarget.id], emoji);
+          const success = await sendSignal(senderId, receiverIds, emoji);
 
           if (!success) {
             console.log("개인 신호 실패");
             return;
           }
 
-          console.log("개인 신호 성공:", signalTarget.name, emoji);
-          markContacted(signalTarget.personId);
-          dismissRedActionForPerson(signalTarget.personId);
-
-          if (personCatalog[signalTarget.personId]) {
-            personCatalog[signalTarget.personId].urgent = false;
+          console.log("개인 신호 성공:", receiverIds.length, "명", emoji);
+          for (const receiverId of receiverIds) {
+            const personId = personIdByReceiver.get(receiverId);
+            if (!personId) continue;
+            markContacted(personId);
+            dismissRedActionForPerson(personId);
+            if (personCatalog[personId]) {
+              personCatalog[personId].urgent = false;
+            }
           }
 
           // 보낸 신호는 상대방 화면의 파란점으로 표시된다.
@@ -3242,7 +3295,7 @@ const isJoined =
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              receiverIds: [signalTarget.id],
+              receiverIds,
               title: "새 신호가 도착했어요",
               body: `${emoji} 신호가 왔어요.`,
               url: "/dashboard/signals",

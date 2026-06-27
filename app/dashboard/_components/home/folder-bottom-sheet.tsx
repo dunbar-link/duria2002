@@ -34,8 +34,10 @@ import {
 import { personCatalog } from "./home-page-types";
 import { usePeopleStore } from "../../people/store";
 import type { DashboardPerson } from "../../people/data";
-import { getPersonDisplayPhoto } from "../../people/data";
-import SignalBottomSheet from "./signal-bottom-sheet";
+import { getPersonDisplayName, getPersonDisplayPhoto } from "../../people/data";
+import SignalBottomSheet, {
+  type SignalRecipient,
+} from "./signal-bottom-sheet";
 
 // 폴더 "내부 구성원" 그리드 전용 타일 폭. 공유 SHEET_TILE_WIDTH(60)보다 작게 잡아
 // 좁은 폰에서도 5칸이 카드 밖으로 삐져나오지 않게 한다(레이어 더보기 시트는 그대로 유지).
@@ -407,10 +409,11 @@ export default function FolderBottomSheet({
         return {
           personId,
           receiverUserId,
+          name: getPersonDisplayName(person),
         };
       })
       .filter(
-        (item): item is { personId: string; receiverUserId: string } =>
+        (item): item is { personId: string; receiverUserId: string; name: string } =>
           Boolean(item),
       );
   }, [allFolderPersonIds, people]);
@@ -418,6 +421,44 @@ export default function FolderBottomSheet({
   const connectedMemberIds = useMemo(() => {
     return connectedMembers.map((item) => item.receiverUserId);
   }, [connectedMembers]);
+
+  // P2-5: 폴더 신호 기본 받는 사람 = 폴더 안 연결된 사람 전체.
+  const folderSignalRecipients = useMemo<SignalRecipient[]>(
+    () =>
+      connectedMembers.map((m) => ({
+        receiverId: m.receiverUserId,
+        personId: m.personId,
+        name: m.name,
+      })),
+    [connectedMembers],
+  );
+
+  // "사람 추가" 후보 = store 전체의 연결된 사람(PID 기준). 이미 선택된 폴더
+  // 멤버는 시트가 자동 제외한다. me/미연결은 제외.
+  const connectedSignalPool = useMemo<SignalRecipient[]>(() => {
+    const pick = (value: unknown) =>
+      typeof value === "string" && value.trim() ? value.trim() : "";
+    const out: SignalRecipient[] = [];
+    const seen = new Set<string>();
+    for (const p of people) {
+      const rec = p as Record<string, unknown>;
+      const receiverId =
+        pick(rec.userId) || pick(rec.dlUserId) || pick(rec.acceptedPersonId);
+      if (!receiverId || receiverId === "me" || seen.has(receiverId)) {
+        continue;
+      }
+      seen.add(receiverId);
+      out.push({ receiverId, personId: p.id, name: getPersonDisplayName(p) });
+    }
+    return out;
+  }, [people]);
+
+  const folderPersonIdByReceiver = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of connectedSignalPool) map.set(r.receiverId, r.personId);
+    for (const m of connectedMembers) map.set(m.receiverUserId, m.personId);
+    return map;
+  }, [connectedSignalPool, connectedMembers]);
 
   const gridIds = fillSlots(directMemberIds, Math.max(9, directMemberIds.length));
   const isDragActive = folderDragState !== null;
@@ -444,27 +485,33 @@ export default function FolderBottomSheet({
     setSignalOpen(true);
   }
 
- async function handleSendFolderSignal(emoji: string) {
-  if (connectedMemberIds.length === 0) {
-    setSignalFeedback("보낼 수 있는 연결된 사람이 없어요.");
+ // P2-5: 받는 사람 선택 모드. 시트에서 선택된 receiverIds(폴더 멤버 + 추가한
+ // 사람) 로 보낸다. 0명이면 시트가 전송을 막으므로 여기선 방어만.
+ async function handleSendFolderSignal(emoji: string, receiverIds: string[]) {
+  const ids = Array.from(new Set(receiverIds.filter(Boolean)));
+  if (ids.length === 0) {
+    setSignalFeedback("받는 사람을 1명 이상 선택해 주세요.");
     return;
   }
 
   const senderId = getCurrentUserId();
 
-  const success = await sendSignal(senderId, connectedMemberIds, emoji);
+  const success = await sendSignal(senderId, ids, emoji);
 
   if (!success) {
     setSignalFeedback("신호 전송에 실패했어요.");
     return;
   }
 
-  for (const member of connectedMembers) {
-    markContacted(member.personId);
+  for (const receiverId of ids) {
+    const personId = folderPersonIdByReceiver.get(receiverId);
+    if (personId) {
+      markContacted(personId);
+    }
   }
 
   setSignalOpen(false);
-  setSignalFeedback(`${emoji} ${connectedMemberIds.length}명에게 보냈어요.`);
+  setSignalFeedback(`${emoji} ${ids.length}명에게 보냈어요.`);
 }
 
 
@@ -662,7 +709,9 @@ export default function FolderBottomSheet({
       <SignalBottomSheet
         open={signalOpen}
         onClose={() => setSignalOpen(false)}
-        onSelect={handleSendFolderSignal}
+        recipients={folderSignalRecipients}
+        candidates={connectedSignalPool}
+        onSendSignal={handleSendFolderSignal}
       />
     </>
   );

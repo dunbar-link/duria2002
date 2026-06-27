@@ -12,11 +12,37 @@ import {
   type SignalItem,
 } from "./signal-data";
 
+// P2-5: 신호 "받는 사람". receiverId = 연결 PID(userId/dlUserId/acceptedPersonId),
+// personId = 로컬 person id(markContacted 용), name = 표시명.
+export type SignalRecipient = {
+  receiverId: string;
+  personId: string;
+  name: string;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSelect: (emoji: string) => void;
+  // legacy 단일 콜백(상세/신호함/invite 시트에서 사용). 받는 사람은 호출부 고정.
+  onSelect?: (emoji: string) => void;
+  // P2-5 받는 사람 선택 모드(개인/폴더 신호). recipients + onSendSignal 이 모두
+  // 주어지면 chip + "사람 추가" UI 를 렌더하고, 이모지 탭 시 선택된 모두에게 보낸다.
+  recipients?: SignalRecipient[];
+  candidates?: SignalRecipient[];
+  onSendSignal?: (emoji: string, receiverIds: string[]) => void;
 };
+
+function dedupeRecipients(list: SignalRecipient[]): SignalRecipient[] {
+  const seen = new Set<string>();
+  const out: SignalRecipient[] = [];
+  for (const r of list) {
+    const id = r.receiverId.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(r);
+  }
+  return out;
+}
 
 function readRecentSignals(): string[] {
   if (typeof window === "undefined") {
@@ -52,14 +78,50 @@ type GridEntry = {
   isFirstInCategory: boolean;
 };
 
-export default function SignalBottomSheet({ open, onClose, onSelect }: Props) {
+export default function SignalBottomSheet({
+  open,
+  onClose,
+  onSelect,
+  recipients,
+  candidates,
+  onSendSignal,
+}: Props) {
   const [recent, setRecent] = useState<string[]>([]);
+  // P2-5 받는 사람 선택 모드.
+  const recipientMode = Boolean(recipients && onSendSignal);
+  const [selected, setSelected] = useState<SignalRecipient[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  // recipients/candidates 는 렌더마다 새 배열일 수 있어 open 전이 시점에만 초기화.
+  const recipientsRef = useRef<SignalRecipient[] | undefined>(recipients);
+  recipientsRef.current = recipients;
 
   useEffect(() => {
     if (open) {
       setRecent(readRecentSignals());
+      setSelected(dedupeRecipients(recipientsRef.current ?? []));
+      setShowAdd(false);
     }
   }, [open]);
+
+  const selectedIds = useMemo(
+    () => new Set(selected.map((r) => r.receiverId)),
+    [selected],
+  );
+  // 추가 가능한 후보 = 연결된 사람(호출부가 PID 보장) 중 아직 선택 안 된 사람.
+  const addableCandidates = useMemo(
+    () => dedupeRecipients(candidates ?? []).filter((c) => !selectedIds.has(c.receiverId)),
+    [candidates, selectedIds],
+  );
+
+  function addRecipient(r: SignalRecipient) {
+    setSelected((prev) =>
+      prev.some((p) => p.receiverId === r.receiverId) ? prev : [...prev, r],
+    );
+  }
+
+  function removeRecipient(receiverId: string) {
+    setSelected((prev) => prev.filter((p) => p.receiverId !== receiverId));
+  }
 
   const recentList = useMemo(() => {
     return recent
@@ -127,12 +189,28 @@ export default function SignalBottomSheet({ open, onClose, onSelect }: Props) {
   }
 
   function handleSelect(emoji: string) {
+    // 받는 사람 선택 모드: 0명이면 전송 막음, 아니면 선택된 모두에게 보낸다.
+    if (recipientMode) {
+      const receiverIds = Array.from(
+        new Set(selected.map((r) => r.receiverId.trim()).filter(Boolean)),
+      );
+      if (receiverIds.length === 0) {
+        return;
+      }
+      const next = [emoji, ...recent.filter((item) => item !== emoji)];
+      setRecent(next);
+      writeRecentSignals(next);
+      onSendSignal?.(emoji, receiverIds);
+      onClose();
+      return;
+    }
+
     const next = [emoji, ...recent.filter((item) => item !== emoji)];
 
     setRecent(next);
     writeRecentSignals(next);
 
-    onSelect(emoji);
+    onSelect?.(emoji);
     onClose();
   }
 
@@ -147,6 +225,68 @@ export default function SignalBottomSheet({ open, onClose, onSelect }: Props) {
 
       <section className="fixed bottom-0 left-1/2 z-[91] w-full max-w-md -translate-x-1/2 rounded-t-[30px] bg-[#f8f9fb] px-[14px] pb-[calc(16px+env(safe-area-inset-bottom))] pt-[10px] shadow-[0_-18px_44px_rgba(15,23,42,0.18)]">
         <div className="mx-auto mb-[10px] h-[4px] w-[42px] rounded-full bg-slate-300" />
+
+        {recipientMode ? (
+          <div className="mb-[12px] rounded-[18px] border border-slate-200 bg-white px-[12px] py-[10px]">
+            <div className="mb-[8px] flex items-center justify-between">
+              <span className="text-[12px] font-semibold text-slate-700">
+                받는 사람 {selected.length}명
+              </span>
+              {addableCandidates.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAdd((v) => !v)}
+                  className="rounded-full border border-slate-200 bg-white px-[10px] py-[4px] text-[11px] font-semibold text-slate-600 active:scale-95"
+                >
+                  {showAdd ? "닫기" : "+ 사람 추가"}
+                </button>
+              ) : null}
+            </div>
+
+            {selected.length === 0 ? (
+              <p className="text-[11px] text-slate-400">
+                받는 사람을 1명 이상 선택하면 신호를 보낼 수 있어요.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-[6px]">
+                {selected.map((r) => (
+                  <span
+                    key={r.receiverId}
+                    className="inline-flex items-center gap-[5px] rounded-full bg-slate-100 px-[10px] py-[5px] text-[12px] font-medium text-slate-700"
+                  >
+                    <span className="max-w-[120px] truncate">{r.name}</span>
+                    <button
+                      type="button"
+                      aria-label={`${r.name} 제외`}
+                      onClick={() => removeRecipient(r.receiverId)}
+                      className="text-[12px] leading-none text-slate-400 active:scale-90"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {showAdd ? (
+              <div className="mt-[10px] max-h-[160px] overflow-y-auto rounded-[14px] border border-slate-100 bg-slate-50/60 p-[6px]">
+                {addableCandidates.map((c) => (
+                  <button
+                    key={c.receiverId}
+                    type="button"
+                    onClick={() => addRecipient(c)}
+                    className="flex w-full items-center justify-between rounded-[10px] px-[10px] py-[7px] text-left text-[13px] font-medium text-slate-700 hover:bg-white active:scale-[0.99]"
+                  >
+                    <span className="max-w-[200px] truncate">{c.name}</span>
+                    <span className="text-[12px] font-semibold text-slate-400">
+                      추가
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="-mx-[14px] mb-[10px] overflow-x-auto px-[14px]">
           <div className="flex w-max gap-[6px]">
