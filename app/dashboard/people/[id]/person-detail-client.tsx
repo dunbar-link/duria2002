@@ -168,11 +168,11 @@ function CompactInfoRow({
   }
 
   return (
-    <div className="rounded-2xl bg-slate-50 px-3 py-3">
+    <div className="rounded-[14px] bg-slate-50 px-3 py-2">
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-sm leading-6 text-slate-700">{value}</p>
+      <p className="mt-0.5 text-sm leading-5 text-slate-700">{value}</p>
     </div>
   );
 }
@@ -809,12 +809,12 @@ export default function PersonDetailClient({ person }: Props) {
   return (
     <>
       <main className="hide-scrollbar flex h-full min-h-0 flex-col overflow-y-auto bg-[#F5F3EE] pb-[112px] text-[#0F172A] [overscroll-behavior-y:contain] [scrollbar-width:none]">
-        <div className="sticky top-0 z-20 border-b border-[#D3D1C7] bg-[#FAFAF8] px-5 pb-4 pt-4">
+        <div className="sticky top-0 z-20 border-b border-[#D3D1C7] bg-[#FAFAF8] px-5 pb-3 pt-3.5">
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={() => router.back()}
-              className="inline-flex h-10 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
+              className="inline-flex h-9 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
             >
               뒤로
             </button>
@@ -824,9 +824,9 @@ export default function PersonDetailClient({ person }: Props) {
             </Link>
           </div>
 
-          <div className="mt-5 flex items-center gap-3">
+          <div className="mt-3.5 flex items-center gap-3">
             <div
-              className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[2.5px] text-[20px] font-bold"
+              className="relative flex h-[50px] w-[50px] shrink-0 items-center justify-center overflow-hidden rounded-[15px] border-[2.5px] text-[18px] font-bold"
               style={{
                 borderColor: tierColor.border,
                 background: tierColor.bg,
@@ -848,7 +848,7 @@ export default function PersonDetailClient({ person }: Props) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 {/* 헤더 큰 이름 = 표시 이름(localAlias > remoteProfileName > name) */}
-                <h1 className="truncate text-[28px] font-bold tracking-[-0.04em]">
+                <h1 className="truncate text-[23px] font-bold tracking-[-0.04em]">
                   {getPersonDisplayName(displayPerson)}
                 </h1>
                 {isJoined ? <span className="h-2 w-2 rounded-full bg-[#079863]" /> : null}
@@ -874,21 +874,24 @@ export default function PersonDetailClient({ person }: Props) {
           ) : null}
         </div>
 
-        <section className="px-4 pt-4">
-          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
-            <p className="text-[13px] font-semibold text-[#079863]">
-              {isJoined ? "던바링크에 가입했어요." : "아직 가입 전이에요."}
-            </p>
-            <p className="mt-2 text-[14px] leading-6 text-[#64748B]">
+        {/* P2-6B-2: 가입 안내는 헤더의 가입 칩과 중복이라 한 줄 스트립으로 압축
+            (상태 + 신호 가능 여부를 한 문장으로). 정보는 유지, 카드 높이만 축소. */}
+        <section className="px-4 pt-3">
+          <p className="rounded-[16px] bg-[#FAFAF8] px-4 py-2.5 text-[13px] leading-5 shadow-sm ring-1 ring-[#D3D1C7]">
+            <span className="font-semibold text-[#079863]">
+              {isJoined ? "가입 완료" : "가입 전"}
+            </span>
+            <span className="text-[#64748B]">
+              {" · "}
               {isJoined
                 ? "바로 짧은 신호를 보낼 수 있어요."
                 : "가입 완료 후 신호 보내기가 열려요."}
-            </p>
-          </div>
+            </span>
+          </p>
         </section>
 
-        <section className="mt-3 px-4">
-          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+        <section className="mt-2.5 px-4">
+          <div className="rounded-[22px] bg-[#FAFAF8] px-4 py-3.5 shadow-sm ring-1 ring-[#D3D1C7]">
             <button
               type="button"
               onClick={() => {
@@ -904,7 +907,7 @@ export default function PersonDetailClient({ person }: Props) {
                 }
                 setSignalOpen(true);
               }}
-              className="flex h-[52px] w-full items-center justify-center rounded-[18px] bg-[#0F172A] text-[15px] font-bold text-white active:scale-95"
+              className="flex h-[50px] w-full items-center justify-center rounded-[16px] bg-[#0F172A] text-[15px] font-bold text-white active:scale-95"
             >
               신호 보내기
             </button>
@@ -912,43 +915,43 @@ export default function PersonDetailClient({ person }: Props) {
             <button
               type="button"
               onClick={() => handleSnooze(3)}
-              className="mt-3 flex h-[48px] w-full items-center justify-center rounded-[18px] bg-white text-[14px] font-bold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
+              className="mt-2.5 flex h-[44px] w-full items-center justify-center rounded-[16px] bg-white text-[14px] font-semibold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
             >
               3일 보류하기
             </button>
 
             {remainingSnoozeDays > 0 ? (
-              <p className="mt-3 text-center text-[12px] font-semibold text-[#936018]">
+              <p className="mt-2.5 text-center text-[12px] font-semibold text-[#936018]">
                 현재 {remainingSnoozeDays}일 보류 중
               </p>
             ) : null}
           </div>
         </section>
 
-        <section className="mt-3 px-4">
-          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
-            <h2 className="text-[17px] font-bold">최근 신호</h2>
+        <section className="mt-2.5 px-4">
+          <div className="rounded-[22px] bg-[#FAFAF8] px-4 py-3.5 shadow-sm ring-1 ring-[#D3D1C7]">
+            <h2 className="text-[15px] font-bold">최근 신호</h2>
 
             {!receiverUserId ? (
-              <p className="mt-3 text-[13px] leading-6 text-[#64748B]">
+              <p className="mt-2 text-[13px] leading-5 text-[#64748B]">
                 연결되면 주고받은 신호가 여기에 표시돼요.
               </p>
             ) : recentSignals === null ? (
-              <p className="mt-3 text-[13px] text-[#8D99AE]">불러오는 중...</p>
+              <p className="mt-2 text-[13px] text-[#8D99AE]">불러오는 중...</p>
             ) : recentSignals.length === 0 ? (
-              <p className="mt-3 text-[13px] leading-6 text-[#64748B]">
+              <p className="mt-2 text-[13px] leading-5 text-[#64748B]">
                 아직 주고받은 신호가 없어요.
               </p>
             ) : (
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-2.5 space-y-1.5">
                 {recentSignals.map((signal) => {
                   const isSent = signal.sender_id === currentUserId;
                   return (
                     <li
                       key={signal.id}
-                      className="flex items-center gap-3 rounded-[16px] bg-white px-3 py-2 ring-1 ring-[#D3D1C7]"
+                      className="flex items-center gap-2.5 rounded-[14px] bg-white px-2.5 py-1.5 ring-1 ring-[#D3D1C7]"
                     >
-                      <span className="text-[22px] leading-none">{signal.emoji}</span>
+                      <span className="text-[20px] leading-none">{signal.emoji}</span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                           isSent
@@ -969,10 +972,10 @@ export default function PersonDetailClient({ person }: Props) {
           </div>
         </section>
 
-        <section className="mt-3 px-4">
-          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
+        <section className="mt-2.5 px-4">
+          <div className="rounded-[22px] bg-[#FAFAF8] px-4 py-3.5 shadow-sm ring-1 ring-[#D3D1C7]">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-[17px] font-bold">표시 이름</h2>
+              <h2 className="text-[15px] font-bold">표시 이름</h2>
               {person.remoteProfileName &&
               person.remoteProfileName.trim() &&
               person.remoteProfileName.trim() !== getPersonDisplayName(person) ? (
@@ -984,7 +987,7 @@ export default function PersonDetailClient({ person }: Props) {
             <p className="mt-1 text-[12px] leading-5 text-[#64748B]">
               내 화면에서만 보이는 이름이에요. 비우면 상대가 입력한 이름으로 표시돼요.
             </p>
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-2.5 flex items-center gap-2">
               <input
                 value={aliasDraft}
                 onChange={(event) => setAliasDraft(event.target.value)}
@@ -1002,10 +1005,10 @@ export default function PersonDetailClient({ person }: Props) {
           </div>
         </section>
 
-        <section className="mt-3 px-4">
-          <div className="rounded-[26px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#D3D1C7]">
-            <h2 className="text-[17px] font-bold">기본 정보</h2>
-            <div className="mt-4 grid gap-2">
+        <section className="mt-2.5 px-4">
+          <div className="rounded-[22px] bg-[#FAFAF8] px-4 py-3.5 shadow-sm ring-1 ring-[#D3D1C7]">
+            <h2 className="text-[15px] font-bold">기본 정보</h2>
+            <div className="mt-2.5 grid gap-1.5">
               {/* 기본정보 이름 = 상대 실제 프로필 이름(remoteProfileName) 우선.
                   내 별명(localAlias)은 여기에 절대 들어가지 않는다. */}
               <CompactInfoRow
@@ -1019,11 +1022,11 @@ export default function PersonDetailClient({ person }: Props) {
           </div>
         </section>
 
-        <section className="mt-3 px-4">
+        <section className="mt-2.5 px-4">
           <button
             type="button"
             onClick={() => router.push("/dashboard/people")}
-            className="flex h-[46px] w-full items-center justify-center rounded-[18px] bg-white text-[14px] font-bold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
+            className="flex h-[46px] w-full items-center justify-center rounded-[16px] bg-white text-[14px] font-bold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
           >
             친구 목록으로
           </button>
