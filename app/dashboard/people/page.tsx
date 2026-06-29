@@ -459,7 +459,7 @@ function getInitials(value: string) {
 
 function IconDetail() {
   return (
-    <svg viewBox="0 0 24 24" className="h-[20px] w-[20px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <path d="M14 2v6h6" />
       <path d="M8 13h8" />
@@ -478,7 +478,7 @@ function IconContact() {
 
 function IconDelete() {
   return (
-    <svg viewBox="0 0 24 24" className="h-[20px] w-[20px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 6h18" />
       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -1427,7 +1427,11 @@ export default function DashboardPeoplePage() {
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1.5">
+                    {/* P2-6A: 신호(연락)를 주인공으로, 상세/삭제는 시각적으로
+                        후퇴. 동작/라우팅/삭제 로직은 그대로(스타일·아이콘 크기만
+                        조정). 상세는 카드 아바타와 중복이라 보조 톤으로, 삭제는
+                        목록에서 튀지 않게 ghost 톤으로 낮춘다. */}
+                    <div className="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
                         onClick={(event) => {
@@ -1441,7 +1445,7 @@ export default function DashboardPeoplePage() {
 
                           openDetail(person.id);
                         }}
-                        className="flex h-[38px] w-[38px] items-center justify-center rounded-[13px] bg-[#0F172A] text-white active:scale-95"
+                        className="flex h-[32px] w-[32px] items-center justify-center rounded-[11px] bg-white text-[#8D919A] ring-1 ring-[#E2E0D8] active:scale-95"
                         aria-label="상세 보기"
                       >
                         <IconDetail />
@@ -1450,8 +1454,8 @@ export default function DashboardPeoplePage() {
                       <button
                         type="button"
                         onClick={(event) => handlePrimaryAction(event, person)}
-                        className="flex h-[38px] w-[38px] items-center justify-center rounded-[13px] bg-[#2C2C2A] text-[#F1EFE8] active:scale-95"
-                        aria-label="연락하기"
+                        className="flex h-[40px] w-[40px] items-center justify-center rounded-[14px] bg-[#2C2C2A] text-[#F1EFE8] shadow-[0_4px_12px_rgba(15,23,42,0.12)] active:scale-95"
+                        aria-label="신호 보내기"
                       >
                         <IconContact />
                       </button>
@@ -1459,7 +1463,7 @@ export default function DashboardPeoplePage() {
                       <button
                         type="button"
                         onClick={(event) => handleDeletePerson(event, person)}
-                        className="flex h-[38px] w-[38px] items-center justify-center rounded-[13px] bg-[#FBEAF0] text-[#993556] ring-1 ring-[#F4C0D1] active:scale-95"
+                        className="flex h-[32px] w-[32px] items-center justify-center rounded-[11px] bg-transparent text-[#C99AAC] active:scale-95"
                         aria-label="삭제"
                       >
                         <IconDelete />

@@ -237,9 +237,9 @@ export default function SignalBottomSheet({
         <div className="mx-auto mb-[10px] h-[4px] w-[42px] rounded-full bg-slate-300" />
 
         {recipientMode ? (
-          <div className="mb-[12px] rounded-[18px] border border-slate-200 bg-white px-[12px] py-[10px]">
-            <div className="mb-[8px] flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-slate-700">
+          <div className="mb-[14px] rounded-[18px] border border-slate-200 bg-white px-[13px] py-[11px] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+            <div className="mb-[9px] flex items-center justify-between">
+              <span className="text-[13px] font-bold text-slate-800">
                 받는 사람 {selected.length}명
               </span>
               {/* "사람 추가"는 항상 노출(후보 0명이어도 패널에서 안내). */}
@@ -287,7 +287,7 @@ export default function SignalBottomSheet({
                   placeholder="이름 검색"
                   className="mb-[6px] h-[36px] w-full rounded-[12px] border border-slate-200 bg-white px-[10px] text-[13px] text-slate-700 outline-none placeholder:text-slate-300 focus:border-slate-400"
                 />
-                <div className="max-h-[160px] overflow-y-auto rounded-[14px] border border-slate-100 bg-slate-50/60 p-[6px]">
+                <div className="max-h-[160px] overflow-y-auto rounded-[14px] border border-slate-100 bg-slate-50/60 p-[6px] [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.35)_transparent] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/50 [&::-webkit-scrollbar-track]:bg-transparent">
                   {addableCandidates.length === 0 ? (
                     <p className="px-[10px] py-[10px] text-[12px] text-slate-400">
                       추가할 사람이 없어요.
@@ -317,14 +317,14 @@ export default function SignalBottomSheet({
           </div>
         ) : null}
 
-        <div className="-mx-[14px] mb-[10px] overflow-x-auto px-[14px]">
-          <div className="flex w-max gap-[6px]">
+        <div className="-mx-[14px] mb-[12px] overflow-x-auto px-[14px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex w-max gap-[7px]">
             {SIGNAL_CATEGORIES.map((category) => (
               <button
                 key={category.id}
                 type="button"
                 onClick={() => handleCategoryJump(category.id)}
-                className="h-[26px] shrink-0 rounded-full border border-slate-200 bg-white px-[12px] text-[12px] font-medium text-slate-500 active:scale-95"
+                className="h-[28px] shrink-0 rounded-full border border-slate-200 bg-white px-[13px] text-[12px] font-medium text-slate-500 active:scale-95"
               >
                 {category.label}
               </button>
@@ -339,7 +339,7 @@ export default function SignalBottomSheet({
                 key={`recent-${signal.id}`}
                 type="button"
                 onClick={() => handleSelect(signal.emoji)}
-                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-transparent text-[28px] active:scale-95"
+                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-transparent text-[26px] active:scale-95"
                 aria-label={`최근 신호 ${signal.emoji} 보내기`}
               >
                 {signal.emoji}
@@ -350,9 +350,9 @@ export default function SignalBottomSheet({
 
         <div
           ref={scrollContainerRef}
-          className="max-h-[330px] overflow-y-auto"
+          className="max-h-[330px] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.35)_transparent] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/50 [&::-webkit-scrollbar-track]:bg-transparent"
         >
-          <div className="grid grid-cols-6 gap-x-[8px] gap-y-[10px]">
+          <div className="grid grid-cols-6 gap-x-[10px] gap-y-[13px] pb-[4px]">
             {gridEntries.map(({ signal, category, isFirstInCategory }) => (
               <button
                 key={signal.id}
@@ -365,7 +365,7 @@ export default function SignalBottomSheet({
                 }
                 type="button"
                 onClick={() => handleSelect(signal.emoji)}
-                className="flex h-[44px] items-center justify-center rounded-full bg-transparent text-[30px] active:scale-95"
+                className="flex h-[42px] items-center justify-center rounded-full bg-transparent text-[26px] active:scale-95"
                 aria-label={`신호 ${signal.emoji} 보내기`}
               >
                 {signal.emoji}

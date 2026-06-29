@@ -1083,7 +1083,7 @@ export function EmptyDropSlot({
       ) : null}
 
       <div
-        className={`relative z-10 flex items-center justify-center text-[15px] font-semibold transition-all duration-200 motion-reduce:transition-none motion-reduce:transform-none ${
+        className={`relative z-10 flex items-center justify-center text-[14px] font-medium transition-all duration-200 motion-reduce:transition-none motion-reduce:transform-none ${
           isDropTarget ? "scale-[1.06]" : "scale-100"
         }`}
         style={{
@@ -1093,10 +1093,12 @@ export function EmptyDropSlot({
           background: isDropTarget ? "#FAFAF8" : layerColor.bg,
           border: `1.5px dashed ${isDropTarget ? layerColor.text : layerColor.border}`,
           color: layerColor.text,
-          opacity: isDragActive ? 0.98 : 1,
+          // P2-6A: 빈 슬롯은 실제 사람/폴더보다 시각적으로 후퇴시킨다(동작 동일).
+          // 평상시엔 흐리게(0.5), 드래그 중에는 드롭 타깃을 명확히 보이도록 복원.
+          opacity: isDragActive ? 0.98 : 0.5,
           boxShadow: isDropTarget
             ? "0 10px 24px rgba(15,23,42,0.14)"
-            : "0 4px 12px rgba(15,23,42,0.03)",
+            : "0 2px 6px rgba(15,23,42,0.02)",
         }}
       >
         {isDropTarget ? "놓기" : "+"}
