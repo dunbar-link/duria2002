@@ -40,6 +40,36 @@ type TierFilter =
 
 type NeedFilter = "all" | "need" | "ok" | "later" | "done";
 
+// P2-5d: People tier 필터 선택을 같은 브라우저 세션 동안 유지한다(탭 이동 후 복귀
+// 시 "전체"로 초기화되지 않게). sessionStorage = 세션 한정(앱 재접속 시 초기화),
+// 서버/DB 동기화 대상 아님.
+const PEOPLE_TIER_FILTER_KEY = "dunbar-link-people-tier-filter-v1";
+const TIER_FILTER_VALUES: readonly TierFilter[] = [
+  "all",
+  "family",
+  "tier5",
+  "tier15",
+  "tier50",
+  "tier150",
+];
+
+function isTierFilter(value: unknown): value is TierFilter {
+  return (
+    typeof value === "string" &&
+    (TIER_FILTER_VALUES as readonly string[]).includes(value)
+  );
+}
+
+function readStoredTierFilter(): TierFilter | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(PEOPLE_TIER_FILTER_KEY);
+    return isTierFilter(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
 type EnrichedPerson = {
   raw: DashboardPerson & Record<string, unknown>;
   id: string;
@@ -479,6 +509,23 @@ export default function DashboardPeoplePage() {
   const [needFilter, setNeedFilter] = useState<NeedFilter>("all");
   const [statusMap, setStatusMap] = useState<RelationshipStatusMap>({});
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // P2-5d: 마운트 시 세션에 저장된 tier 필터 복원(SSR 하이드레이션 불일치를 피하려
+  // 초기값은 "all", 마운트 후 1회 복원). 변경 시 세션에 저장.
+  useEffect(() => {
+    const stored = readStoredTierFilter();
+    if (stored) {
+      setTierFilter(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(PEOPLE_TIER_FILTER_KEY, tierFilter);
+    } catch {
+      // sessionStorage 불가 환경은 무시(필터 유지만 안 될 뿐 기능 영향 없음).
+    }
+  }, [tierFilter]);
   const [actionMessage, setActionMessage] = useState("");
   const [actionMessageTone, setActionMessageTone] =
     useState<ActionFeedbackTone>("success");
