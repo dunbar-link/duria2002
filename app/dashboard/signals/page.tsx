@@ -503,7 +503,7 @@ export default function SignalsPage() {
           </p>
         ) : null}
 
-        <section className="flex flex-col gap-3">
+        <section className="flex flex-col gap-2">
           {loadStatus === "loading" ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
               신호를 불러오는 중이에요.
@@ -554,90 +554,84 @@ export default function SignalsPage() {
                   }
                 }}
                 className={[
-                  "rounded-3xl border bg-white p-4 shadow-sm transition",
+                  "rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition",
                   isUnread
-                    ? "border-rose-200 ring-2 ring-rose-100"
+                    ? "border-rose-200 ring-1 ring-rose-100"
                     : "border-slate-200",
                   isUnread ? "cursor-pointer active:scale-[0.99]" : "",
                 ].join(" ")}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-2xl">
-                      {signal.emoji}
-                    </div>
-
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-950">
-                          {isReceived ? "받은 신호" : "보낸 신호"}
-                        </p>
-                        {isUnread ? (
-                          <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-                        ) : null}
-                      </div>
-
-                      <p className="mt-1 text-xs text-slate-400">
-                        {formatSignalTime(signal.created_at)}
-                      </p>
-                    </div>
+                {/* P2-6B-1: 한 줄 리스트형으로 압축(모바일 5~7개 노출). 정보/액션
+                    배치만 바꾸고 읽음·답신호·삭제 핸들러는 그대로 유지한다. */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">
+                    {signal.emoji}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void handleDeleteSignal(signal.id);
-                    }}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 disabled:opacity-40"
-                    disabled={busySignalId === signal.id}
-                  >
-                    지우기
-                  </button>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="min-w-0 truncate text-sm font-semibold text-slate-900">
+                        {oppositeName}
+                        <span className="ml-1.5 text-[11px] font-medium text-slate-400">
+                          {isReceived ? "받은 신호" : "보낸 신호"}
+                        </span>
+                      </p>
+                      {isUnread ? (
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-rose-400" />
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                      {formatSignalTime(signal.created_at)}
+                      {isUnread ? " · 눌러서 읽음" : ""}
+                    </p>
+                  </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                  <span className="min-w-0 truncate">
-                    {isReceived ? "보낸 사람" : "받는 사람"}: {oppositeName}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {canReply ? (
+                      <button
+                        type="button"
+                        // stopPropagation 하지 않는다 — 미확인 받은 신호에서
+                        // 답신호를 누르면 카드 onClick(markSignalRead)이 함께
+                        // 동작해 읽음 처리되는 것이 의도된 동작(홈 파란점 답장과
+                        // 동일한 의미). 단, me 이름 미완성으로 차단할 때는 홈이
+                        // 파란점을 유지하듯 읽음 처리도 막고 안내만 보여준다.
+                        onClick={(event) => {
+                          if (isIncompleteMeName(readMeProfileName())) {
+                            event.stopPropagation();
+                            setMessage(ME_NAME_REQUIRED_MESSAGE);
+                            setReplyGuardSignalId(signal.id);
+                            return;
+                          }
+                          setReplyGuardSignalId(null);
+                          setReplyTarget({
+                            userId: oppositeUserId,
+                            name: oppositeName,
+                          });
+                        }}
+                        className="shrink-0 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
+                      >
+                        {isReceived ? "답신호" : "또 보내기"}
+                      </button>
+                    ) : null}
 
-                  {canReply ? (
                     <button
                       type="button"
-                      // stopPropagation 하지 않는다 — 미확인 받은 신호에서
-                      // 답신호를 누르면 카드 onClick(markSignalRead)이 함께
-                      // 동작해 읽음 처리되는 것이 의도된 동작(홈 파란점 답장과
-                      // 동일한 의미). 단, me 이름 미완성으로 차단할 때는 홈이
-                      // 파란점을 유지하듯 읽음 처리도 막고 안내만 보여준다.
                       onClick={(event) => {
-                        if (isIncompleteMeName(readMeProfileName())) {
-                          event.stopPropagation();
-                          setMessage(ME_NAME_REQUIRED_MESSAGE);
-                          setReplyGuardSignalId(signal.id);
-                          return;
-                        }
-                        setReplyGuardSignalId(null);
-                        setReplyTarget({
-                          userId: oppositeUserId,
-                          name: oppositeName,
-                        });
+                        event.stopPropagation();
+                        void handleDeleteSignal(signal.id);
                       }}
-                      className="shrink-0 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm text-slate-300 active:scale-90 disabled:opacity-40"
+                      disabled={busySignalId === signal.id}
+                      aria-label="신호 지우기"
                     >
-                      {isReceived ? "답신호" : "또 보내기"}
+                      ✕
                     </button>
-                  ) : null}
+                  </div>
                 </div>
 
                 {replyGuardSignalId === signal.id ? (
-                  <p className="mt-2 text-right text-[11px] text-rose-500">
+                  <p className="mt-1.5 text-right text-[11px] text-rose-500">
                     {ME_NAME_REQUIRED_MESSAGE}
-                  </p>
-                ) : null}
-
-                {isUnread ? (
-                  <p className="mt-3 text-xs text-rose-400">
-                    카드를 누르면 읽음 처리돼요.
                   </p>
                 ) : null}
               </article>
