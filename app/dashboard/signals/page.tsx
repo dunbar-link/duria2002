@@ -9,6 +9,7 @@ import {
   readMeProfileName,
 } from "@/lib/me/profile-name";
 import {
+  markSignalsReadFromSender,
   readSignalsForUser,
   type SignalRecord,
 } from "@/lib/signal/read-signals";
@@ -522,6 +523,45 @@ export default function SignalsPage() {
     setMessage("신호를 지웠어요.");
   }
 
+  // P2-7C: 사람별 row 토글. 새로 "열 때"만(닫을 때 아님) 그 사람에게서 받은
+  // 안 읽은 신호를 일괄 읽음 처리한다 — receiver=me & sender=group.key &
+  // is_read=false 만(내가 보낸 신호는 대상 아님). unreadCount 가 0이면 호출하지
+  // 않아 중복/불필요 호출을 막는다. 낙관적 로컬 반영으로 붉은 점이 즉시 사라지고,
+  // 서버 일괄 읽음(기존 markSignalsReadFromSender)은 실패해도 앱을 깨지 않는다.
+  // 개별 신호 탭의 markSignalRead 흐름은 패널 안에 그대로 유지된다.
+  function handleSelectGroup(group: SignalGroup) {
+    const opening = selectedGroupKey !== group.key;
+    setSelectedGroupKey(opening ? group.key : null);
+
+    if (
+      !opening ||
+      group.unreadCount <= 0 ||
+      !currentUserId ||
+      currentUserId === "me"
+    ) {
+      return;
+    }
+
+    // 낙관적 로컬 반영: 이 사람에게서 받은 unread 만 읽음 처리(붉은 점 즉시 제거).
+    setSignals((current) =>
+      current.map((signal) =>
+        signal.receiver_id === currentUserId &&
+        signal.sender_id === group.key &&
+        !signal.is_read
+          ? { ...signal, is_read: true }
+          : signal,
+      ),
+    );
+    // 홈 파란점도 이 사람 기준으로 정리(기존 개별 읽음과 동일 패턴).
+    removeBlueSignalSenderIds([group.key]);
+
+    // 서버 일괄 읽음(read-signals.ts 기존 helper, 수정 없음). 실패는 앱을 깨지
+    // 않게 warn 만 — 낙관적 로컬 상태는 유지하고 다음 refetch 에서 서버와 수렴.
+    void markSignalsReadFromSender(currentUserId, group.key).catch((error) => {
+      console.warn("사람별 읽음 처리 실패:", error);
+    });
+  }
+
   return (
     <>
     <main className="h-[100dvh] overflow-y-auto bg-slate-50 px-4 pb-36 pt-5 text-slate-950">
@@ -581,11 +621,7 @@ export default function SignalsPage() {
               <div key={group.key} className="flex flex-col gap-1.5">
                 <button
                   type="button"
-                  onClick={() =>
-                    setSelectedGroupKey((prev) =>
-                      prev === group.key ? null : group.key,
-                    )
-                  }
+                  onClick={() => handleSelectGroup(group)}
                   aria-expanded={isOpen}
                   className={[
                     "flex items-center gap-3 rounded-2xl border bg-white px-3 py-2.5 text-left shadow-sm transition active:scale-[0.99]",
