@@ -1455,7 +1455,9 @@ export default function DashboardPeoplePage() {
                         type="button"
                         onClick={(event) => handlePrimaryAction(event, person)}
                         className="flex h-[40px] w-[40px] items-center justify-center rounded-[14px] bg-[#2C2C2A] text-[#F1EFE8] shadow-[0_4px_12px_rgba(15,23,42,0.12)] active:scale-95"
-                        aria-label="신호 보내기"
+                        // P2-8B-1: 이 버튼은 연락 채널(문자/전화/복사) picker 를 연다.
+                        // 이모지 신호 시트가 아니므로 라벨을 동작에 맞춰 "연락하기"로 정정.
+                        aria-label="연락하기"
                       >
                         <IconContact />
                       </button>
