@@ -17,6 +17,7 @@ import { sendSignal } from "@/lib/signal/send-signal";
 import { usePeopleStore } from "@/app/dashboard/people/store";
 import {
   getPersonDisplayName,
+  getPersonDisplayPhoto,
   isConnectedSignalUserId,
 } from "@/app/dashboard/people/data";
 import SignalBottomSheet, {
@@ -105,6 +106,8 @@ function removeBlueSignalSenderIds(senderIds: string[]) {
 type SignalGroup = {
   key: string;
   name: string;
+  // P2-7B: 상대 프로필사진(없으면 "" → 초성 fallback). people store 에서 PID 매핑.
+  photo: string;
   signals: SignalRecord[];
   count: number;
   latestAt: string;
@@ -289,6 +292,18 @@ export default function SignalsPage() {
     const groups: SignalGroup[] = Array.from(map.entries()).map(
       ([key, list]) => {
         const name = getPersonName(key);
+        // P2-7B: 상대 PID 로 people store 의 사람을 찾아 프로필사진을 구한다
+        // (getPersonName 의 매핑 기준과 동일). 없으면 빈 값 → 초성 fallback.
+        const matchedPerson = people.find((p) => {
+          const rec = p as unknown as Record<string, unknown>;
+          return (
+            p.id === key ||
+            rec.userId === key ||
+            rec.dlUserId === key ||
+            rec.acceptedPersonId === key
+          );
+        });
+        const photo = matchedPerson ? getPersonDisplayPhoto(matchedPerson) : "";
         const unreadCount = list.filter(
           (s) => s.receiver_id === currentUserId && !s.is_read,
         ).length;
@@ -301,6 +316,7 @@ export default function SignalsPage() {
         return {
           key,
           name,
+          photo,
           signals: list,
           count: list.length,
           latestAt: list[0]?.created_at ?? "",
@@ -528,36 +544,9 @@ export default function SignalsPage() {
           </Link>
         </header>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm text-slate-500">읽지 않은 신호</p>
-              <p className="mt-1 text-3xl font-semibold text-slate-950">
-                {unreadCount}
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void loadSignals()}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
-              >
-                새로고침
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void handleMarkAllRead()}
-                className="rounded-full bg-rose-400 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
-                disabled={unreadCount === 0}
-              >
-                모두 읽음
-              </button>
-            </div>
-          </div>
-        </section>
-
+        {/* P2-7B: 상단 "읽지 않은 신호" 요약 카드(새로고침/모두 읽음)는 제거.
+            제목 아래 바로 사람별 신호 목록이 오게 한다. 데이터 조회는 mount/
+            realtime 구독이 담당하므로 새로고침 버튼 없이도 최신 유지된다. */}
         {message ? (
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
             {message}
@@ -600,19 +589,22 @@ export default function SignalsPage() {
                   aria-expanded={isOpen}
                   className={[
                     "flex items-center gap-3 rounded-2xl border bg-white px-3 py-2.5 text-left shadow-sm transition active:scale-[0.99]",
-                    group.unreadCount > 0
-                      ? "border-rose-200 ring-1 ring-rose-100"
-                      : "border-slate-200",
-                    isOpen ? "border-slate-300" : "",
+                    isOpen ? "border-slate-300" : "border-slate-200",
                   ].join(" ")}
                 >
-                  {/* 최신 이모지 1~3개 미리보기 */}
-                  <div className="flex h-10 shrink-0 items-center justify-center gap-0.5 rounded-xl bg-slate-100 px-2 text-lg">
-                    {group.latestEmojis.map((emoji, index) => (
-                      <span key={index} className="leading-none">
-                        {emoji}
-                      </span>
-                    ))}
+                  {/* P2-7B: 왼쪽 = 상대 프로필사진(없으면 초성 fallback) */}
+                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-sm font-bold text-slate-500">
+                    {group.name.slice(0, 2) || "?"}
+                    {group.photo ? (
+                      <img
+                        src={group.photo}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : null}
                   </div>
 
                   <div className="min-w-0 flex-1">
@@ -620,10 +612,12 @@ export default function SignalsPage() {
                       <p className="min-w-0 truncate text-sm font-semibold text-slate-900">
                         {group.name}
                       </p>
+                      {/* P2-7B: unread 있으면 이름 옆 작은 붉은 점(숫자 배지 미사용) */}
                       {group.unreadCount > 0 ? (
-                        <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-rose-400 px-1 text-[10px] font-bold text-white">
-                          {group.unreadCount}
-                        </span>
+                        <span
+                          aria-label="읽지 않은 신호 있음"
+                          className="h-[7px] w-[7px] shrink-0 rounded-full bg-rose-500"
+                        />
                       ) : null}
                     </div>
                     <p className="mt-0.5 truncate text-[11px] text-slate-400">
@@ -631,14 +625,26 @@ export default function SignalsPage() {
                     </p>
                   </div>
 
-                  <span
-                    aria-hidden
-                    className={`shrink-0 text-[18px] leading-none text-slate-300 transition-transform ${
-                      isOpen ? "rotate-90" : ""
-                    }`}
-                  >
-                    ›
-                  </span>
+                  {/* P2-7B: 오른쪽 끝 = 최신 이모지 1~3개 pill + chevron */}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {group.latestEmojis.length > 0 ? (
+                      <div className="flex items-center gap-0.5 rounded-full bg-slate-50 px-2 py-1 text-base leading-none">
+                        {group.latestEmojis.map((emoji, index) => (
+                          <span key={index} className="leading-none">
+                            {emoji}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <span
+                      aria-hidden
+                      className={`text-[18px] leading-none text-slate-300 transition-transform ${
+                        isOpen ? "rotate-90" : ""
+                      }`}
+                    >
+                      ›
+                    </span>
+                  </div>
                 </button>
 
                 {isOpen ? (
