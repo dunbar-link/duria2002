@@ -100,6 +100,19 @@ function removeBlueSignalSenderIds(senderIds: string[]) {
   writeBlueSignalSenderIds(next);
 }
 
+// P2-7A: 사람별 신호 묶음. group key 는 반드시 상대 remote PID(oppositeUserId)다
+// (이름 groupBy 금지 — 동명이인 충돌 방지). 같은 사람의 보낸/받은 신호가 한 그룹.
+type SignalGroup = {
+  key: string;
+  name: string;
+  signals: SignalRecord[];
+  count: number;
+  latestAt: string;
+  latestEmojis: string[];
+  unreadCount: number;
+  canReply: boolean;
+};
+
 export default function SignalsPage() {
   const people = usePeopleStore((state) => state.people);
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
@@ -157,6 +170,9 @@ export default function SignalsPage() {
   const [replyGuardSignalId, setReplyGuardSignalId] = useState<string | null>(
     null,
   );
+  // P2-7A: 현재 펼친 사람별 신호 기록 패널의 group key(상대 PID). null = 모두 접힘.
+  // 로컬 상태만 사용(URL/스토리지 미변경). 그룹이 사라지면 매칭 실패로 자연히 닫힘.
+  const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
 
   useEffect(() => {
     const userId = getCurrentUserId();
@@ -253,6 +269,51 @@ export default function SignalsPage() {
     },
     [currentUserId, people, inviteDrafts],
   );
+
+  // P2-7A: visibleSignals 를 상대 PID(oppositeUserId) 기준으로 묶는다.
+  //  - oppositeUserId = 받은 신호면 sender_id, 보낸 신호면 receiver_id.
+  //  - visibleSignals 는 created_at desc 라 각 그룹 내부도 desc 순서를 유지한다.
+  //  - canReply 는 기존 카드 게이트와 동일(연결됨 + 이름 resolve + 자기 자신 아님).
+  //  - 그룹 목록은 최근 활동(latestAt) desc. 데이터/네트워크 호출 없음(순수 파생).
+  const signalGroups = useMemo<SignalGroup[]>(() => {
+    const map = new Map<string, SignalRecord[]>();
+    for (const signal of visibleSignals) {
+      const isReceived = signal.receiver_id === currentUserId;
+      const oppositeUserId = isReceived ? signal.sender_id : signal.receiver_id;
+      if (!oppositeUserId) continue;
+      const list = map.get(oppositeUserId);
+      if (list) list.push(signal);
+      else map.set(oppositeUserId, [signal]);
+    }
+
+    const groups: SignalGroup[] = Array.from(map.entries()).map(
+      ([key, list]) => {
+        const name = getPersonName(key);
+        const unreadCount = list.filter(
+          (s) => s.receiver_id === currentUserId && !s.is_read,
+        ).length;
+        const canReply =
+          Boolean(key) &&
+          key !== currentUserId &&
+          name !== "알 수 없음" &&
+          isConnectedSignalUserId(key, people, inviteDrafts);
+
+        return {
+          key,
+          name,
+          signals: list,
+          count: list.length,
+          latestAt: list[0]?.created_at ?? "",
+          latestEmojis: list.slice(0, 3).map((s) => s.emoji),
+          unreadCount,
+          canReply,
+        };
+      },
+    );
+
+    groups.sort((a, b) => b.latestAt.localeCompare(a.latestAt));
+    return groups;
+  }, [visibleSignals, currentUserId, people, inviteDrafts, getPersonName]);
 
   const loadSignals = useCallback(async () => {
     if (!currentUserId || currentUserId === "me") {
@@ -522,119 +583,169 @@ export default function SignalsPage() {
             </div>
           ) : null}
 
-          {visibleSignals.map((signal) => {
-            const isReceived = signal.receiver_id === currentUserId;
-            const isUnread = isReceived && !signal.is_read;
-            const oppositeUserId = isReceived
-              ? signal.sender_id
-              : signal.receiver_id;
-            const oppositeName = getPersonName(oppositeUserId);
-            // 답신호 버튼은 상대가 "현재 연결된 사람"으로 resolve 될 때만
-            // 노출한다(9ac4aa0 필터와 동일 게이트). 자기 자신/알 수 없음 대상
-            // 제외. signals 는 수신자별 1 row 라 보낸 신호도 항상 상대 1명.
-            const canReply =
-              Boolean(oppositeUserId) &&
-              oppositeUserId !== currentUserId &&
-              oppositeName !== "알 수 없음" &&
-              isConnectedSignalUserId(oppositeUserId, people, inviteDrafts);
+          {/* P2-7A: 첫 화면 = 사람별 신호 목록(같은 사람과 주고받은 신호를 한 row로).
+              row tap → 같은 페이지 인라인 "신호 기록" 패널. 새 라우트/DB 변경 없음. */}
+          {signalGroups.map((group) => {
+            const isOpen = selectedGroupKey === group.key;
 
             return (
-              <article
-                key={signal.id}
-                role={isUnread ? "button" : undefined}
-                tabIndex={isUnread ? 0 : undefined}
-                onClick={() => {
-                  if (isUnread) {
-                    void markSignalRead(signal);
+              <div key={group.key} className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedGroupKey((prev) =>
+                      prev === group.key ? null : group.key,
+                    )
                   }
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && isUnread) {
-                    void markSignalRead(signal);
-                  }
-                }}
-                className={[
-                  "rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition",
-                  isUnread
-                    ? "border-rose-200 ring-1 ring-rose-100"
-                    : "border-slate-200",
-                  isUnread ? "cursor-pointer active:scale-[0.99]" : "",
-                ].join(" ")}
-              >
-                {/* P2-6B-1: 한 줄 리스트형으로 압축(모바일 5~7개 노출). 정보/액션
-                    배치만 바꾸고 읽음·답신호·삭제 핸들러는 그대로 유지한다. */}
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">
-                    {signal.emoji}
+                  aria-expanded={isOpen}
+                  className={[
+                    "flex items-center gap-3 rounded-2xl border bg-white px-3 py-2.5 text-left shadow-sm transition active:scale-[0.99]",
+                    group.unreadCount > 0
+                      ? "border-rose-200 ring-1 ring-rose-100"
+                      : "border-slate-200",
+                    isOpen ? "border-slate-300" : "",
+                  ].join(" ")}
+                >
+                  {/* 최신 이모지 1~3개 미리보기 */}
+                  <div className="flex h-10 shrink-0 items-center justify-center gap-0.5 rounded-xl bg-slate-100 px-2 text-lg">
+                    {group.latestEmojis.map((emoji, index) => (
+                      <span key={index} className="leading-none">
+                        {emoji}
+                      </span>
+                    ))}
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="min-w-0 truncate text-sm font-semibold text-slate-900">
-                        {oppositeName}
-                        <span className="ml-1.5 text-[11px] font-medium text-slate-400">
-                          {isReceived ? "받은 신호" : "보낸 신호"}
-                        </span>
+                        {group.name}
                       </p>
-                      {isUnread ? (
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-rose-400" />
+                      {group.unreadCount > 0 ? (
+                        <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-rose-400 px-1 text-[10px] font-bold text-white">
+                          {group.unreadCount}
+                        </span>
                       ) : null}
                     </div>
                     <p className="mt-0.5 truncate text-[11px] text-slate-400">
-                      {formatSignalTime(signal.created_at)}
-                      {isUnread ? " · 눌러서 읽음" : ""}
+                      신호 {group.count}개 · {formatSignalTime(group.latestAt)}
                     </p>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {canReply ? (
-                      <button
-                        type="button"
-                        // stopPropagation 하지 않는다 — 미확인 받은 신호에서
-                        // 답신호를 누르면 카드 onClick(markSignalRead)이 함께
-                        // 동작해 읽음 처리되는 것이 의도된 동작(홈 파란점 답장과
-                        // 동일한 의미). 단, me 이름 미완성으로 차단할 때는 홈이
-                        // 파란점을 유지하듯 읽음 처리도 막고 안내만 보여준다.
-                        onClick={(event) => {
-                          if (isIncompleteMeName(readMeProfileName())) {
-                            event.stopPropagation();
-                            setMessage(ME_NAME_REQUIRED_MESSAGE);
-                            setReplyGuardSignalId(signal.id);
-                            return;
-                          }
-                          setReplyGuardSignalId(null);
-                          setReplyTarget({
-                            userId: oppositeUserId,
-                            name: oppositeName,
-                          });
-                        }}
-                        className="shrink-0 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
-                      >
-                        {isReceived ? "답신호" : "또 보내기"}
-                      </button>
+                  <span
+                    aria-hidden
+                    className={`shrink-0 text-[18px] leading-none text-slate-300 transition-transform ${
+                      isOpen ? "rotate-90" : ""
+                    }`}
+                  >
+                    ›
+                  </span>
+                </button>
+
+                {isOpen ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-2.5">
+                    {/* 패널 헤더: 상대 이름 + 주고받은 신호 수 + 신호 보내기 1개 */}
+                    <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">
+                          {group.name}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          주고받은 신호 {group.count}개
+                        </p>
+                      </div>
+                      {group.canReply ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isIncompleteMeName(readMeProfileName())) {
+                              setMessage(ME_NAME_REQUIRED_MESSAGE);
+                              setReplyGuardSignalId(group.key);
+                              return;
+                            }
+                            setReplyGuardSignalId(null);
+                            setReplyTarget({
+                              userId: group.key,
+                              name: group.name,
+                            });
+                          }}
+                          className="shrink-0 rounded-full bg-rose-400 px-3 py-1.5 text-xs font-semibold text-white active:scale-95"
+                        >
+                          신호 보내기
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {replyGuardSignalId === group.key ? (
+                      <p className="mb-2 px-1 text-right text-[11px] text-rose-500">
+                        {ME_NAME_REQUIRED_MESSAGE}
+                      </p>
                     ) : null}
 
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleDeleteSignal(signal.id);
-                      }}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm text-slate-300 active:scale-90 disabled:opacity-40"
-                      disabled={busySignalId === signal.id}
-                      aria-label="신호 지우기"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
+                    {/* 신호 기록: 기존 압축 row 재사용(이모지·보냄/받음·시간·삭제 ✕) */}
+                    <ul className="flex flex-col gap-1.5">
+                      {group.signals.map((signal) => {
+                        const isReceived =
+                          signal.receiver_id === currentUserId;
+                        const isUnread = isReceived && !signal.is_read;
 
-                {replyGuardSignalId === signal.id ? (
-                  <p className="mt-1.5 text-right text-[11px] text-rose-500">
-                    {ME_NAME_REQUIRED_MESSAGE}
-                  </p>
+                        return (
+                          <li
+                            key={signal.id}
+                            role={isUnread ? "button" : undefined}
+                            tabIndex={isUnread ? 0 : undefined}
+                            onClick={() => {
+                              if (isUnread) {
+                                void markSignalRead(signal);
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && isUnread) {
+                                void markSignalRead(signal);
+                              }
+                            }}
+                            className={[
+                              "flex items-center gap-3 rounded-xl border bg-white px-2.5 py-2 transition",
+                              isUnread
+                                ? "cursor-pointer border-rose-200 active:scale-[0.99]"
+                                : "border-slate-200",
+                            ].join(" ")}
+                          >
+                            <span className="text-xl leading-none">
+                              {signal.emoji}
+                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
+                                {isReceived ? "받음" : "보냄"}
+                                {isUnread ? (
+                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                                ) : null}
+                              </p>
+                              <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                                {formatSignalTime(signal.created_at)}
+                                {isUnread ? " · 눌러서 읽음" : ""}
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleDeleteSignal(signal.id);
+                              }}
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm text-slate-300 active:scale-90 disabled:opacity-40"
+                              disabled={busySignalId === signal.id}
+                              aria-label="신호 지우기"
+                            >
+                              ✕
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 ) : null}
-              </article>
+              </div>
             );
           })}
         </section>
