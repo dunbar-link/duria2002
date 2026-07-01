@@ -110,6 +110,22 @@ function toBoolean(value: unknown) {
   return value === true;
 }
 
+// 추가 정보 아코디언 헤더의 "입력 N/7" 표시용. 7개 의미 버킷 중 하나라도
+// 값이 있으면 채워진 것으로 센다(값 자체는 노출하지 않는다).
+function countAdditionalFilled(p: MeProfile): number {
+  const has = (v: string) => v.trim() !== "";
+  const buckets = [
+    has(p.phone),
+    has(p.email),
+    has(p.address),
+    has(p.birthday),
+    has(p.elementarySchool) || has(p.middleSchool) || has(p.highSchool),
+    has(p.schoolName) || has(p.major) || has(p.studentId) || has(p.universityMajor),
+    has(p.companyName) || has(p.jobTitle) || has(p.department) || has(p.company),
+  ];
+  return buckets.filter(Boolean).length;
+}
+
 // 공개 boolean 복원 규칙(true=공개):
 // 1) 저장된 boolean 이 있으면 그대로 보존 → 기존 공개/비공개 상태 유지(자동 공개 금지)
 // 2) boolean 이 없고 값이 이미 있으면 false → 기존 데이터 보호(비공개)
@@ -284,6 +300,8 @@ export default function DashboardMePage() {
   const people = usePeopleStore((state) => state.people);
   const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
+  // 추가 정보는 기본 접힘(모바일 압박 완화). 단순 useState — persist 불필요.
+  const [additionalOpen, setAdditionalOpen] = useState(false);
   // P2-4e-1: "초대 성공"/Point 는 기기별 localStorage(inviteDrafts) 가 아니라
   // 서버 /api/me/stats(계정 전체 dl_invites accepted) 기준으로 통일한다.
   // P2-4e-1b: 서버값 도착 전에는 로컬 fallback 을 쓰지 않고 "—"(로딩)/실패 안내로
@@ -735,12 +753,35 @@ export default function DashboardMePage() {
       <QuestAchievementCard people={people} inviteDrafts={inviteDrafts} />
 
       <section className="mt-2 rounded-[24px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#E2E0D8]">
-        {/* P2-6C: 추가 정보는 선택 입력임을 한 줄로 안내해 상단 필수(이름·사진·계정)와
-            시각적으로 구분한다. 제목 톤을 살짝 낮추고 부제를 덧붙인다. */}
-        <h2 className="text-[16px] font-bold text-[#334155]">추가 정보</h2>
-        <p className="mt-0.5 text-[11px] font-medium text-[#A0A8B4]">
-          선택 입력이에요. 채운 만큼 연결에 도움이 돼요.
-        </p>
+        {/* P3-1C: 추가 정보를 기본 접힘 아코디언으로. 헤더에 "입력 N/7"만 노출하고
+            펼치면 기존 입력 폼(값·비공개 체크박스·저장 로직) 그대로 사용한다. */}
+        <button
+          type="button"
+          onClick={() => setAdditionalOpen((value) => !value)}
+          aria-expanded={additionalOpen}
+          className="flex w-full items-start justify-between gap-3 text-left"
+        >
+          <span className="min-w-0">
+            <span className="flex items-center gap-2">
+              <span className="text-[16px] font-bold text-[#334155]">추가 정보</span>
+              <span className="shrink-0 rounded-full bg-[#EFEDE6] px-2 py-0.5 text-[11px] font-semibold text-[#8D99AE]">
+                입력 {countAdditionalFilled(profile)}/7
+              </span>
+            </span>
+            <span className="mt-0.5 block text-[11px] font-medium leading-snug text-[#A0A8B4]">
+              선택 입력이에요. 채운 만큼 연결에 도움이 돼요.
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className={`mt-0.5 shrink-0 text-[15px] leading-none text-[#A0A8B4] transition-transform ${
+              additionalOpen ? "rotate-180" : ""
+            }`}
+          >
+            ⌄
+          </span>
+        </button>
+        {additionalOpen ? (
         <div className="mt-2 grid grid-cols-1 gap-1.5">
           <CompactField label="전화번호" value={profile.phone} onChange={(value) => updateProfile("phone", value)} placeholder="휴대폰 번호" checked={profile.phonePublic} onPublicChange={(next) => updateProfile("phonePublic", next)} />
           <CompactField label="이메일" value={profile.email} onChange={(value) => updateProfile("email", value)} placeholder="이메일" checked={profile.emailPublic} onPublicChange={(next) => updateProfile("emailPublic", next)} />
@@ -768,6 +809,7 @@ export default function DashboardMePage() {
             </div>
           </div>
         </div>
+        ) : null}
       </section>
 
       <p className="mt-2 text-center text-[12px] font-medium leading-5 text-[#8D99AE]">

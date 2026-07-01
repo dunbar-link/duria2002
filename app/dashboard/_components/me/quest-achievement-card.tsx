@@ -236,7 +236,7 @@ export function QuestAchievementCard({
   if (!mounted) return null;
 
   return (
-    <section className="relative mt-2 overflow-hidden rounded-[24px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#E2E0D8]">
+    <section className="relative mt-2 rounded-[24px] bg-[#FAFAF8] p-4 shadow-sm ring-1 ring-[#E2E0D8]">
       <style>{`
         @keyframes questPointRise {
           0% { opacity: 0; transform: translateY(6px) scale(0.9); }
@@ -247,15 +247,15 @@ export function QuestAchievementCard({
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[16px] font-bold text-[#334155]">인맥지도 성취도</h2>
-          <p className="mt-0.5 text-[11px] font-medium text-[#A0A8B4]">
+          <h2 className="text-[17px] font-bold text-[#334155]">인맥지도 성취도</h2>
+          <p className="mt-1 text-[11px] font-medium leading-snug text-[#A0A8B4]">
             인맥지도 준비용 점수예요 · 실제 지급/서버 코인 아님
           </p>
         </div>
         <div className="relative shrink-0 text-right">
           <p className="text-[11px] font-semibold text-[#8D99AE]">준비 점수</p>
           <p
-            className={`text-[20px] font-bold text-[#4B6B57] ${
+            className={`text-[22px] font-bold leading-tight text-[#4B6B57] ${
               burst ? "transition-transform duration-300" : ""
             }`}
             style={burst ? { transform: "scale(1.12)" } : undefined}
@@ -278,7 +278,7 @@ export function QuestAchievementCard({
       </div>
 
       {/* 준비도 % + 완료 개수 + 얇은 바 */}
-      <div className="mt-2">
+      <div className="mt-3">
         <div className="flex items-center justify-between text-[12px] font-medium text-[#8D99AE]">
           <span>
             완료 {doneCount}/{totalCount} 미션
@@ -294,7 +294,7 @@ export function QuestAchievementCard({
       </div>
 
       {/* 미션 리스트 */}
-      <ul className="mt-2.5 flex flex-col gap-[7px]">
+      <ul className="mt-3 flex flex-col gap-[10px]">
         {missions.map((mission) => (
           <li key={mission.key} className="flex items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-[8px]">
@@ -328,7 +328,7 @@ export function QuestAchievementCard({
       </ul>
 
       {/* 다음 추천 미션 1개 */}
-      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#ECEAE2] pt-2.5">
+      <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-[#ECEAE2] pt-3">
         {allDone ? (
           <>
             <span className="text-[12px] font-semibold text-[#4B6B57]">
