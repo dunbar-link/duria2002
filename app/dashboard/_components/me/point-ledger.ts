@@ -1,21 +1,13 @@
-// P3-2A 로컬 누적 Point Ledger (localStorage MVP).
+// P3-2A2 deterministic Point 계산 (상태 기반 순수 함수).
 //
-// - Point 는 100점 만점이 아니라 계속 쌓이는 누적값이다.
-// - idempotency key 로 "같은 대상 1회만" 적립한다(중복/수정/삭제 재입력 방지).
-// - 기존 데이터는 첫 진입 시 조용히 backfill 하고, 이후 새 적립만 효과를 낸다.
-// - 서버 wallet/coin/dl_wallets 미연동. 로컬 MVP라 anti-abuse 는 범위 밖(P3-4+).
+// P3-2A 의 localStorage 누적 장부(dunbar-link-point-ledger-v1)는 기기별로 갈리고
+// append-only + 휘발성 key 로 인플레이션이 생겨 PC/모바일 불일치를 유발했다.
+// → 잔액 장부를 Point source of truth 로 쓰지 않는다. Point 는 "현재 서버동기
+//    상태"만으로 매번 결정적으로 계산한다. 같은 상태면 어느 기기든 같은 값.
+//
+// (기존 dunbar-link-point-ledger-v1 key 는 삭제하지 않는다. 더 이상 읽지/쓰지
+//  않고 무시할 뿐이다. localStorage 는 아래 "효과 seen 캐시"에만 쓴다.)
 
-export type PointLedgerEntry = {
-  key: string;
-  kind: string;
-  points: number;
-  label: string;
-  createdAt: string;
-};
-
-export const POINT_LEDGER_KEY = "dunbar-link-point-ledger-v1";
-
-// 적립 정책(누적). 신호는 하루 첫 1회만(daily key)로 별도 처리한다.
 export const POINT_RULES = {
   name: 10,
   profileField: 5,
@@ -23,130 +15,79 @@ export const POINT_RULES = {
   personTier: 5,
   inviteSent: 10,
   connection: 20,
-  signalDaily: 5,
 } as const;
 
-export type PointStateInput = {
+export type PointScoreInput = {
   hasName: boolean;
-  // 채워진 추가정보 버킷 키(phone/email/address/birthday/school/university/company)
-  filledProfileFields: string[];
-  personIds: string[];
-  tieredPersonIds: string[];
-  inviteSentKeys: string[];
-  connectionKeys: string[];
+  // 채워진 추가정보 버킷 수(phone/email/address/birthday/school/university/company)
+  filledFieldCount: number;
+  peopleCount: number;
+  tieredCount: number;
+  // 초대/연결은 휘발성 token 이 아니라 안정 identity 로 dedup 한 "관계 수".
+  inviteSentCount: number;
+  connectionCount: number;
 };
 
-function isEntry(value: unknown): value is PointLedgerEntry {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { key?: unknown }).key === "string" &&
-    typeof (value as { points?: unknown }).points === "number"
-  );
+export type PointBreakdown = {
+  namePoints: number;
+  profileFieldPoints: number;
+  peoplePoints: number;
+  tierPoints: number;
+  inviteSentPoints: number;
+  connectionPoints: number;
+  totalPoints: number;
+};
+
+// 디버깅 용이성을 위해 항상 breakdown 을 반환한다(PC/모바일 값 비교용).
+export function buildDeterministicPointScore(
+  input: PointScoreInput
+): PointBreakdown {
+  const namePoints = input.hasName ? POINT_RULES.name : 0;
+  const profileFieldPoints = Math.max(0, input.filledFieldCount) * POINT_RULES.profileField;
+  const peoplePoints = Math.max(0, input.peopleCount) * POINT_RULES.personAdd;
+  const tierPoints = Math.max(0, input.tieredCount) * POINT_RULES.personTier;
+  const inviteSentPoints = Math.max(0, input.inviteSentCount) * POINT_RULES.inviteSent;
+  const connectionPoints = Math.max(0, input.connectionCount) * POINT_RULES.connection;
+  const totalPoints =
+    namePoints +
+    profileFieldPoints +
+    peoplePoints +
+    tierPoints +
+    inviteSentPoints +
+    connectionPoints;
+  return {
+    namePoints,
+    profileFieldPoints,
+    peoplePoints,
+    tierPoints,
+    inviteSentPoints,
+    connectionPoints,
+    totalPoints,
+  };
 }
 
-export function loadPointLedger(): PointLedgerEntry[] | null {
+// 🪙 효과용 seen 캐시. "이 기기에서 마지막으로 보여준 total" 일 뿐, 점수 정답
+// 소스가 아니다(정답은 deterministic 계산). 서버동기로 total 이 올라가는 최초
+// 순간에는 효과를 터뜨리지 않도록 호출부에서 seed 타이밍을 제어한다.
+export const POINT_EFFECT_SEEN_KEY = "dunbar-link-point-effect-seen-v1";
+
+export function readPointEffectSeen(): number | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(POINT_LEDGER_KEY);
+    const raw = window.localStorage.getItem(POINT_EFFECT_SEEN_KEY);
     if (raw === null) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isEntry) : [];
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-export function savePointLedger(entries: PointLedgerEntry[]): void {
+export function writePointEffectSeen(total: number): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(POINT_LEDGER_KEY, JSON.stringify(entries));
+    window.localStorage.setItem(POINT_EFFECT_SEEN_KEY, String(total));
   } catch {
-    // 저장 실패는 무시(다음 reconcile 에서 재시도)
+    // 효과용 캐시일 뿐 — 실패 무시
   }
-}
-
-export function getPointTotal(entries: PointLedgerEntry[]): number {
-  return entries.reduce(
-    (sum, entry) => sum + (typeof entry.points === "number" ? entry.points : 0),
-    0
-  );
-}
-
-// YYYY-MM-DD (로컬 날짜). 신호 daily key 계산용.
-export function todayKey(now: Date = new Date()): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-// 현재 상태에서 "적립 후보" 이벤트 목록을 만든다(신호 제외 — 신호는 발송 시점 처리).
-export function buildPointEventsFromCurrentState(
-  input: PointStateInput
-): PointLedgerEntry[] {
-  const now = new Date().toISOString();
-  const events: PointLedgerEntry[] = [];
-
-  if (input.hasName) {
-    events.push({ key: "profile:name", kind: "profile", points: POINT_RULES.name, label: "이름 등록", createdAt: now });
-  }
-  for (const field of input.filledProfileFields) {
-    events.push({ key: `profile:field:${field}`, kind: "profile", points: POINT_RULES.profileField, label: "추가정보 입력", createdAt: now });
-  }
-  for (const id of input.personIds) {
-    events.push({ key: `person:add:${id}`, kind: "person", points: POINT_RULES.personAdd, label: "사람 등록", createdAt: now });
-  }
-  for (const id of input.tieredPersonIds) {
-    events.push({ key: `person:tier:${id}`, kind: "tier", points: POINT_RULES.personTier, label: "관계 분류", createdAt: now });
-  }
-  for (const key of input.inviteSentKeys) {
-    events.push({ key: `invite:sent:${key}`, kind: "invite", points: POINT_RULES.inviteSent, label: "친구 초대", createdAt: now });
-  }
-  for (const key of input.connectionKeys) {
-    events.push({ key: `invite:accepted:${key}`, kind: "connection", points: POINT_RULES.connection, label: "연결 성공", createdAt: now });
-  }
-  return events;
-}
-
-// 현재 ledger 에 없는 key 만 추가한다. added(신규 적립분)를 함께 반환한다.
-// 삭제/수정으로 상태가 줄어도 기존 적립은 차감하지 않는다(append-only).
-export function reconcilePointLedger(
-  existing: PointLedgerEntry[],
-  events: PointLedgerEntry[]
-): { ledger: PointLedgerEntry[]; added: PointLedgerEntry[] } {
-  const seen = new Set(existing.map((entry) => entry.key));
-  const added: PointLedgerEntry[] = [];
-  for (const event of events) {
-    if (!seen.has(event.key)) {
-      seen.add(event.key);
-      added.push(event);
-    }
-  }
-  return { ledger: added.length ? [...existing, ...added] : existing, added };
-}
-
-// P3-2B 용: 신호 발송 성공 시 "하루 첫 신호"만 +5P. 이미 오늘 적립됐으면 무시.
-// (이번 P3-2A 에서는 아직 호출 지점을 연결하지 않는다 — 신호 발송이 여러 UI 에
-//  분산돼 있고 Home 은 수정 금지라, 안전한 단일 훅킹을 P3-2B 로 분리한다.)
-export function addSignalDailyPoint(now: Date = new Date()): {
-  added: boolean;
-  points: number;
-} {
-  const ledger = loadPointLedger() ?? [];
-  const key = `signal:daily:${todayKey(now)}`;
-  if (ledger.some((entry) => entry.key === key)) {
-    return { added: false, points: 0 };
-  }
-  savePointLedger([
-    ...ledger,
-    {
-      key,
-      kind: "signal",
-      points: POINT_RULES.signalDaily,
-      label: "오늘 신호 보상",
-      createdAt: now.toISOString(),
-    },
-  ]);
-  return { added: true, points: POINT_RULES.signalDaily };
 }

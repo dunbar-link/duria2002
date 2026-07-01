@@ -8,11 +8,9 @@ import { usePeopleStore } from "../people/store";
 import { AccountSection } from "./account-section";
 import QuestAchievementCard, { buildQuestMissions } from "../_components/me/quest-achievement-card";
 import {
-  buildPointEventsFromCurrentState,
-  getPointTotal,
-  loadPointLedger,
-  reconcilePointLedger,
-  savePointLedger,
+  buildDeterministicPointScore,
+  readPointEffectSeen,
+  writePointEffectSeen,
 } from "../_components/me/point-ledger";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
@@ -451,63 +449,78 @@ export default function DashboardMePage() {
   );
   const questReady = hasHydrated && isLoaded;
 
-  // P3-2A 누적 Point Ledger. 현재 상태에서 없는 key 만 적립(중복 방지). 기존
-  // 완료분은 첫 settle 에서 조용히 backfill(효과 없음), 이후 새 적립만 🪙 효과.
-  const [pointTotal, setPointTotal] = useState(0);
-  const [pointReady, setPointReady] = useState(false);
-  const [pointBurst, setPointBurst] = useState<number | null>(null);
-  const ledgerSettledRef = useRef(false);
-
+  // P3-2A2: Me 진입 시 accepted 초대를 read-only 로 서버동기(GET /api/invites/mine).
+  // Home 에만 있던 초대 sync 를 Me 에서도 1회 실행해 PC 도 초대/연결이 채워지게 한다.
+  // store 의 GET-only 액션 재사용(서버 write 없음). settle 후 효과 seed 를 연다.
+  const [syncSettled, setSyncSettled] = useState(false);
   useEffect(() => {
-    if (!questReady) return;
-    const events = buildPointEventsFromCurrentState({
-      hasName: !isIncompleteMeName(profile.name),
-      filledProfileFields: [
-        profile.phone.trim() ? "phone" : "",
-        profile.email.trim() ? "email" : "",
-        profile.address.trim() ? "address" : "",
-        profile.birthday.trim() ? "birthday" : "",
-        profile.elementarySchool.trim() ||
-        profile.middleSchool.trim() ||
-        profile.highSchool.trim()
-          ? "school"
-          : "",
-        profile.schoolName.trim() ||
-        profile.major.trim() ||
-        profile.studentId.trim() ||
-        profile.universityMajor.trim()
-          ? "university"
-          : "",
-        profile.companyName.trim() ||
-        profile.jobTitle.trim() ||
-        profile.department.trim() ||
-        profile.company.trim()
-          ? "company"
-          : "",
-      ].filter((field) => field !== ""),
-      personIds: people.map((p) => p.id),
-      tieredPersonIds: people
-        .filter((p) => typeof p.tier === "number")
-        .map((p) => p.id),
-      inviteSentKeys: inviteDrafts.map((d) => d.token).filter((t) => Boolean(t)),
-      connectionKeys: inviteDrafts
-        .filter((d) => d.status === "accepted")
-        .map((d) => d.acceptedPersonId ?? d.token)
-        .filter((k): k is string => Boolean(k)),
-    });
-    const existing = loadPointLedger();
-    const { ledger, added } = reconcilePointLedger(existing ?? [], events);
-    if (added.length > 0 || existing === null) {
-      savePointLedger(ledger);
+    let cancelled = false;
+    void usePeopleStore
+      .getState()
+      .syncAcceptedInvitesToPeople()
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSyncSettled(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 초대/연결은 휘발성 token 이 아니라 안정 identity 로 dedup(관계당 1회).
+  // 우선순위: acceptedPersonId → sourcePersonId → (마지막) token.
+  const inviteSentCount = useMemo(() => {
+    const keys = new Set<string>();
+    for (const draft of inviteDrafts) {
+      const key = draft.acceptedPersonId || draft.sourcePersonId || draft.token;
+      if (key) keys.add(key);
     }
-    setPointTotal(getPointTotal(ledger));
-    setPointReady(true);
-    // 첫 settle 은 backfill 이라 효과 없음. 이후 새 적립분만 🪙 로 표시.
-    if (ledgerSettledRef.current && added.length > 0) {
-      setPointBurst(added.reduce((sum, entry) => sum + entry.points, 0));
+    return keys.size;
+  }, [inviteDrafts]);
+  const connectionCount = useMemo(() => {
+    const keys = new Set<string>();
+    for (const draft of inviteDrafts) {
+      if (draft.status !== "accepted") continue;
+      const key = draft.acceptedPersonId || draft.sourcePersonId || draft.token;
+      if (key) keys.add(key);
     }
-    ledgerSettledRef.current = true;
-  }, [questReady, profile, people, inviteDrafts]);
+    return keys.size;
+  }, [inviteDrafts]);
+
+  // Point = 서버동기 상태 기반 deterministic 계산(localStorage 잔액 장부 미사용).
+  // 같은 상태면 PC/모바일 동일 값.
+  const pointBreakdown = useMemo(
+    () =>
+      buildDeterministicPointScore({
+        hasName: !isIncompleteMeName(profile.name),
+        filledFieldCount: countAdditionalFilled(profile),
+        peopleCount: people.length,
+        tieredCount: people.filter((p) => typeof p.tier === "number").length,
+        inviteSentCount,
+        connectionCount,
+      }),
+    [profile, people, inviteSentCount, connectionCount]
+  );
+  const pointTotal = pointBreakdown.totalPoints;
+
+  // 🪙 효과: 초대 sync settle 후 첫 계산에서 현재 total 을 seed(효과 없음) →
+  // PC 가 95→305 로 올라가는 최초 동기화 구간은 seed 로 흡수돼 폭발하지 않는다.
+  // 이후 같은 기기에서 새 행동으로 total 이 증가할 때만 🪙 +N 표시.
+  const [pointBurst, setPointBurst] = useState<number | null>(null);
+  const effectSeededRef = useRef(false);
+  useEffect(() => {
+    if (!questReady || !syncSettled) return;
+    const seen = readPointEffectSeen();
+    if (!effectSeededRef.current) {
+      effectSeededRef.current = true;
+      writePointEffectSeen(pointTotal);
+      return;
+    }
+    if (seen !== null && pointTotal > seen) {
+      setPointBurst(pointTotal - seen);
+    }
+    writePointEffectSeen(pointTotal);
+  }, [questReady, syncSettled, pointTotal]);
 
   useEffect(() => {
     if (pointBurst === null) return;
@@ -815,7 +828,7 @@ export default function DashboardMePage() {
         <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">Point</p>
           <p className="mt-1 text-[22px] font-bold">
-            {pointReady ? pointTotal : "—"}
+            {questReady && syncSettled ? pointTotal : "—"}
           </p>
         </div>
       </section>
