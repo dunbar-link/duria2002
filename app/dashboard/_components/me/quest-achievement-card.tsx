@@ -129,6 +129,8 @@ export function QuestAchievementCard({
   const [burst, setBurst] = useState<{ total: number } | null>(null);
   // 성취도 카드는 기본 접힘(Me 기본 화면을 가볍게). 요약은 접힘 상태에도 보인다.
   const [expanded, setExpanded] = useState(false);
+  // 펼침 안에서 미션 리스트 표시 토글(100%면 기본 숨김, 진행 중이면 3개 미리보기).
+  const [showMissions, setShowMissions] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -235,6 +237,23 @@ export function QuestAchievementCard({
   const allDone = doneCount === totalCount;
   const nextMission = missions.find((m) => !m.done) ?? null;
 
+  // 미션 리스트 표시량: 100% 완료면 토글 눌러야만, 진행 중이면 기본 3개 미리보기.
+  const missionsToShow = allDone
+    ? showMissions
+      ? missions
+      : []
+    : showMissions
+      ? missions
+      : missions.slice(0, 3);
+  const missionToggleVisible = allDone || missions.length > 3;
+  const missionToggleLabel = allDone
+    ? showMissions
+      ? "완료 미션 접기"
+      : "완료 미션 보기"
+    : showMissions
+      ? "접기"
+      : `전체 보기 (${totalCount})`;
+
   if (!mounted) return null;
 
   return (
@@ -305,50 +324,11 @@ export function QuestAchievementCard({
 
       {!expanded ? null : (
       <>
-      <p className="mt-3 text-[11px] font-medium leading-snug text-[#A0A8B4]">
-        인맥지도 준비용 점수예요 · 실제 지급/서버 코인 아님 · 준비 점수 {earnedPoints}/
-        {totalPoints}P
-      </p>
-
-      {/* 미션 리스트 */}
-      <ul className="mt-3 flex flex-col gap-[10px]">
-        {missions.map((mission) => (
-          <li key={mission.key} className="flex items-center justify-between gap-3">
-            <span className="flex min-w-0 items-center gap-[8px]">
-              <span
-                aria-hidden="true"
-                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11px] ${
-                  mission.done
-                    ? "bg-[#6C8A77] text-white"
-                    : "border border-[#CDD2CB] text-transparent"
-                }`}
-              >
-                ✓
-              </span>
-              <span
-                className={`truncate text-[13px] ${
-                  mission.done ? "text-[#A0A8B4] line-through" : "text-[#334155]"
-                }`}
-              >
-                {mission.label}
-              </span>
-            </span>
-            <span
-              className={`shrink-0 text-[11px] font-semibold ${
-                mission.done ? "text-[#6C8A77]" : "text-[#B7BEC8]"
-              }`}
-            >
-              준비 +{mission.points}P
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {/* 다음 추천 미션 1개 */}
-      <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-[#ECEAE2] pt-3">
+      {/* 완료 요약(100%) 또는 다음 미션(<100%) — 맨 위, compact */}
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#ECEAE2] pt-3">
         {allDone ? (
           <>
-            <span className="text-[12px] font-semibold text-[#4B6B57]">
+            <span className="text-[13px] font-semibold text-[#4B6B57]">
               모든 준비 미션 완료 🎉
             </span>
             <span className="shrink-0 rounded-full bg-[#EEF7F0] px-3 py-1 text-[12px] font-semibold text-[#4B6B57]">
@@ -371,6 +351,57 @@ export function QuestAchievementCard({
           </>
         )}
       </div>
+
+      {/* 미션 리스트: 100% 완료엔 기본 숨김(토글), 진행 중엔 3개 미리보기 */}
+      {missionsToShow.length > 0 ? (
+        <ul className="mt-2.5 flex flex-col gap-[8px]">
+          {missionsToShow.map((mission) => (
+            <li key={mission.key} className="flex items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-[8px]">
+                <span
+                  aria-hidden="true"
+                  className={`flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-[10px] ${
+                    mission.done
+                      ? "bg-[#6C8A77] text-white"
+                      : "border border-[#CDD2CB] text-transparent"
+                  }`}
+                >
+                  ✓
+                </span>
+                <span
+                  className={`truncate text-[13px] ${
+                    mission.done ? "text-[#A0A8B4] line-through" : "text-[#334155]"
+                  }`}
+                >
+                  {mission.label}
+                </span>
+              </span>
+              <span
+                className={`shrink-0 text-[11px] font-semibold ${
+                  mission.done ? "text-[#6C8A77]" : "text-[#B7BEC8]"
+                }`}
+              >
+                준비 +{mission.points}P
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {missionToggleVisible ? (
+        <button
+          type="button"
+          onClick={() => setShowMissions((value) => !value)}
+          aria-expanded={showMissions}
+          className="mt-2.5 text-[12px] font-semibold text-[#6C8A77] active:opacity-70"
+        >
+          {missionToggleLabel}
+        </button>
+      ) : null}
+
+      <p className="mt-2.5 text-[11px] font-medium text-[#B7BEC8]">
+        준비 점수 · 실제 지급 아님
+      </p>
       </>
       )}
     </section>

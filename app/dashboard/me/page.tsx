@@ -777,6 +777,7 @@ export default function DashboardMePage() {
           </span>
         </button>
         {additionalOpen ? (
+        <>
         <div className="mt-2 grid grid-cols-1 gap-1.5">
           <CompactField label="전화번호" value={profile.phone} onChange={(value) => updateProfile("phone", value)} placeholder="휴대폰 번호" checked={profile.phonePublic} onPublicChange={(next) => updateProfile("phonePublic", next)} />
           <CompactField label="이메일" value={profile.email} onChange={(value) => updateProfile("email", value)} placeholder="이메일" checked={profile.emailPublic} onPublicChange={(next) => updateProfile("emailPublic", next)} />
@@ -804,10 +805,7 @@ export default function DashboardMePage() {
             </div>
           </div>
         </div>
-        ) : null}
-      </section>
-
-      <div className="mt-2 flex justify-end">
+        <div className="mt-3 flex justify-end">
       <button
         type="button"
         onClick={() => {
@@ -855,7 +853,10 @@ export default function DashboardMePage() {
       >
         저장
       </button>
-      </div>
+        </div>
+        </>
+        ) : null}
+      </section>
     </main>
   );
 }
