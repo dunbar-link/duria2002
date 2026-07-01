@@ -189,7 +189,7 @@ export function QuestAchievementCard({
       {
         key: "signal",
         label: "연결된 사람에게 신호 보내기",
-        points: 5,
+        points: 10,
         done: hasConnectedPerson,
         href: "/dashboard/signals",
       },
