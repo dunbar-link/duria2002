@@ -70,6 +70,7 @@ import LayerBottomSheet from "./_components/home/layer-bottom-sheet";
 import LayerStrip from "./_components/home/layer-strip";
 import LongPressGhost from "./_components/home/LongPressGhost";
 import HomeConnectableSearchSheet from "./_components/home/home-connectable-search-sheet";
+import QuestCard from "./_components/home/quest-card";
 import SignalBottomSheet, {
   type SignalRecipient,
 } from "./_components/home/signal-bottom-sheet";
@@ -3032,6 +3033,10 @@ const isJoined =
                   </span>
                 </Link>
               ) : null}
+              {/* P3-1: 인맥지도 시작 퀘스트 카드(local/UI-only, computed 표시 전용).
+                  기존 상태를 read-only 로 계산해 진행도/다음 행동만 보여준다.
+                  드래그·폴더·+N·신호 로직에는 영향을 주지 않는다. */}
+              <QuestCard people={people} inviteDrafts={inviteDrafts} />
               <HomeLayerSection
                 layers={layerBlueprints}
                 renderLayer={(layer) => {
