@@ -1,87 +1,51 @@
 "use client";
 
 /**
- * P3-1B 인맥지도 성취도 카드 (Me 탭, local / UI-only).
+ * P3-1G 인맥지도 성취도 카드 (Me 탭, presentational).
  *
- * P3-1 의 Home 퀘스트 카드를 대체한다. Home 은 사람/레이어가 최우선이라
- * 읽는 카드를 두지 않고, 진행상황/미션/준비 점수는 Me 에서 "성취도"처럼
- * 확인하는 구조로 옮겼다.
+ * 미션/점수 계산은 me/page 에서 buildQuestMissions 로 "한 번만" 하고 내려준다.
+ * 그 결과 Me 상단 Point 와 이 카드의 점수가 항상 같은 소스를 쓴다(숫자 단일화).
+ * 이 카드는 표시 + 완료 효과(🪙)만 담당한다.
  *
- * 원칙(P3-1 과 동일):
- *  - computed-only. 기존 상태(people / inviteDrafts / me 프로필 localStorage)를
- *    read-only 로 읽어 완료 여부만 계산한다.
- *  - 서버 write / wallet·coin 연동 / 서버 API 호출 없음.
- *  - "준비 점수"는 실제 지급/서버 코인이 아니다(문구로 명시).
- *  - 내 상태만 사용한다. 타인/비공개 필드는 표시하지 않는다.
- *
- * 유일한 신규 로컬 저장: 미션 완료 "효과 seen 처리"용 key 하나. 새로 완료된
- * 미션에만 +점수 효과를 1회 보여주고, 새로고침 후 같은 미션이 계속 터지지
- * 않게 한다. 이는 P3-2 정식 보상 store 가 아니다(점수 잔액 저장 없음).
+ * 원칙: computed-only · 서버 write 없음 · wallet/coin 미연동 · persist 잔액 없음.
+ * 유일한 로컬 저장은 "효과 seen 처리" key 하나(정식 보상 store 아님).
  */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type { DashboardPerson } from "../../people/data";
-import type { InviteDraft } from "../../people/store";
-
-const PROFILE_STORAGE_KEYS = [
-  "dunbar-link-me-profile-v3",
-  "dunbar-link-me-profile-v2",
-  "dunbar-link-me-profile-v1",
-];
-// 미션 완료 효과 seen 처리(잔액이 아니라 "이미 터뜨린 미션 key" 집합).
 const SEEN_COMPLETIONS_KEY = "dunbar-link-quest-seen-completions-v1";
-const PROFILE_UPDATED_EVENT = "dunbar-link-me-profile-updated";
 
-function readProfileName(): string {
-  if (typeof window === "undefined") return "";
-  for (const key of PROFILE_STORAGE_KEYS) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw) as { name?: unknown };
-      const name = typeof parsed.name === "string" ? parsed.name.trim() : "";
-      if (name) return name;
-    } catch {
-      // 다음 키로
-    }
-  }
-  return "";
-}
+export type QuestMission = {
+  key: string;
+  label: string;
+  points: number;
+  done: boolean;
+  href: string;
+};
 
-function isIncompleteName(name: string): boolean {
-  const trimmed = name.trim();
-  return trimmed === "" || trimmed === "나";
-}
+export type QuestState = {
+  hasName: boolean;
+  peopleCount: number;
+  hasTieredPerson: boolean;
+  inviteCount: number;
+  hasExploreField: boolean;
+  hasConnectedPerson: boolean;
+};
 
-// 학교/회사/지역 필드가 하나라도 채워졌는지만 확인(값 자체는 노출하지 않음).
-function readExploreFieldReady(): boolean {
-  if (typeof window === "undefined") return false;
-  const text = (value: unknown) =>
-    typeof value === "string" ? value.trim() : "";
-  for (const key of PROFILE_STORAGE_KEYS) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      const filled = [
-        parsed.schoolName,
-        parsed.highSchool,
-        parsed.middleSchool,
-        parsed.elementarySchool,
-        parsed.universityMajor,
-        parsed.major,
-        parsed.companyName,
-        parsed.company,
-        parsed.address,
-      ].some((value) => text(value) !== "");
-      if (filled) return true;
-    } catch {
-      // 다음 키로
-    }
-  }
-  return false;
+/**
+ * 미션/점수 단일 정의. Me 상단 Point 와 성취도 카드가 이 함수를 공유해 같은
+ * 숫자를 쓴다. 총점 = 10+10+30+20+20+10 = 100P.
+ */
+export function buildQuestMissions(s: QuestState): QuestMission[] {
+  return [
+    { key: "name", label: "내 이름 등록", points: 10, done: s.hasName, href: "/dashboard/me" },
+    { key: "person", label: "가까운 사람 1명 등록", points: 10, done: s.peopleCount >= 1, href: "/dashboard/people" },
+    { key: "tier", label: "사람을 관계 단계로 분류", points: 30, done: s.hasTieredPerson, href: "/dashboard/people" },
+    { key: "invite", label: "친구 초대 시작", points: 20, done: s.inviteCount >= 1, href: "/dashboard/people/invite" },
+    { key: "explore", label: "학교·회사·지역 중 1개 입력", points: 20, done: s.hasExploreField, href: "/dashboard/me" },
+    { key: "signal", label: "연결된 사람에게 신호 보내기", points: 10, done: s.hasConnectedPerson, href: "/dashboard/signals" },
+  ];
 }
 
 function readSeenCompletions(): string[] | null {
@@ -103,141 +67,39 @@ function writeSeenCompletions(keys: string[]): void {
   try {
     window.localStorage.setItem(SEEN_COMPLETIONS_KEY, JSON.stringify(keys));
   } catch {
-    // 저장 실패는 무시(효과용일 뿐, 데이터 아님)
+    // 효과용일 뿐 — 실패 무시(데이터 아님)
   }
 }
 
-type Mission = {
-  key: string;
-  label: string;
-  points: number;
-  done: boolean;
-  href: string;
-};
-
 export function QuestAchievementCard({
-  people,
-  inviteDrafts,
+  missions,
+  ready,
 }: {
-  people: DashboardPerson[];
-  inviteDrafts: InviteDraft[];
+  missions: QuestMission[];
+  ready: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
-  const [hasName, setHasName] = useState(false);
-  const [hasExploreField, setHasExploreField] = useState(false);
-  // 새로 완료된 미션 효과: [{key, points}] 를 잠깐 띄운다.
-  const [burst, setBurst] = useState<{ total: number } | null>(null);
-  // 성취도 카드는 기본 접힘(Me 기본 화면을 가볍게). 요약은 접힘 상태에도 보인다.
   const [expanded, setExpanded] = useState(false);
-  // 펼침 안에서 미션 리스트 표시 토글(100%면 기본 숨김, 진행 중이면 3개 미리보기).
   const [showMissions, setShowMissions] = useState(false);
+  const [burst, setBurst] = useState<{ total: number } | null>(null);
+  // ready(데이터 안정) 후 첫 1회만 seed(효과 없이 현재 완료분 기록). 이후 세션 중
+  // 새로 완료된 미션만 🪙 효과를 낸다 → 로드 시 하이드레이션으로 인한 효과 폭발 방지.
+  const seededRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
-    const refresh = () => {
-      setHasName(!isIncompleteName(readProfileName()));
-      setHasExploreField(readExploreFieldReady());
-    };
-    refresh();
-    window.addEventListener(PROFILE_UPDATED_EVENT, refresh);
-    window.addEventListener("focus", refresh);
-    return () => {
-      window.removeEventListener(PROFILE_UPDATED_EVENT, refresh);
-      window.removeEventListener("focus", refresh);
-    };
   }, []);
-
-  const hasConnectedPerson = inviteDrafts.some(
-    (draft) => draft.status === "accepted"
-  );
-
-  const missions: Mission[] = useMemo(
-    () => [
-      {
-        key: "name",
-        label: "내 이름 등록",
-        points: 10,
-        done: hasName,
-        href: "/dashboard/me",
-      },
-      {
-        key: "person",
-        label: "가까운 사람 1명 등록",
-        points: 10,
-        done: people.length >= 1,
-        href: "/dashboard/people",
-      },
-      {
-        key: "tier",
-        label: "사람을 관계 단계로 분류",
-        points: 30,
-        done: people.some((person) => typeof person.tier === "number"),
-        href: "/dashboard/people",
-      },
-      {
-        key: "invite",
-        label: "친구 초대 시작",
-        points: 20,
-        done: inviteDrafts.length >= 1,
-        href: "/dashboard/people/invite",
-      },
-      {
-        key: "explore",
-        label: "학교·회사·지역 중 1개 입력",
-        points: 20,
-        done: hasExploreField,
-        href: "/dashboard/me",
-      },
-      {
-        key: "signal",
-        label: "연결된 사람에게 신호 보내기",
-        points: 10,
-        done: hasConnectedPerson,
-        href: "/dashboard/signals",
-      },
-    ],
-    [hasName, hasExploreField, hasConnectedPerson, people, inviteDrafts]
-  );
-
-  // 미션 완료 효과 seen 처리. 최초 방문(seen 키 없음)에는 이미 완료된 미션을
-  // 터뜨리지 않고 seen 으로만 심는다(첫 진입에 과하게 터지는 것 방지). 이후
-  // 새로 완료되는 미션에만 +점수 효과를 1회 보여준다.
-  useEffect(() => {
-    if (!mounted) return;
-    const completedKeys = missions.filter((m) => m.done).map((m) => m.key);
-    const seen = readSeenCompletions();
-
-    if (seen === null) {
-      writeSeenCompletions(completedKeys);
-      return;
-    }
-
-    const seenSet = new Set(seen);
-    const newlyDone = missions.filter((m) => m.done && !seenSet.has(m.key));
-    if (newlyDone.length === 0) return;
-
-    const total = newlyDone.reduce((sum, m) => sum + m.points, 0);
-    setBurst({ total });
-    const union = Array.from(new Set([...seen, ...completedKeys]));
-    writeSeenCompletions(union);
-
-    const timer = window.setTimeout(() => setBurst(null), 1600);
-    return () => window.clearTimeout(timer);
-    // missions 는 상태 파생값이라 done 조합이 바뀔 때만 재평가된다.
-  }, [mounted, missions]);
 
   const doneCount = missions.filter((m) => m.done).length;
   const totalCount = missions.length;
-  const readinessPct = Math.round((doneCount / totalCount) * 100);
-  const totalPoints = missions.reduce((sum, m) => sum + m.points, 0);
+  const readinessPct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
   const earnedPoints = missions.reduce(
     (sum, m) => (m.done ? sum + m.points : sum),
     0
   );
-  const allDone = doneCount === totalCount;
+  const allDone = totalCount > 0 && doneCount === totalCount;
   const nextMission = missions.find((m) => !m.done) ?? null;
 
-  // 미션 리스트 표시량: 100% 완료면 토글 눌러야만, 진행 중이면 기본 3개 미리보기.
   const missionsToShow = allDone
     ? showMissions
       ? missions
@@ -254,6 +116,25 @@ export function QuestAchievementCard({
       ? "접기"
       : `전체 보기 (${totalCount})`;
 
+  useEffect(() => {
+    if (!mounted || !ready) return;
+    const doneKeys = missions.filter((m) => m.done).map((m) => m.key);
+    const seen = readSeenCompletions() ?? [];
+    if (!seededRef.current) {
+      seededRef.current = true;
+      writeSeenCompletions(Array.from(new Set([...seen, ...doneKeys])));
+      return;
+    }
+    const seenSet = new Set(seen);
+    const newly = missions.filter((m) => m.done && !seenSet.has(m.key));
+    if (newly.length === 0) return;
+    const total = newly.reduce((sum, m) => sum + m.points, 0);
+    setBurst({ total });
+    writeSeenCompletions(Array.from(new Set([...seen, ...doneKeys])));
+    const timer = window.setTimeout(() => setBurst(null), 1600);
+    return () => window.clearTimeout(timer);
+  }, [mounted, ready, missions]);
+
   if (!mounted) return null;
 
   return (
@@ -266,12 +147,10 @@ export function QuestAchievementCard({
         }
       `}</style>
 
-      {/* 헤더(항상 표시) = 접힘/펼침 토글. 접힘 상태에도 요약(준비도·점수·완료)이
-          보여 눌러볼 이유를 준다. 🪙 효과는 헤더 우측에 absolute 로 띄워 레이아웃을
-          밀지 않는다. */}
+      {/* 헤더(항상 표시) = 접힘/펼침 토글. 요약(준비도·Point·완료)이 접힘에도 보인다. */}
       <button
         type="button"
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
         aria-label={expanded ? "인맥지도 성취도 접기" : "인맥지도 성취도 펼치기"}
         className="flex w-full items-start justify-between gap-3 text-left"
@@ -285,7 +164,11 @@ export function QuestAchievementCard({
               className={`font-semibold text-[#4B6B57] ${
                 burst ? "transition-transform duration-300" : ""
               }`}
-              style={burst ? { display: "inline-block", transform: "scale(1.12)" } : undefined}
+              style={
+                burst
+                  ? { display: "inline-block", transform: "scale(1.12)" }
+                  : undefined
+              }
             >
               {earnedPoints}P
             </span>
@@ -314,7 +197,7 @@ export function QuestAchievementCard({
         </div>
       </button>
 
-      {/* 얇은 진행바(접힘 상태에도 표시) */}
+      {/* 얇은 진행바(접힘에도 표시) */}
       <div className="mt-2.5 h-[6px] w-full overflow-hidden rounded-full bg-[#ECEAE2]">
         <div
           className="h-full rounded-full bg-[#6C8A77] transition-[width] duration-500"
@@ -323,86 +206,82 @@ export function QuestAchievementCard({
       </div>
 
       {!expanded ? null : (
-      <>
-      {/* 완료 요약(100%) 또는 다음 미션(<100%) — 맨 위, compact */}
-      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#ECEAE2] pt-3">
-        {allDone ? (
-          <>
-            <span className="text-[13px] font-semibold text-[#4B6B57]">
-              모든 준비 미션 완료 🎉
-            </span>
-            <span className="shrink-0 rounded-full bg-[#EEF7F0] px-3 py-1 text-[12px] font-semibold text-[#4B6B57]">
-              인맥지도 준비 완료
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="min-w-0 truncate text-[12px] text-[#8D99AE]">
-              다음 미션 · {nextMission?.label}
-            </span>
-            {nextMission ? (
-              <Link
-                href={nextMission.href}
-                className="shrink-0 rounded-full bg-[#2C2C2A] px-3.5 py-1 text-[12px] font-semibold text-[#F1EFE8] active:scale-[0.98]"
-              >
-                하러 가기
-              </Link>
-            ) : null}
-          </>
-        )}
-      </div>
-
-      {/* 미션 리스트: 100% 완료엔 기본 숨김(토글), 진행 중엔 3개 미리보기 */}
-      {missionsToShow.length > 0 ? (
-        <ul className="mt-2.5 flex flex-col gap-[8px]">
-          {missionsToShow.map((mission) => (
-            <li key={mission.key} className="flex items-center justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-[8px]">
-                <span
-                  aria-hidden="true"
-                  className={`flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-[10px] ${
-                    mission.done
-                      ? "bg-[#6C8A77] text-white"
-                      : "border border-[#CDD2CB] text-transparent"
-                  }`}
-                >
-                  ✓
+        <>
+          {/* 완료 요약(100%) 또는 다음 미션(<100%) — compact */}
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#ECEAE2] pt-3">
+            {allDone ? (
+              <>
+                <span className="text-[13px] font-semibold text-[#4B6B57]">
+                  모든 준비 미션 완료 🎉
                 </span>
-                <span
-                  className={`truncate text-[13px] ${
-                    mission.done ? "text-[#A0A8B4] line-through" : "text-[#334155]"
-                  }`}
-                >
-                  {mission.label}
+                <span className="shrink-0 rounded-full bg-[#EEF7F0] px-3 py-1 text-[12px] font-semibold text-[#4B6B57]">
+                  인맥지도 준비 완료
                 </span>
-              </span>
-              <span
-                className={`shrink-0 text-[11px] font-semibold ${
-                  mission.done ? "text-[#6C8A77]" : "text-[#B7BEC8]"
-                }`}
-              >
-                준비 +{mission.points}P
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+              </>
+            ) : (
+              <>
+                <span className="min-w-0 truncate text-[12px] text-[#8D99AE]">
+                  다음 미션 · {nextMission?.label}
+                </span>
+                {nextMission ? (
+                  <Link
+                    href={nextMission.href}
+                    className="shrink-0 rounded-full bg-[#2C2C2A] px-3.5 py-1 text-[12px] font-semibold text-[#F1EFE8] active:scale-[0.98]"
+                  >
+                    하러 가기
+                  </Link>
+                ) : null}
+              </>
+            )}
+          </div>
 
-      {missionToggleVisible ? (
-        <button
-          type="button"
-          onClick={() => setShowMissions((value) => !value)}
-          aria-expanded={showMissions}
-          className="mt-2.5 text-[12px] font-semibold text-[#6C8A77] active:opacity-70"
-        >
-          {missionToggleLabel}
-        </button>
-      ) : null}
+          {/* 미션 리스트: 100% 완료엔 기본 숨김(토글), 진행 중엔 3개 미리보기 */}
+          {missionsToShow.length > 0 ? (
+            <ul className="mt-2.5 flex flex-col gap-[8px]">
+              {missionsToShow.map((mission) => (
+                <li key={mission.key} className="flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-[8px]">
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-[10px] ${
+                        mission.done
+                          ? "bg-[#6C8A77] text-white"
+                          : "border border-[#CDD2CB] text-transparent"
+                      }`}
+                    >
+                      ✓
+                    </span>
+                    <span
+                      className={`truncate text-[13px] ${
+                        mission.done ? "text-[#A0A8B4] line-through" : "text-[#334155]"
+                      }`}
+                    >
+                      {mission.label}
+                    </span>
+                  </span>
+                  <span
+                    className={`shrink-0 text-[11px] font-semibold ${
+                      mission.done ? "text-[#6C8A77]" : "text-[#B7BEC8]"
+                    }`}
+                  >
+                    +{mission.points}P
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
-      <p className="mt-2.5 text-[11px] font-medium text-[#B7BEC8]">
-        준비 점수 · 실제 지급 아님
-      </p>
-      </>
+          {missionToggleVisible ? (
+            <button
+              type="button"
+              onClick={() => setShowMissions((v) => !v)}
+              aria-expanded={showMissions}
+              className="mt-2.5 text-[12px] font-semibold text-[#6C8A77] active:opacity-70"
+            >
+              {missionToggleLabel}
+            </button>
+          ) : null}
+        </>
       )}
     </section>
   );

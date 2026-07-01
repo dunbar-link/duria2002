@@ -6,7 +6,7 @@ import { getCurrentUserId } from "@/lib/auth/current-user";
 import { isIncompleteMeName, readMeProfileImageUrl } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../people/store";
 import { AccountSection } from "./account-section";
-import QuestAchievementCard from "../_components/me/quest-achievement-card";
+import QuestAchievementCard, { buildQuestMissions } from "../_components/me/quest-achievement-card";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const LEGACY_PROFILE_STORAGE_KEY_V2 = "dunbar-link-me-profile-v2";
@@ -417,27 +417,36 @@ export default function DashboardMePage() {
     };
   }, []);
 
-  // Point 는 서버 acceptedCount 가 도착(ready)했을 때만 계산한다(서버 SoT).
-  // 로딩/실패면 null → UI 는 "—". local 기반 point 를 잠깐도 보여주지 않는다.
-  const linkPoint = useMemo(() => {
-    if (stats.status !== "ready") return null;
-    const filled = [
-      profile.name,
-      profile.phone,
-      profile.email,
-      profile.address,
-      profile.birthday,
-      profile.elementarySchool,
-      profile.middleSchool,
-      profile.highSchool,
-      profile.universityMajor,
-      profile.company,
-      profile.imageUrl,
-      profile.imageDataUrl,
-    ].some((value) => value.trim());
-
-    return stats.acceptedCount * 10 + people.length * 3 + (filled ? 5 : 0);
-  }, [stats, people.length, profile]);
+  // P3-1G: Me 상단 Point 를 인맥지도 성취도(quest 미션) 점수와 단일화한다.
+  // 미션/점수는 buildQuestMissions 한 곳에서 계산하고, 상단 Point 와 성취도
+  // 카드가 같은 결과를 쓴다. 서버 acceptedCount 는 "초대 성공" 카드에만 쓴다.
+  const questMissions = useMemo(
+    () =>
+      buildQuestMissions({
+        hasName: !isIncompleteMeName(profile.name),
+        peopleCount: people.length,
+        hasTieredPerson: people.some((p) => typeof p.tier === "number"),
+        inviteCount: inviteDrafts.length,
+        hasExploreField: [
+          profile.schoolName,
+          profile.highSchool,
+          profile.middleSchool,
+          profile.elementarySchool,
+          profile.universityMajor,
+          profile.major,
+          profile.companyName,
+          profile.company,
+          profile.address,
+        ].some((value) => value.trim() !== ""),
+        hasConnectedPerson: inviteDrafts.some((d) => d.status === "accepted"),
+      }),
+    [profile, people, inviteDrafts]
+  );
+  const questEarned = questMissions.reduce(
+    (sum, m) => (m.done ? sum + m.points : sum),
+    0
+  );
+  const questReady = hasHydrated && isLoaded;
 
   function updateProfile<K extends keyof MeProfile>(key: K, value: MeProfile[K]) {
     setProfile((prev) => ({ ...prev, [key]: value }));
@@ -738,7 +747,9 @@ export default function DashboardMePage() {
         </div>
         <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">Point</p>
-          <p className="mt-1 text-[22px] font-bold">{linkPoint ?? "—"}</p>
+          <p className="mt-1 text-[22px] font-bold">
+            {questReady ? questEarned : "—"}
+          </p>
         </div>
       </section>
       {stats.status === "error" && (
@@ -750,7 +761,7 @@ export default function DashboardMePage() {
       {/* P3-1B: 인맥지도 성취도(튜토리얼 진행상황). Home 의 큰 카드를 Me 로 옮겨
           "성취도"처럼 보게 한다. computed-only · 서버 write 없음 · 준비 점수는
           실제 지급/코인이 아니다. */}
-      <QuestAchievementCard people={people} inviteDrafts={inviteDrafts} />
+      <QuestAchievementCard missions={questMissions} ready={questReady} />
 
       <section className="mt-2 rounded-[24px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#E2E0D8]">
         {/* P3-1C: 추가 정보를 기본 접힘 아코디언으로. 헤더에 "입력 N/7"만 노출하고
