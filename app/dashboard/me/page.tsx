@@ -6,6 +6,7 @@ import { getCurrentUserId } from "@/lib/auth/current-user";
 import { isIncompleteMeName, readMeProfileImageUrl } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../people/store";
 import { AccountSection } from "./account-section";
+import QuestAchievementCard from "../_components/me/quest-achievement-card";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const LEGACY_PROFILE_STORAGE_KEY_V2 = "dunbar-link-me-profile-v2";
@@ -281,6 +282,7 @@ function CompactField({
 
 export default function DashboardMePage() {
   const people = usePeopleStore((state) => state.people);
+  const inviteDrafts = usePeopleStore((state) => state.inviteDrafts);
   const hasHydrated = usePeopleStore((state) => state.hasHydrated);
   // P2-4e-1: "초대 성공"/Point 는 기기별 localStorage(inviteDrafts) 가 아니라
   // 서버 /api/me/stats(계정 전체 dl_invites accepted) 기준으로 통일한다.
@@ -726,6 +728,11 @@ export default function DashboardMePage() {
           통계를 불러오지 못했어요. 잠시 후 다시 확인해 주세요.
         </p>
       )}
+
+      {/* P3-1B: 인맥지도 성취도(튜토리얼 진행상황). Home 의 큰 카드를 Me 로 옮겨
+          "성취도"처럼 보게 한다. computed-only · 서버 write 없음 · 준비 점수는
+          실제 지급/코인이 아니다. */}
+      <QuestAchievementCard people={people} inviteDrafts={inviteDrafts} />
 
       <section className="mt-2 rounded-[24px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#E2E0D8]">
         {/* P2-6C: 추가 정보는 선택 입력임을 한 줄로 안내해 상단 필수(이름·사진·계정)와
