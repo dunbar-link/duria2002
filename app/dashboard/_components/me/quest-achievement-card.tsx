@@ -1,90 +1,38 @@
 "use client";
 
 /**
- * P3-1G 인맥지도 성취도 카드 (Me 탭, presentational).
+ * P3-2A 인맥지도 성취도 카드 (Me 탭, presentational).
  *
- * 미션/점수 계산은 me/page 에서 buildQuestMissions 로 "한 번만" 하고 내려준다.
- * 그 결과 Me 상단 Point 와 이 카드의 점수가 항상 같은 소스를 쓴다(숫자 단일화).
- * 이 카드는 표시 + 완료 효과(🪙)만 담당한다.
+ * - 준비도(%)는 6개 milestone(quest missions)의 완료율 — 0~100%.
+ * - Point 는 누적값(로컬 Point Ledger 합계)으로 me/page 에서 계산해 내려준다.
+ *   준비도(완료율)와 Point(누적)는 분리된 개념이며 100점 만점 표현을 쓰지 않는다.
+ * - 🪙 +N 효과는 me/page 의 ledger reconcile 에서 "새 적립"이 생겼을 때만
+ *   burstPoints 로 내려온다(기존 backfill 에는 효과 없음).
  *
- * 원칙: computed-only · 서버 write 없음 · wallet/coin 미연동 · persist 잔액 없음.
- * 유일한 로컬 저장은 "효과 seen 처리" key 하나(정식 보상 store 아님).
+ * computed-only · 서버 write 없음 · wallet/coin 미연동.
  */
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-const SEEN_COMPLETIONS_KEY = "dunbar-link-quest-seen-completions-v1";
+import { buildQuestMissions } from "./quest-missions";
+import type { QuestMission } from "./quest-missions";
 
-export type QuestMission = {
-  key: string;
-  label: string;
-  points: number;
-  done: boolean;
-  href: string;
-};
-
-export type QuestState = {
-  hasName: boolean;
-  peopleCount: number;
-  hasTieredPerson: boolean;
-  inviteCount: number;
-  hasExploreField: boolean;
-  hasConnectedPerson: boolean;
-};
-
-/**
- * 미션/점수 단일 정의. Me 상단 Point 와 성취도 카드가 이 함수를 공유해 같은
- * 숫자를 쓴다. 총점 = 10+10+30+20+20+10 = 100P.
- */
-export function buildQuestMissions(s: QuestState): QuestMission[] {
-  return [
-    { key: "name", label: "내 이름 등록", points: 10, done: s.hasName, href: "/dashboard/me" },
-    { key: "person", label: "가까운 사람 1명 등록", points: 10, done: s.peopleCount >= 1, href: "/dashboard/people" },
-    { key: "tier", label: "사람을 관계 단계로 분류", points: 30, done: s.hasTieredPerson, href: "/dashboard/people" },
-    { key: "invite", label: "친구 초대 시작", points: 20, done: s.inviteCount >= 1, href: "/dashboard/people/invite" },
-    { key: "explore", label: "학교·회사·지역 중 1개 입력", points: 20, done: s.hasExploreField, href: "/dashboard/me" },
-    { key: "signal", label: "연결된 사람에게 신호 보내기", points: 10, done: s.hasConnectedPerson, href: "/dashboard/signals" },
-  ];
-}
-
-function readSeenCompletions(): string[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(SEEN_COMPLETIONS_KEY);
-    if (raw === null) return null;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeSeenCompletions(keys: string[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SEEN_COMPLETIONS_KEY, JSON.stringify(keys));
-  } catch {
-    // 효과용일 뿐 — 실패 무시(데이터 아님)
-  }
-}
+export { buildQuestMissions };
+export type { QuestMission };
 
 export function QuestAchievementCard({
   missions,
-  ready,
+  pointTotal,
+  burstPoints,
 }: {
   missions: QuestMission[];
-  ready: boolean;
+  pointTotal: number;
+  burstPoints: number | null;
 }) {
   const [mounted, setMounted] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
-  const [burst, setBurst] = useState<{ total: number } | null>(null);
-  // ready(데이터 안정) 후 첫 1회만 seed(효과 없이 현재 완료분 기록). 이후 세션 중
-  // 새로 완료된 미션만 🪙 효과를 낸다 → 로드 시 하이드레이션으로 인한 효과 폭발 방지.
-  const seededRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -93,10 +41,6 @@ export function QuestAchievementCard({
   const doneCount = missions.filter((m) => m.done).length;
   const totalCount = missions.length;
   const readinessPct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
-  const earnedPoints = missions.reduce(
-    (sum, m) => (m.done ? sum + m.points : sum),
-    0
-  );
   const allDone = totalCount > 0 && doneCount === totalCount;
   const nextMission = missions.find((m) => !m.done) ?? null;
 
@@ -116,25 +60,6 @@ export function QuestAchievementCard({
       ? "접기"
       : `전체 보기 (${totalCount})`;
 
-  useEffect(() => {
-    if (!mounted || !ready) return;
-    const doneKeys = missions.filter((m) => m.done).map((m) => m.key);
-    const seen = readSeenCompletions() ?? [];
-    if (!seededRef.current) {
-      seededRef.current = true;
-      writeSeenCompletions(Array.from(new Set([...seen, ...doneKeys])));
-      return;
-    }
-    const seenSet = new Set(seen);
-    const newly = missions.filter((m) => m.done && !seenSet.has(m.key));
-    if (newly.length === 0) return;
-    const total = newly.reduce((sum, m) => sum + m.points, 0);
-    setBurst({ total });
-    writeSeenCompletions(Array.from(new Set([...seen, ...doneKeys])));
-    const timer = window.setTimeout(() => setBurst(null), 1600);
-    return () => window.clearTimeout(timer);
-  }, [mounted, ready, missions]);
-
   if (!mounted) return null;
 
   return (
@@ -147,7 +72,7 @@ export function QuestAchievementCard({
         }
       `}</style>
 
-      {/* 헤더(항상 표시) = 접힘/펼침 토글. 요약(준비도·Point·완료)이 접힘에도 보인다. */}
+      {/* 헤더(항상 표시) = 접힘/펼침 토글. 요약: 준비도(완료율) · 누적 Point · 완료수 */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -162,28 +87,28 @@ export function QuestAchievementCard({
             {" · "}
             <span
               className={`font-semibold text-[#4B6B57] ${
-                burst ? "transition-transform duration-300" : ""
+                burstPoints !== null ? "transition-transform duration-300" : ""
               }`}
               style={
-                burst
+                burstPoints !== null
                   ? { display: "inline-block", transform: "scale(1.12)" }
                   : undefined
               }
             >
-              {earnedPoints}P
+              누적 {pointTotal}P
             </span>
             {" · "}
             {doneCount}/{totalCount} 완료
           </p>
         </div>
         <div className="relative flex shrink-0 items-center gap-1.5">
-          {burst ? (
+          {burstPoints !== null ? (
             <span
               aria-hidden="true"
               className="pointer-events-none absolute -top-4 right-5 text-[13px] font-bold text-[#C8890B]"
               style={{ animation: "questPointRise 1.6s ease-out forwards" }}
             >
-              🪙 +{burst.total}
+              🪙 +{burstPoints}
             </span>
           ) : null}
           <span
@@ -197,7 +122,7 @@ export function QuestAchievementCard({
         </div>
       </button>
 
-      {/* 얇은 진행바(접힘에도 표시) */}
+      {/* 얇은 진행바 = 준비도(완료율). 누적 Point 와 무관. */}
       <div className="mt-2.5 h-[6px] w-full overflow-hidden rounded-full bg-[#ECEAE2]">
         <div
           className="h-full rounded-full bg-[#6C8A77] transition-[width] duration-500"
@@ -235,52 +160,50 @@ export function QuestAchievementCard({
             )}
           </div>
 
-          {/* 미션 리스트: 100% 완료엔 기본 숨김(토글), 진행 중엔 3개 미리보기 */}
+          {/* 미션 리스트: milestone 완료 체크(누적 Point 와 별개라 점수 미표기) */}
           {missionsToShow.length > 0 ? (
             <ul className="mt-2.5 flex flex-col gap-[8px]">
               {missionsToShow.map((mission) => (
-                <li key={mission.key} className="flex items-center justify-between gap-3">
-                  <span className="flex min-w-0 items-center gap-[8px]">
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-[10px] ${
-                        mission.done
-                          ? "bg-[#6C8A77] text-white"
-                          : "border border-[#CDD2CB] text-transparent"
-                      }`}
-                    >
-                      ✓
-                    </span>
-                    <span
-                      className={`truncate text-[13px] ${
-                        mission.done ? "text-[#A0A8B4] line-through" : "text-[#334155]"
-                      }`}
-                    >
-                      {mission.label}
-                    </span>
-                  </span>
+                <li key={mission.key} className="flex items-center gap-[8px]">
                   <span
-                    className={`shrink-0 text-[11px] font-semibold ${
-                      mission.done ? "text-[#6C8A77]" : "text-[#B7BEC8]"
+                    aria-hidden="true"
+                    className={`flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-[10px] ${
+                      mission.done
+                        ? "bg-[#6C8A77] text-white"
+                        : "border border-[#CDD2CB] text-transparent"
                     }`}
                   >
-                    +{mission.points}P
+                    ✓
+                  </span>
+                  <span
+                    className={`truncate text-[13px] ${
+                      mission.done ? "text-[#A0A8B4] line-through" : "text-[#334155]"
+                    }`}
+                  >
+                    {mission.label}
                   </span>
                 </li>
               ))}
             </ul>
           ) : null}
 
-          {missionToggleVisible ? (
-            <button
-              type="button"
-              onClick={() => setShowMissions((v) => !v)}
-              aria-expanded={showMissions}
-              className="mt-2.5 text-[12px] font-semibold text-[#6C8A77] active:opacity-70"
-            >
-              {missionToggleLabel}
-            </button>
-          ) : null}
+          <div className="mt-2.5 flex items-center justify-between gap-3">
+            {missionToggleVisible ? (
+              <button
+                type="button"
+                onClick={() => setShowMissions((v) => !v)}
+                aria-expanded={showMissions}
+                className="text-[12px] font-semibold text-[#6C8A77] active:opacity-70"
+              >
+                {missionToggleLabel}
+              </button>
+            ) : (
+              <span />
+            )}
+            <span className="shrink-0 text-[12px] font-semibold text-[#4B6B57]">
+              누적 Point {pointTotal}P
+            </span>
+          </div>
         </>
       )}
     </section>

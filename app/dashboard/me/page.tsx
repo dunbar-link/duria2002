@@ -7,6 +7,13 @@ import { isIncompleteMeName, readMeProfileImageUrl } from "@/lib/me/profile-name
 import { usePeopleStore } from "../people/store";
 import { AccountSection } from "./account-section";
 import QuestAchievementCard, { buildQuestMissions } from "../_components/me/quest-achievement-card";
+import {
+  buildPointEventsFromCurrentState,
+  getPointTotal,
+  loadPointLedger,
+  reconcilePointLedger,
+  savePointLedger,
+} from "../_components/me/point-ledger";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const LEGACY_PROFILE_STORAGE_KEY_V2 = "dunbar-link-me-profile-v2";
@@ -442,11 +449,71 @@ export default function DashboardMePage() {
       }),
     [profile, people, inviteDrafts]
   );
-  const questEarned = questMissions.reduce(
-    (sum, m) => (m.done ? sum + m.points : sum),
-    0
-  );
   const questReady = hasHydrated && isLoaded;
+
+  // P3-2A 누적 Point Ledger. 현재 상태에서 없는 key 만 적립(중복 방지). 기존
+  // 완료분은 첫 settle 에서 조용히 backfill(효과 없음), 이후 새 적립만 🪙 효과.
+  const [pointTotal, setPointTotal] = useState(0);
+  const [pointReady, setPointReady] = useState(false);
+  const [pointBurst, setPointBurst] = useState<number | null>(null);
+  const ledgerSettledRef = useRef(false);
+
+  useEffect(() => {
+    if (!questReady) return;
+    const events = buildPointEventsFromCurrentState({
+      hasName: !isIncompleteMeName(profile.name),
+      filledProfileFields: [
+        profile.phone.trim() ? "phone" : "",
+        profile.email.trim() ? "email" : "",
+        profile.address.trim() ? "address" : "",
+        profile.birthday.trim() ? "birthday" : "",
+        profile.elementarySchool.trim() ||
+        profile.middleSchool.trim() ||
+        profile.highSchool.trim()
+          ? "school"
+          : "",
+        profile.schoolName.trim() ||
+        profile.major.trim() ||
+        profile.studentId.trim() ||
+        profile.universityMajor.trim()
+          ? "university"
+          : "",
+        profile.companyName.trim() ||
+        profile.jobTitle.trim() ||
+        profile.department.trim() ||
+        profile.company.trim()
+          ? "company"
+          : "",
+      ].filter((field) => field !== ""),
+      personIds: people.map((p) => p.id),
+      tieredPersonIds: people
+        .filter((p) => typeof p.tier === "number")
+        .map((p) => p.id),
+      inviteSentKeys: inviteDrafts.map((d) => d.token).filter((t) => Boolean(t)),
+      connectionKeys: inviteDrafts
+        .filter((d) => d.status === "accepted")
+        .map((d) => d.acceptedPersonId ?? d.token)
+        .filter((k): k is string => Boolean(k)),
+    });
+    const existing = loadPointLedger();
+    const { ledger, added } = reconcilePointLedger(existing ?? [], events);
+    if (added.length > 0 || existing === null) {
+      savePointLedger(ledger);
+    }
+    setPointTotal(getPointTotal(ledger));
+    setPointReady(true);
+    // 첫 settle 은 backfill 이라 효과 없음. 이후 새 적립분만 🪙 로 표시.
+    if (ledgerSettledRef.current && added.length > 0) {
+      setPointBurst(added.reduce((sum, entry) => sum + entry.points, 0));
+    }
+    ledgerSettledRef.current = true;
+  }, [questReady, profile, people, inviteDrafts]);
+
+  useEffect(() => {
+    if (pointBurst === null) return;
+    const timer = window.setTimeout(() => setPointBurst(null), 1600);
+    return () => window.clearTimeout(timer);
+  }, [pointBurst]);
 
   function updateProfile<K extends keyof MeProfile>(key: K, value: MeProfile[K]) {
     setProfile((prev) => ({ ...prev, [key]: value }));
@@ -748,7 +815,7 @@ export default function DashboardMePage() {
         <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">Point</p>
           <p className="mt-1 text-[22px] font-bold">
-            {questReady ? questEarned : "—"}
+            {pointReady ? pointTotal : "—"}
           </p>
         </div>
       </section>
@@ -761,7 +828,11 @@ export default function DashboardMePage() {
       {/* P3-1B: 인맥지도 성취도(튜토리얼 진행상황). Home 의 큰 카드를 Me 로 옮겨
           "성취도"처럼 보게 한다. computed-only · 서버 write 없음 · 준비 점수는
           실제 지급/코인이 아니다. */}
-      <QuestAchievementCard missions={questMissions} ready={questReady} />
+      <QuestAchievementCard
+        missions={questMissions}
+        pointTotal={pointTotal}
+        burstPoints={pointBurst}
+      />
 
       <section className="mt-2 rounded-[24px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#E2E0D8]">
         {/* P3-1C: 추가 정보를 기본 접힘 아코디언으로. 헤더에 "입력 N/7"만 노출하고
