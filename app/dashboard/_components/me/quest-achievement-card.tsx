@@ -127,6 +127,8 @@ export function QuestAchievementCard({
   const [hasExploreField, setHasExploreField] = useState(false);
   // 새로 완료된 미션 효과: [{key, points}] 를 잠깐 띄운다.
   const [burst, setBurst] = useState<{ total: number } | null>(null);
+  // 성취도 카드는 기본 접힘(Me 기본 화면을 가볍게). 요약은 접힘 상태에도 보인다.
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -245,53 +247,68 @@ export function QuestAchievementCard({
         }
       `}</style>
 
-      <div className="flex items-start justify-between gap-3">
+      {/* 헤더(항상 표시) = 접힘/펼침 토글. 접힘 상태에도 요약(준비도·점수·완료)이
+          보여 눌러볼 이유를 준다. 🪙 효과는 헤더 우측에 absolute 로 띄워 레이아웃을
+          밀지 않는다. */}
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        aria-label={expanded ? "인맥지도 성취도 접기" : "인맥지도 성취도 펼치기"}
+        className="flex w-full items-start justify-between gap-3 text-left"
+      >
         <div className="min-w-0">
           <h2 className="text-[17px] font-bold text-[#334155]">인맥지도 성취도</h2>
-          <p className="mt-1 text-[11px] font-medium leading-snug text-[#A0A8B4]">
-            인맥지도 준비용 점수예요 · 실제 지급/서버 코인 아님
+          <p className="mt-1 text-[12px] font-medium leading-snug text-[#8D99AE]">
+            준비도 <span className="font-semibold text-[#4B6B57]">{readinessPct}%</span>
+            {" · "}
+            <span
+              className={`font-semibold text-[#4B6B57] ${
+                burst ? "transition-transform duration-300" : ""
+              }`}
+              style={burst ? { display: "inline-block", transform: "scale(1.12)" } : undefined}
+            >
+              {earnedPoints}P
+            </span>
+            {" · "}
+            {doneCount}/{totalCount} 완료
           </p>
         </div>
-        <div className="relative shrink-0 text-right">
-          <p className="text-[11px] font-semibold text-[#8D99AE]">준비 점수</p>
-          <p
-            className={`text-[22px] font-bold leading-tight text-[#4B6B57] ${
-              burst ? "transition-transform duration-300" : ""
-            }`}
-            style={burst ? { transform: "scale(1.12)" } : undefined}
-          >
-            {earnedPoints}
-            <span className="text-[12px] font-semibold text-[#8D99AE]">
-              /{totalPoints}P
-            </span>
-          </p>
+        <div className="relative flex shrink-0 items-center gap-1.5">
           {burst ? (
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute -top-3 right-0 text-[13px] font-bold text-[#C8890B]"
+              className="pointer-events-none absolute -top-4 right-5 text-[13px] font-bold text-[#C8890B]"
               style={{ animation: "questPointRise 1.6s ease-out forwards" }}
             >
               🪙 +{burst.total}
             </span>
           ) : null}
+          <span
+            aria-hidden="true"
+            className={`text-[15px] leading-none text-[#A0A8B4] transition-transform ${
+              expanded ? "rotate-180" : ""
+            }`}
+          >
+            ⌄
+          </span>
         </div>
+      </button>
+
+      {/* 얇은 진행바(접힘 상태에도 표시) */}
+      <div className="mt-2.5 h-[6px] w-full overflow-hidden rounded-full bg-[#ECEAE2]">
+        <div
+          className="h-full rounded-full bg-[#6C8A77] transition-[width] duration-500"
+          style={{ width: `${readinessPct}%` }}
+        />
       </div>
 
-      {/* 준비도 % + 완료 개수 + 얇은 바 */}
-      <div className="mt-3">
-        <div className="flex items-center justify-between text-[12px] font-medium text-[#8D99AE]">
-          <span>
-            완료 {doneCount}/{totalCount} 미션
-          </span>
-          <span className="text-[#4B6B57]">준비도 {readinessPct}%</span>
-        </div>
-        <div className="mt-1.5 h-[6px] w-full overflow-hidden rounded-full bg-[#ECEAE2]">
-          <div
-            className="h-full rounded-full bg-[#6C8A77] transition-[width] duration-500"
-            style={{ width: `${readinessPct}%` }}
-          />
-        </div>
-      </div>
+      {!expanded ? null : (
+      <>
+      <p className="mt-3 text-[11px] font-medium leading-snug text-[#A0A8B4]">
+        인맥지도 준비용 점수예요 · 실제 지급/서버 코인 아님 · 준비 점수 {earnedPoints}/
+        {totalPoints}P
+      </p>
 
       {/* 미션 리스트 */}
       <ul className="mt-3 flex flex-col gap-[10px]">
@@ -354,6 +371,8 @@ export function QuestAchievementCard({
           </>
         )}
       </div>
+      </>
+      )}
     </section>
   );
 }
