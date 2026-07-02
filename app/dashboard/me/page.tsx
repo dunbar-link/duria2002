@@ -7,7 +7,6 @@ import { isIncompleteMeName, readMeProfileImageUrl } from "@/lib/me/profile-name
 import { usePeopleStore } from "../people/store";
 import { AccountSection } from "./account-section";
 import QuestAchievementCard, { buildQuestMissions } from "../_components/me/quest-achievement-card";
-import NetworkDiscoveryCard from "../_components/me/network-discovery-card";
 import {
   buildDeterministicPointScore,
   readPointEffectSeen,
@@ -926,8 +925,6 @@ export default function DashboardMePage() {
           {senderIdsCount} · total {pointTotal}
         </p>
       ) : null}
-      {/* P3-3: 연결 가능성(인맥 탐색 mock, 기본 접힘, UI-only, Point 미연동). */}
-      <NetworkDiscoveryCard networkCount={peopleCount} />
 
       <section className="mt-2 rounded-[24px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#E2E0D8]">
         {/* P3-1C: 추가 정보를 기본 접힘 아코디언으로. 헤더에 "입력 N/7"만 노출하고
