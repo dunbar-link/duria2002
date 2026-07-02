@@ -422,86 +422,105 @@ export default function DashboardMePage() {
     };
   }, []);
 
-  // P3-1G: Me 상단 Point 를 인맥지도 성취도(quest 미션) 점수와 단일화한다.
-  // 미션/점수는 buildQuestMissions 한 곳에서 계산하고, 상단 Point 와 성취도
-  // 카드가 같은 결과를 쓴다. 서버 acceptedCount 는 "초대 성공" 카드에만 쓴다.
+  // P3-2A3: 상단 스탯 · Point · 성취도가 "같은 소스"를 쓰도록 통일한다.
+  // 초대/연결은 기기별 inviteDrafts 가 아니라 화면 "초대 성공"과 동일한 서버값
+  // (/api/me/stats acceptedCount)을 주 소스로 삼는다 → 같은 계정이면 PC/모바일 동일.
+  const questReady = hasHydrated && isLoaded;
+
+  // Me 진입 시 accepted 초대 read-only 서버동기(GET /api/invites/mine). people/
+  // inviteDrafts 신선도 보조용(주 소스는 아래 stats). store GET-only 액션, write 없음.
+  useEffect(() => {
+    void usePeopleStore.getState().syncAcceptedInvitesToPeople().catch(() => {});
+  }, []);
+
+  const statsAcceptedCount =
+    stats.status === "ready" ? stats.acceptedCount : 0;
+  // fallback(서버 stats 준비 전): 연결된 사람(remote id 존재) 수. people 기준이라
+  // 고유(≤ 사람수) → token 중복 인플레가 없다. draft 개수는 fallback 에도 쓰지 않는다.
+  const connectedPeopleCount = useMemo(
+    () =>
+      people.filter((p) => {
+        const extended = p as Record<string, unknown>;
+        return Boolean(
+          extended.userId ||
+            extended.dlUserId ||
+            extended.acceptedPersonId ||
+            extended.isJoined
+        );
+      }).length,
+    [people]
+  );
+
+  // 초대 성공 수: 주 소스 = 서버 stats(화면 "초대 성공"과 동일 값). 준비 전엔
+  // 인플레 없는 fallback(connectedPeopleCount). 발송/연결 점수 모두 이 값으로 일관
+  // 계산한다(기기별 draft 개수로 세면 모바일 token 중복 → 인플레 → 불일치가 됨).
+  const inviteSuccessCount =
+    stats.status === "ready" ? statsAcceptedCount : connectedPeopleCount;
+  const inviteSentCount = inviteSuccessCount;
+  const connectionCount = inviteSuccessCount;
+
+  const hasProfileName = !isIncompleteMeName(profile.name);
+  const profileFieldCount = countAdditionalFilled(profile);
+  const peopleCount = people.length;
+  const tieredPeopleCount = people.filter(
+    (p) => typeof p.tier === "number"
+  ).length;
+  const hasExploreField = [
+    profile.schoolName,
+    profile.highSchool,
+    profile.middleSchool,
+    profile.elementarySchool,
+    profile.universityMajor,
+    profile.major,
+    profile.companyName,
+    profile.company,
+    profile.address,
+  ].some((value) => value.trim() !== "");
+
+  // 성취도 milestone(준비도/완료수) — Point 와 같은 통일 소스 사용.
   const questMissions = useMemo(
     () =>
       buildQuestMissions({
-        hasName: !isIncompleteMeName(profile.name),
-        peopleCount: people.length,
-        hasTieredPerson: people.some((p) => typeof p.tier === "number"),
-        inviteCount: inviteDrafts.length,
-        hasExploreField: [
-          profile.schoolName,
-          profile.highSchool,
-          profile.middleSchool,
-          profile.elementarySchool,
-          profile.universityMajor,
-          profile.major,
-          profile.companyName,
-          profile.company,
-          profile.address,
-        ].some((value) => value.trim() !== ""),
-        hasConnectedPerson: inviteDrafts.some((d) => d.status === "accepted"),
+        hasName: hasProfileName,
+        peopleCount,
+        hasTieredPerson: tieredPeopleCount >= 1,
+        inviteCount: inviteSentCount,
+        hasExploreField,
+        hasConnectedPerson: connectionCount >= 1,
       }),
-    [profile, people, inviteDrafts]
+    [
+      hasProfileName,
+      peopleCount,
+      tieredPeopleCount,
+      inviteSentCount,
+      hasExploreField,
+      connectionCount,
+    ]
   );
-  const questReady = hasHydrated && isLoaded;
 
-  // P3-2A2: Me 진입 시 accepted 초대를 read-only 로 서버동기(GET /api/invites/mine).
-  // Home 에만 있던 초대 sync 를 Me 에서도 1회 실행해 PC 도 초대/연결이 채워지게 한다.
-  // store 의 GET-only 액션 재사용(서버 write 없음). settle 후 효과 seed 를 연다.
-  const [syncSettled, setSyncSettled] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    void usePeopleStore
-      .getState()
-      .syncAcceptedInvitesToPeople()
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setSyncSettled(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // 초대/연결은 휘발성 token 이 아니라 안정 identity 로 dedup(관계당 1회).
-  // 우선순위: acceptedPersonId → sourcePersonId → (마지막) token.
-  const inviteSentCount = useMemo(() => {
-    const keys = new Set<string>();
-    for (const draft of inviteDrafts) {
-      const key = draft.acceptedPersonId || draft.sourcePersonId || draft.token;
-      if (key) keys.add(key);
-    }
-    return keys.size;
-  }, [inviteDrafts]);
-  const connectionCount = useMemo(() => {
-    const keys = new Set<string>();
-    for (const draft of inviteDrafts) {
-      if (draft.status !== "accepted") continue;
-      const key = draft.acceptedPersonId || draft.sourcePersonId || draft.token;
-      if (key) keys.add(key);
-    }
-    return keys.size;
-  }, [inviteDrafts]);
-
-  // Point = 서버동기 상태 기반 deterministic 계산(localStorage 잔액 장부 미사용).
-  // 같은 상태면 PC/모바일 동일 값.
+  // Point = 통일 소스 기반 deterministic 계산(localStorage 잔액 장부 미사용).
   const pointBreakdown = useMemo(
     () =>
       buildDeterministicPointScore({
-        hasName: !isIncompleteMeName(profile.name),
-        filledFieldCount: countAdditionalFilled(profile),
-        peopleCount: people.length,
-        tieredCount: people.filter((p) => typeof p.tier === "number").length,
+        hasName: hasProfileName,
+        filledFieldCount: profileFieldCount,
+        peopleCount,
+        tieredCount: tieredPeopleCount,
         inviteSentCount,
         connectionCount,
       }),
-    [profile, people, inviteSentCount, connectionCount]
+    [
+      hasProfileName,
+      profileFieldCount,
+      peopleCount,
+      tieredPeopleCount,
+      inviteSentCount,
+      connectionCount,
+    ]
   );
   const pointTotal = pointBreakdown.totalPoints;
+  // Point 표시는 화면 "초대 성공"과 같은 서버값을 쓰므로 stats ready 후 노출.
+  const pointReady = questReady && stats.status === "ready";
 
   // 🪙 효과: 초대 sync settle 후 첫 계산에서 현재 total 을 seed(효과 없음) →
   // PC 가 95→305 로 올라가는 최초 동기화 구간은 seed 로 흡수돼 폭발하지 않는다.
@@ -509,7 +528,7 @@ export default function DashboardMePage() {
   const [pointBurst, setPointBurst] = useState<number | null>(null);
   const effectSeededRef = useRef(false);
   useEffect(() => {
-    if (!questReady || !syncSettled) return;
+    if (!pointReady) return;
     const seen = readPointEffectSeen();
     if (!effectSeededRef.current) {
       effectSeededRef.current = true;
@@ -520,13 +539,25 @@ export default function DashboardMePage() {
       setPointBurst(pointTotal - seen);
     }
     writePointEffectSeen(pointTotal);
-  }, [questReady, syncSettled, pointTotal]);
+  }, [pointReady, pointTotal]);
 
   useEffect(() => {
     if (pointBurst === null) return;
     const timer = window.setTimeout(() => setPointBurst(null), 1600);
     return () => window.clearTimeout(timer);
   }, [pointBurst]);
+
+  // debugPoint=1 쿼리일 때만 숫자 breakdown 노출(개인정보 없음, 숫자만).
+  const [debugPoint, setDebugPoint] = useState(false);
+  useEffect(() => {
+    try {
+      setDebugPoint(
+        new URLSearchParams(window.location.search).get("debugPoint") === "1"
+      );
+    } catch {
+      setDebugPoint(false);
+    }
+  }, []);
 
   function updateProfile<K extends keyof MeProfile>(key: K, value: MeProfile[K]) {
     setProfile((prev) => ({ ...prev, [key]: value }));
@@ -828,7 +859,7 @@ export default function DashboardMePage() {
         <div className="rounded-[20px] bg-[#FAFAF8] px-4 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
           <p className="text-[11px] font-semibold text-[#8D99AE]">Point</p>
           <p className="mt-1 text-[22px] font-bold">
-            {questReady && syncSettled ? pointTotal : "—"}
+            {pointReady ? pointTotal : "—"}
           </p>
         </div>
       </section>
@@ -846,6 +877,13 @@ export default function DashboardMePage() {
         pointTotal={pointTotal}
         burstPoints={pointBurst}
       />
+      {debugPoint ? (
+        <p className="mt-1 px-1 text-[10px] leading-relaxed text-[#B7BEC8]">
+          debug · fields {profileFieldCount} · people {peopleCount} · tier{" "}
+          {tieredPeopleCount} · sent {inviteSentCount} · success{" "}
+          {inviteSuccessCount} · conn {connectionCount} · total {pointTotal}
+        </p>
+      ) : null}
 
       <section className="mt-2 rounded-[24px] bg-[#FAFAF8] p-3 shadow-sm ring-1 ring-[#E2E0D8]">
         {/* P3-1C: 추가 정보를 기본 접힘 아코디언으로. 헤더에 "입력 N/7"만 노출하고
