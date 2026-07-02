@@ -11,6 +11,7 @@ import {
   type SignalGridCategoryId,
   type SignalItem,
 } from "./signal-data";
+import VoiceSignalPreview from "./voice-signal-preview";
 
 // P2-5: 신호 "받는 사람". receiverId = 연결 PID(userId/dlUserId/acceptedPersonId),
 // personId = 로컬 person id(markContacted 용), name = 표시명.
@@ -87,6 +88,8 @@ export default function SignalBottomSheet({
   onSendSignal,
 }: Props) {
   const [recent, setRecent] = useState<string[]>([]);
+  // P4-1A: 2초 음성 신호 local preview 실험(접힘 기본, 전송 없음).
+  const [showVoiceLab, setShowVoiceLab] = useState(false);
   // P2-5 받는 사람 선택 모드.
   const recipientMode = Boolean(recipients && onSendSignal);
   const [selected, setSelected] = useState<SignalRecipient[]>([]);
@@ -102,6 +105,7 @@ export default function SignalBottomSheet({
       setSelected(dedupeRecipients(recipientsRef.current ?? []));
       setShowAdd(false);
       setAddQuery("");
+      setShowVoiceLab(false);
     }
   }, [open]);
 
@@ -372,6 +376,22 @@ export default function SignalBottomSheet({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* P4-1A: 2초 음성 신호 실험(local preview 전용, 이모지 전송 흐름과 무관). */}
+        <div className="mt-[10px]">
+          <button
+            type="button"
+            onClick={() => setShowVoiceLab((v) => !v)}
+            className="text-[11px] font-medium text-slate-400 active:scale-95"
+          >
+            {showVoiceLab ? "🎙️ 2초 음성 신호 실험 접기" : "🎙️ 2초 음성 신호 실험"}
+          </button>
+          {showVoiceLab ? (
+            <div className="mt-[8px]">
+              <VoiceSignalPreview />
+            </div>
+          ) : null}
         </div>
       </section>
     </>
