@@ -12,7 +12,6 @@ import {
   readPointEffectSeen,
   writePointEffectSeen,
 } from "../_components/me/point-ledger";
-import { countSignalSendDaysKST } from "@/lib/signal/read-signals";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const LEGACY_PROFILE_STORAGE_KEY_V2 = "dunbar-link-me-profile-v2";
@@ -434,21 +433,37 @@ export default function DashboardMePage() {
     void usePeopleStore.getState().syncAcceptedInvitesToPeople().catch(() => {});
   }, []);
 
-  // P3-2B: 신호 발송일수(KST) read-only 집계.
-  // ⚠ 라이브 총점 반영은 OFF(SIGNAL_IN_LIVE_TOTAL=false). sender_id 가 기기별
-  // dl-user-id(getCurrentUserId)라 기기 간 값이 갈릴 수 있어(PC/모바일 발산 하드룰
-  // 위반), 계정 일치가 보장되는 서버 auth 기반 집계(P3-2B-2) 전까지 총점에 넣지
-  // 않는다. 지금은 debugPoint=1 에서 값만 확인한다.
-  const SIGNAL_IN_LIVE_TOTAL = false;
+  // P3-2B-2: 신호 발송일수(KST)를 "서버 auth 기준"으로 집계해 live Point 에 반영한다.
+  // GET /api/me/signal-days 는 세션 auth → user_identity_links 의 legacy sender id
+  // 전체로 signals 를 집계하므로, 같은 계정이면 PC/모바일 동일 값(client 기기별 id
+  // 문제 해결). 실패 시 0 으로 fallback(Point 전체를 깨지 않음).
   const [signalDayCount, setSignalDayCount] = useState(0);
+  const [senderIdsCount, setSenderIdsCount] = useState(0);
+  const [signalReady, setSignalReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    const me = getCurrentUserId();
-    void countSignalSendDaysKST(me ? [me] : [])
-      .then((days) => {
-        if (!cancelled) setSignalDayCount(days);
-      })
-      .catch(() => {});
+    void (async () => {
+      try {
+        const res = await fetch("/api/me/signal-days", { cache: "no-store" });
+        const data = res.ok
+          ? ((await res.json().catch(() => null)) as {
+              ok?: boolean;
+              signalDayCount?: number;
+              senderIdsCount?: number;
+            } | null)
+          : null;
+        if (!cancelled && data?.ok && typeof data.signalDayCount === "number") {
+          setSignalDayCount(Math.max(0, data.signalDayCount));
+          setSenderIdsCount(
+            typeof data.senderIdsCount === "number" ? data.senderIdsCount : 0
+          );
+        }
+      } catch {
+        // 실패는 무시 → signalDayCount 0 fallback
+      } finally {
+        if (!cancelled) setSignalReady(true);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -529,9 +544,8 @@ export default function DashboardMePage() {
         tieredCount: tieredPeopleCount,
         inviteSentCount,
         connectionCount,
-        // 기기별 sender_id 발산 방지 위해 라이브 총점엔 0(플래그 OFF). 서버 auth
-        // 기반 계정 일치(P3-2B-2) 후 flag 를 켜면 그대로 반영된다.
-        signalDayCount: SIGNAL_IN_LIVE_TOTAL ? signalDayCount : 0,
+        // 서버 auth 기준 계정 일치 값이므로 PC/모바일 동일 → live 반영.
+        signalDayCount,
       }),
     [
       hasProfileName,
@@ -540,13 +554,12 @@ export default function DashboardMePage() {
       tieredPeopleCount,
       inviteSentCount,
       connectionCount,
-      SIGNAL_IN_LIVE_TOTAL,
       signalDayCount,
     ]
   );
   const pointTotal = pointBreakdown.totalPoints;
-  // Point 표시는 화면 "초대 성공"과 같은 서버값을 쓰므로 stats ready 후 노출.
-  const pointReady = questReady && stats.status === "ready";
+  // Point 표시는 서버값(초대 성공 + 신호 발송일)을 쓰므로 stats·signal ready 후 노출.
+  const pointReady = questReady && stats.status === "ready" && signalReady;
 
   // 🪙 효과: 초대 sync settle 후 첫 계산에서 현재 total 을 seed(효과 없음) →
   // PC 가 95→305 로 올라가는 최초 동기화 구간은 seed 로 흡수돼 폭발하지 않는다.
@@ -908,8 +921,8 @@ export default function DashboardMePage() {
           debug · fields {profileFieldCount} · people {peopleCount} · tier{" "}
           {tieredPeopleCount} · sent {inviteSentCount} · success{" "}
           {inviteSuccessCount} · conn {connectionCount} · signalDays{" "}
-          {signalDayCount} · signalPts {signalDayCount * 5}
-          {SIGNAL_IN_LIVE_TOTAL ? "" : " (off)"} · total {pointTotal}
+          {signalDayCount} · signalPts {signalDayCount * 5} · senders{" "}
+          {senderIdsCount} · total {pointTotal}
         </p>
       ) : null}
 

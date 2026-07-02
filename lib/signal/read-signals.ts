@@ -40,7 +40,7 @@ export async function readSignalsForUser(userId: string) {
  * KST(UTC+9) 날짜 키(YYYY-MM-DD). 기기 로컬 타임존과 무관하게 동일 결과가 나오도록
  * created_at 을 +9h 시프트 후 UTC 파트로 뽑는다(deterministic).
  */
-function toKstDateKey(iso: string): string {
+export function toKstDateKey(iso: string): string {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return "";
   const kst = new Date(t + 9 * 60 * 60 * 1000);
