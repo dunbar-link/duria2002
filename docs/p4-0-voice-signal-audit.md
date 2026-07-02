@@ -160,6 +160,13 @@ nullable 컬럼 추가: `type text default 'emoji'`, `audio_path text`, `audio_d
 - `profile-images` bucket 정책 변경
 - `push_subscriptions` 스키마 변경 (정리 delete는 P4-1C 승인 범위 내에서만)
 
+## 8-1. P4-1A 실기기 확인 메모 (2026-07-02)
+
+- **Android Chrome 실기기: PASS** — 대장 직접 테스트. 권한 요청 → 2초 녹음 → 자동 정지 → 미리듣기 재생까지 정상, 녹음 음질 양호.
+- **iOS Safari: 미검증 (known-unverified risk)** — 주변 테스트 기기 부재. blocking 아님, Android-first beta로 진행 가능. P4-1B 실전송 전 가능하면 별도 확인 권장 (audio/mp4 fallback 경로가 실제로 타는지).
+- **카카오 인앱 브라우저: 미검증 (선택 확인)** — MediaRecorder 미지원 시 unsupported 안내로 안전 강하하도록 구현되어 있음.
+- P4-1A2 (2026-07-02): 대장 피드백 반영 — 신호 시트에서 음성 신호를 메인(상단 기본 펼침)으로, 이모지 신호를 접힘 보조 영역으로 재배치. 전송은 여전히 미구현.
+
 ## 9. 다음 지시 초안 (P4-1A용)
 
 > P4-1A 실행. 2초 음성 신호 녹음 local preview만 구현한다.

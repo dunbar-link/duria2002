@@ -88,8 +88,8 @@ export default function SignalBottomSheet({
   onSendSignal,
 }: Props) {
   const [recent, setRecent] = useState<string[]>([]);
-  // P4-1A: 2초 음성 신호 local preview 실험(접힘 기본, 전송 없음).
-  const [showVoiceLab, setShowVoiceLab] = useState(false);
+  // P4-1A2: 음성 신호가 메인, 이모지 신호는 접힘 보조 영역(전송 로직은 기존 그대로).
+  const [showEmoji, setShowEmoji] = useState(false);
   // P2-5 받는 사람 선택 모드.
   const recipientMode = Boolean(recipients && onSendSignal);
   const [selected, setSelected] = useState<SignalRecipient[]>([]);
@@ -105,7 +105,7 @@ export default function SignalBottomSheet({
       setSelected(dedupeRecipients(recipientsRef.current ?? []));
       setShowAdd(false);
       setAddQuery("");
-      setShowVoiceLab(false);
+      setShowEmoji(false);
     }
   }, [open]);
 
@@ -321,6 +321,27 @@ export default function SignalBottomSheet({
           </div>
         ) : null}
 
+        {/* P4-1A2: 2초 음성 신호가 메인 영역(기본 펼침, local preview 전용). */}
+        <div className="mb-[12px]">
+          <VoiceSignalPreview />
+        </div>
+
+        {/* 이모지 신호: 보조 영역(기본 접힘). 전송 로직은 기존 그대로. */}
+        <button
+          type="button"
+          onClick={() => setShowEmoji((v) => !v)}
+          className="mb-[10px] flex h-[38px] w-full items-center justify-between rounded-[14px] border border-slate-200 bg-white px-[13px] active:scale-[0.99]"
+        >
+          <span className="text-[12px] font-semibold text-slate-600">
+            😊 이모지 신호
+          </span>
+          <span className="text-[11px] font-medium text-slate-400">
+            {showEmoji ? "접기" : "펼치기"}
+          </span>
+        </button>
+
+        {showEmoji ? (
+          <>
         <div className="-mx-[14px] mb-[12px] overflow-x-auto px-[14px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex w-max gap-[7px]">
             {SIGNAL_CATEGORIES.map((category) => (
@@ -377,22 +398,8 @@ export default function SignalBottomSheet({
             ))}
           </div>
         </div>
-
-        {/* P4-1A: 2초 음성 신호 실험(local preview 전용, 이모지 전송 흐름과 무관). */}
-        <div className="mt-[10px]">
-          <button
-            type="button"
-            onClick={() => setShowVoiceLab((v) => !v)}
-            className="text-[11px] font-medium text-slate-400 active:scale-95"
-          >
-            {showVoiceLab ? "🎙️ 2초 음성 신호 실험 접기" : "🎙️ 2초 음성 신호 실험"}
-          </button>
-          {showVoiceLab ? (
-            <div className="mt-[8px]">
-              <VoiceSignalPreview />
-            </div>
-          ) : null}
-        </div>
+          </>
+        ) : null}
       </section>
     </>
   );

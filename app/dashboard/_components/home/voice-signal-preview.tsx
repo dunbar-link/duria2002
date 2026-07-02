@@ -257,13 +257,13 @@ export default function VoiceSignalPreview() {
   const progressPercent = Math.min(100, (elapsedMs / RECORD_LIMIT_MS) * 100);
 
   return (
-    <div className="rounded-[16px] border border-dashed border-slate-300 bg-white px-[13px] py-[11px]">
+    <div className="rounded-[18px] border border-slate-200 bg-white px-[13px] py-[12px] shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
       <div className="mb-[6px] flex items-center justify-between">
-        <span className="text-[12px] font-bold text-slate-700">
+        <span className="text-[13px] font-bold text-slate-800">
           🎙️ 2초 음성 신호
         </span>
         <span className="rounded-full bg-slate-100 px-[8px] py-[2px] text-[10px] font-semibold text-slate-500">
-          실험 · 미리듣기만
+          미리듣기 전용
         </span>
       </div>
 
