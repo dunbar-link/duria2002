@@ -105,7 +105,7 @@ create index if not exists signals_expires_at_idx
   4. **연결 검증(§7)** — 미연결 403
   5. 파일 검증: MIME 허용목록, size ≤ 300KB, durationMs ≤ 2500 — 위반 413/415/400
   6. signalId(uuid) 생성 → service role로 Storage 업로드 `voice-signals/{receiverId}/{signalId}.{ext}`
-  7. signals insert: `{ id: signalId, sender_id, receiver_id, emoji:'🎙️', type:'voice', audio_path, audio_mime, audio_duration_ms, audio_size_bytes, expires_at: now()+72h, is_read:false }`
+  7. signals insert: `{ id: signalId, sender_id, receiver_id, emoji:'🎙️', type:'voice', audio_path, audio_mime, audio_duration_ms, audio_size_bytes, expires_at: now()+24h, is_read:false }`
   8. insert 실패 시 업로드한 object 삭제(보상 처리) 후 500
   9. push 발송(§9 내부 helper) — push 실패는 전송 실패로 취급하지 않음(로그만)
 - 출력: `200 { ok:true, signalId }`
@@ -176,21 +176,21 @@ connected(me, other) =
 ## 11. 만료/삭제 정책
 
 **P4-1B 최소:**
-- `expires_at = 전송시각 + 72h` 저장(컬럼만 활용)
+- `expires_at = 전송시각 + 24h` 저장(대장 최종 결정: 24시간 만료)
 - voice-url route가 만료면 410 → UI "만료된 신호예요"(재생 차단은 이것으로 성립)
 - 수동 삭제(§6-3)
 
 **P4-1D로 보류:**
 - Storage object + row 실제 cleanup 배치(Vercel Cron vs Supabase pg_cron vs lazy 삭제 비교 후 결정)
 - orphan object 회수
-- 만료 시간 조정(24h/72h) 제품 판단
+- ~~만료 시간 조정(24h/72h) 제품 판단~~ → 24h 로 확정(대장 결정, 2026-07-02)
 
 ## 12. 개인정보/보안 리스크
 
 - 음성 = 개인정보. public URL 금지, private bucket + signed URL(TTL 120초)만.
 - 업로드/재생/삭제 전부 서버 세션 인증 + 본인/연결 검증. client userId 불신 원칙 유지.
 - 자동재생 금지, 다운로드 버튼 없음(audio controls의 브라우저 기본 다운로드 메뉴는 완전 차단 불가 — 한계로 기록).
-- 장기 보관 금지: expires_at 72h 기본, 실삭제는 P4-1D.
+- 장기 보관 금지: expires_at 24h(대장 최종 결정), 실삭제는 P4-1D.
 - 신고/차단 부재 → 연결된 친구에게만 + 2초 + 만료로 리스크 한정.
 - iOS Safari 미검증(audio/mp4 경로), 카카오 인앱 미검증 — Android-first 유지, P4-1B 배포 후 가능 시 확인.
 - `user_identity_links` UPDATE/DELETE 금지, service_role은 조회·업로드 도구로만(인증 대체 금지) — 기존 절대 금지 원칙 유지.
@@ -217,9 +217,29 @@ connected(me, other) =
 | 1 | signals ALTER TABLE migration 적용 | 중 | nullable 추가 + check, 기존 row 무영향 설계 |
 | 2 | private bucket `voice-signals` 생성 | 낮 | Supabase 대시보드 수동 생성 권장 |
 | 3 | push 404/410 시 push_subscriptions delete | 낮 | 제한적 운영 write |
-| 4 | 만료 기본값 72h | 제품 | 24h로 줄일지 판단 |
+| 4 | 만료 기본값 | 제품 | **24h 확정** (대장 결정, 2026-07-02) |
 | 5 | P4-1B 수신자 1명 제한 | 제품 | 다중 전송은 후속 |
 | 6 | /api/push/send 인증 보강을 P4-1C로 분리 | 정책 | 본 문서 권고안 |
+
+## 14-1. P4-1B 구현 결과 (2026-07-02)
+
+- **만료 정책: 24시간 확정 반영** — 코드(`EXPIRES_MS = 24h`)/문구("24시간 후 사라져요"/"하루 동안만 들을 수 있어요")/문서 모두 24h 기준.
+- 구현 완료:
+  - migration 파일 `supabase/migrations/20260702_p4_1b_signals_voice.sql` (voice 필수필드 check 에 expires_at 포함)
+  - private bucket `voice-signals` 생성 완료(service role 스크립트 `scripts/p4-1b-setup-voice-signals.mjs`, private + 300KB + webm/mp4 제한 확인)
+  - `lib/push/send-push.ts` 내부 helper(공개 /api/push/send 미사용, 404/410 구독 삭제)
+  - `POST/DELETE /api/signals/voice`, `GET /api/signals/voice-url`(signed URL 120초, 만료 시 410)
+  - 신호함 voice row(재생 버튼→signed URL→audio controls, 자동재생 금지, 만료 표시, 삭제 분기)
+  - 시트 voice 전송(수신자 1명 제한, recipientMode 에서만)
+  - `readSignalsForUser` 확장 + **migration 미적용 환경 fallback**(이모지 신호함 보호)
+- **미완(대장 액션 필요)**: signals ALTER migration 은 이 환경에 DDL 실행 수단(DB 접속 문자열/access token)이 없어 **Supabase SQL Editor 에서 수동 실행 필요**. 실행 후 `node scripts/p4-1b-setup-voice-signals.mjs` 로 PASS 확인. 적용 전에는 음성 전송이 500(insert_failed)으로 실패하지만 기존 이모지 신호는 정상 동작(fallback).
+- 알려진 제약/리스크:
+  - duration 서버 실검증 없음(size 300KB 상한이 방어선 — §8)
+  - audio controls 의 브라우저 기본 다운로드 메뉴 완전 차단 불가(controlsList=nodownload 보조)
+  - iOS Safari / 카카오 인앱 미검증(known-unverified 유지, Android-first)
+  - 자동 cleanup(만료 row/storage object/삭제 orphan) 미구현 → P4-1D
+  - 기존 /api/push/send 무인증 route 는 미수정(emoji 경로 유지) → P4-1C
+  - Point signal-days: voice 도 signals row 라 "신호 보낸 날"에 자동 포함(기존 산식 무수정). 별도 +5P 여부는 P4-1E 제품 결정.
 
 ## 15. 다음 구현 지시 초안 (P4-1B 실구현용)
 

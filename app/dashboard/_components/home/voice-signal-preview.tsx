@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// P4-1A: 2초 음성 신호 local preview.
-// 녹음 가능성(권한/MediaRecorder/포맷) 검증 전용 — 전송/업로드/DB/푸시 없음.
-// 실전송은 P4-1B(서버 route + private storage)에서 별도 승인 후 진행.
+// P4-1A: 2초 음성 신호 녹음/미리듣기.
+// P4-1B: onSend 가 주어지면 미리듣기에서 실제 전송 버튼을 보여준다(24시간 만료).
+// onSend 가 없으면 기존 local preview 전용으로 동작한다.
 
 const RECORD_LIMIT_MS = 2000;
 
@@ -44,12 +44,27 @@ function isRecordingSupported(): boolean {
   );
 }
 
-export default function VoiceSignalPreview() {
+// P4-1B: 전송 요청 payload/결과. 실제 업로드는 호출부(onSend)가 서버 route 로 한다.
+export type VoiceSendPayload = {
+  blob: Blob;
+  mime: string;
+  durationMs: number;
+};
+
+type Props = {
+  onSend?: (payload: VoiceSendPayload) => Promise<{ ok: boolean; error?: string }>;
+};
+
+export default function VoiceSignalPreview({ onSend }: Props) {
   const [state, setState] = useState<VoiceState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewSize, setPreviewSize] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
+  // P4-1B: 전송 상태(중복 전송 방지) + 실패 사유.
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const [durationMs, setDurationMs] = useState(0);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -59,6 +74,9 @@ export default function VoiceSignalPreview() {
   // 취소 시 onstop 에서 preview 를 만들지 않기 위한 플래그.
   const discardRef = useRef(false);
   const previewUrlRef = useRef("");
+  // P4-1B: 전송용 blob/실측 녹음 시간(ms). 재녹음/취소 시 함께 정리한다.
+  const previewBlobRef = useRef<Blob | null>(null);
+  const recordStartRef = useRef(0);
 
   useEffect(() => {
     if (!isRecordingSupported()) {
@@ -114,8 +132,11 @@ export default function VoiceSignalPreview() {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = "";
     }
+    previewBlobRef.current = null;
     setPreviewUrl("");
     setPreviewSize(0);
+    setDurationMs(0);
+    setSendError("");
   }
 
   async function startRecording() {
@@ -194,6 +215,14 @@ export default function VoiceSignalPreview() {
 
       const url = URL.createObjectURL(blob);
       previewUrlRef.current = url;
+      previewBlobRef.current = blob;
+      // 실측 녹음 시간(ms). 자동 정지(2000ms) 기준으로 상한을 둔다.
+      setDurationMs(
+        Math.min(
+          RECORD_LIMIT_MS + 500,
+          Math.max(1, Date.now() - recordStartRef.current),
+        ),
+      );
       setPreviewUrl(url);
       setPreviewSize(blob.size);
       setState("preview");
@@ -212,6 +241,7 @@ export default function VoiceSignalPreview() {
     setState("recording");
 
     const startedAt = Date.now();
+    recordStartRef.current = startedAt;
     tickTimerRef.current = window.setInterval(() => {
       setElapsedMs(Math.min(RECORD_LIMIT_MS, Date.now() - startedAt));
     }, 100);
@@ -253,6 +283,38 @@ export default function VoiceSignalPreview() {
     setState("idle");
   }
 
+  // P4-1B: 실제 전송. 성공 시 blob/objectURL 을 정리하고 idle 로 돌아간다
+  // (시트를 닫는 것은 onSend 호출부 책임). 실패 시 preview 를 유지하고 사유 표시.
+  async function handleSend() {
+    if (!onSend || sending) {
+      return;
+    }
+    const blob = previewBlobRef.current;
+    if (!blob) {
+      setSendError("녹음이 없어요. 다시 녹음해줘요.");
+      return;
+    }
+
+    setSending(true);
+    setSendError("");
+    try {
+      const result = await onSend({
+        blob,
+        mime: blob.type || "audio/webm",
+        durationMs: durationMs || 1,
+      });
+      if (result.ok) {
+        resetToIdle();
+      } else {
+        setSendError(result.error || "전송에 실패했어요.");
+      }
+    } catch {
+      setSendError("전송에 실패했어요.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   const remainSeconds = Math.max(0, (RECORD_LIMIT_MS - elapsedMs) / 1000);
   const progressPercent = Math.min(100, (elapsedMs / RECORD_LIMIT_MS) * 100);
 
@@ -263,7 +325,7 @@ export default function VoiceSignalPreview() {
           🎙️ 2초 음성 신호
         </span>
         <span className="rounded-full bg-slate-100 px-[8px] py-[2px] text-[10px] font-semibold text-slate-500">
-          미리듣기 전용
+          {onSend ? "24시간 후 사라져요" : "미리듣기 전용"}
         </span>
       </div>
 
@@ -276,7 +338,9 @@ export default function VoiceSignalPreview() {
       {state === "idle" ? (
         <div>
           <p className="mb-[8px] text-[11px] text-slate-400">
-            짧게 목소리만 남겨요. 지금은 내 기기에서만 미리듣기.
+            {onSend
+              ? "짧게 목소리만 남겨요. 저장되지 않고 24시간 후 사라져요."
+              : "짧게 목소리만 남겨요. 지금은 내 기기에서만 미리듣기."}
           </p>
           <button
             type="button"
@@ -333,22 +397,42 @@ export default function VoiceSignalPreview() {
             className="mb-[8px] h-[36px] w-full"
           />
           <p className="mb-[8px] text-[11px] text-slate-400">
-            {Math.round(previewSize / 1024)}KB · 전송은 다음 단계에서 열려요.
+            {Math.round(previewSize / 1024)}KB ·{" "}
+            {onSend
+              ? "하루 동안만 들을 수 있어요."
+              : "전송은 다음 단계에서 열려요."}
           </p>
+          {onSend ? (
+            <button
+              type="button"
+              onClick={() => {
+                void handleSend();
+              }}
+              disabled={sending}
+              className="mb-[8px] h-[36px] w-full rounded-full bg-rose-400 text-[13px] font-bold text-white active:scale-[0.99] disabled:opacity-50"
+            >
+              {sending ? "보내는 중..." : "2초 음성 신호 보내기"}
+            </button>
+          ) : null}
+          {sendError ? (
+            <p className="mb-[8px] text-[11px] text-rose-500">{sendError}</p>
+          ) : null}
           <div className="flex gap-[8px]">
             <button
               type="button"
               onClick={() => {
                 void startRecording();
               }}
-              className="h-[32px] rounded-full bg-slate-800 px-[14px] text-[12px] font-semibold text-white active:scale-95"
+              disabled={sending}
+              className="h-[32px] rounded-full bg-slate-800 px-[14px] text-[12px] font-semibold text-white active:scale-95 disabled:opacity-50"
             >
               다시 녹음
             </button>
             <button
               type="button"
               onClick={resetToIdle}
-              className="h-[32px] rounded-full border border-slate-200 bg-white px-[14px] text-[12px] font-semibold text-slate-500 active:scale-95"
+              disabled={sending}
+              className="h-[32px] rounded-full border border-slate-200 bg-white px-[14px] text-[12px] font-semibold text-slate-500 active:scale-95 disabled:opacity-50"
             >
               취소
             </button>

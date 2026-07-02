@@ -7,6 +7,11 @@ export type SignalRecord = {
   emoji: string;
   created_at: string;
   is_read: boolean;
+  // P4-1B: 음성 신호(voice) 확장 필드. emoji row 는 'emoji'/null.
+  // audio_path 는 클라이언트에 내려주지 않는다(재생은 signed URL route 경유).
+  type?: string | null;
+  audio_duration_ms?: number | null;
+  expires_at?: string | null;
 };
 
 function cleanUserId(userId: string) {
@@ -21,19 +26,35 @@ export async function readSignalsForUser(userId: string) {
     return [] as SignalRecord[];
   }
 
+  // P4-1B: voice 컬럼 포함 조회. migration(20260702_p4_1b_signals_voice.sql)이
+  // 아직 적용되지 않은 환경에서는 컬럼 미존재로 실패하므로, 그 경우 기존
+  // 컬럼만으로 fallback 해 이모지 신호함이 깨지지 않게 한다.
   const { data, error } = await supabase
+    .from("signals")
+    .select(
+      "id, sender_id, receiver_id, emoji, created_at, is_read, type, audio_duration_ms, expires_at",
+    )
+    .or(`sender_id.eq.${cleanId},receiver_id.eq.${cleanId}`)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!error) {
+    return (data ?? []) as SignalRecord[];
+  }
+
+  const { data: legacyData, error: legacyError } = await supabase
     .from("signals")
     .select("id, sender_id, receiver_id, emoji, created_at, is_read")
     .or(`sender_id.eq.${cleanId},receiver_id.eq.${cleanId}`)
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (error) {
-    console.error("신호 불러오기 실패:", error);
+  if (legacyError) {
+    console.error("신호 불러오기 실패:", legacyError);
     return [] as SignalRecord[];
   }
 
-  return (data ?? []) as SignalRecord[];
+  return (legacyData ?? []) as SignalRecord[];
 }
 
 /**

@@ -31,6 +31,18 @@ const HOME_BLUE_SIGNAL_SENDERS_STORAGE_KEY =
   "dunbar-link-home-blue-signal-senders-v1";
 const HOME_BLUE_SIGNAL_CHANGE_EVENT = "dunbar-link-blue-signals-changed";
 
+// P4-1B: 음성 신호 판별/만료 판정. expires_at 이 없거나 파싱 불가면 만료로
+// 취급한다(안전 강하 — 재생 시도 대신 만료 표시).
+function isVoiceSignal(signal: SignalRecord) {
+  return signal.type === "voice";
+}
+
+function isExpiredVoice(signal: SignalRecord) {
+  if (!isVoiceSignal(signal)) return false;
+  const t = signal.expires_at ? Date.parse(signal.expires_at) : Number.NaN;
+  return !Number.isFinite(t) || t <= Date.now();
+}
+
 function formatSignalTime(value: string) {
   const date = new Date(value);
 
@@ -129,6 +141,10 @@ export default function SignalsPage() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("idle");
   const [message, setMessage] = useState("");
   const [busySignalId, setBusySignalId] = useState<string | null>(null);
+  // P4-1B: 음성 신호 재생 상태 — signalId → signed URL(120초 TTL) / 에러 문구.
+  const [voiceUrls, setVoiceUrls] = useState<Record<string, string>>({});
+  const [voiceErrors, setVoiceErrors] = useState<Record<string, string>>({});
+  const [voiceLoadingId, setVoiceLoadingId] = useState<string | null>(null);
   // 신호함 카드에서 바로 답신호를 보낼 대상. 설정되면 기존 SignalBottomSheet
   // (이모지 피커)가 열리고, 선택 시 기존 sendSignal 흐름으로 1명에게 전송한다.
   const [replyTarget, setReplyTarget] = useState<{
@@ -505,22 +521,89 @@ export default function SignalsPage() {
     void loadSignals();
   }
 
-  async function handleDeleteSignal(signalId: string) {
-    setBusySignalId(signalId);
+  async function handleDeleteSignal(signal: SignalRecord) {
+    setBusySignalId(signal.id);
     setMessage("");
 
-    const { error } = await supabase.from("signals").delete().eq("id", signalId);
+    if (isVoiceSignal(signal)) {
+      // P4-1B: voice 는 storage object 정리가 필요해 서버 route 로 삭제한다.
+      try {
+        const res = await fetch(
+          `/api/signals/voice?signalId=${encodeURIComponent(signal.id)}`,
+          { method: "DELETE" },
+        );
+        const data = (await res.json().catch(() => null)) as
+          | { ok?: boolean }
+          | null;
+        setBusySignalId(null);
+        if (!res.ok || !data?.ok) {
+          setMessage("신호 삭제에 실패했어요.");
+          return;
+        }
+      } catch {
+        setBusySignalId(null);
+        setMessage("신호 삭제에 실패했어요.");
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("signals")
+        .delete()
+        .eq("id", signal.id);
 
-    setBusySignalId(null);
+      setBusySignalId(null);
 
-    if (error) {
-      console.error("신호 삭제 실패:", error);
-      setMessage("신호 삭제에 실패했어요.");
-      return;
+      if (error) {
+        console.error("신호 삭제 실패:", error);
+        setMessage("신호 삭제에 실패했어요.");
+        return;
+      }
     }
 
-    setSignals((current) => current.filter((signal) => signal.id !== signalId));
+    setSignals((current) => current.filter((item) => item.id !== signal.id));
     setMessage("신호를 지웠어요.");
+  }
+
+  // P4-1B: 음성 신호 재생 준비 — signed URL(120초)을 받아 audio controls 를
+  // 보여준다. 자동재생 금지: URL 이 준비돼도 재생은 사용자가 직접 누른다.
+  async function handleLoadVoiceUrl(signal: SignalRecord) {
+    if (voiceLoadingId === signal.id) {
+      return;
+    }
+    setVoiceLoadingId(signal.id);
+    setVoiceErrors((current) => ({ ...current, [signal.id]: "" }));
+
+    try {
+      const res = await fetch(
+        `/api/signals/voice-url?signalId=${encodeURIComponent(signal.id)}`,
+      );
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; url?: string }
+        | null;
+
+      if (res.status === 410) {
+        setVoiceErrors((current) => ({
+          ...current,
+          [signal.id]: "만료된 음성 신호예요.",
+        }));
+        return;
+      }
+      if (!res.ok || !data?.ok || !data.url) {
+        setVoiceErrors((current) => ({
+          ...current,
+          [signal.id]: "음성을 불러오지 못했어요.",
+        }));
+        return;
+      }
+      setVoiceUrls((current) => ({ ...current, [signal.id]: data.url as string }));
+    } catch {
+      setVoiceErrors((current) => ({
+        ...current,
+        [signal.id]: "음성을 불러오지 못했어요.",
+      }));
+    } finally {
+      setVoiceLoadingId(null);
+    }
   }
 
   // P2-7C: 사람별 row 토글. 새로 "열 때"만(닫을 때 아님) 그 사람에게서 받은
@@ -729,6 +812,11 @@ export default function SignalsPage() {
                         const isReceived =
                           signal.receiver_id === currentUserId;
                         const isUnread = isReceived && !signal.is_read;
+                        // P4-1B: 음성 신호 row — 재생 버튼/만료 표시가 붙는다.
+                        const isVoice = isVoiceSignal(signal);
+                        const voiceExpired = isExpiredVoice(signal);
+                        const voiceUrl = voiceUrls[signal.id] ?? "";
+                        const voiceError = voiceErrors[signal.id] ?? "";
 
                         return (
                           <li
@@ -746,41 +834,87 @@ export default function SignalsPage() {
                               }
                             }}
                             className={[
-                              "flex items-center gap-3 rounded-xl border bg-white px-2.5 py-2 transition",
+                              "rounded-xl border bg-white px-2.5 py-2 transition",
                               isUnread
                                 ? "cursor-pointer border-rose-200 active:scale-[0.99]"
                                 : "border-slate-200",
                             ].join(" ")}
                           >
-                            <span className="text-xl leading-none">
-                              {signal.emoji}
-                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl leading-none">
+                                {signal.emoji}
+                              </span>
 
-                            <div className="min-w-0 flex-1">
-                              <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
-                                {isReceived ? "받음" : "보냄"}
-                                {isUnread ? (
-                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
-                                ) : null}
-                              </p>
-                              <p className="mt-0.5 truncate text-[11px] text-slate-400">
-                                {formatSignalTime(signal.created_at)}
-                                {isUnread ? " · 눌러서 읽음" : ""}
-                              </p>
+                              <div className="min-w-0 flex-1">
+                                <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
+                                  {isReceived ? "받음" : "보냄"}
+                                  {isVoice ? " · 2초 음성 신호" : ""}
+                                  {isUnread ? (
+                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                                  ) : null}
+                                </p>
+                                <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                                  {formatSignalTime(signal.created_at)}
+                                  {isVoice && !voiceExpired
+                                    ? " · 24시간 후 사라져요"
+                                    : ""}
+                                  {isUnread ? " · 눌러서 읽음" : ""}
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleDeleteSignal(signal);
+                                }}
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm text-slate-300 active:scale-90 disabled:opacity-40"
+                                disabled={busySignalId === signal.id}
+                                aria-label="신호 지우기"
+                              >
+                                ✕
+                              </button>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void handleDeleteSignal(signal.id);
-                              }}
-                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm text-slate-300 active:scale-90 disabled:opacity-40"
-                              disabled={busySignalId === signal.id}
-                              aria-label="신호 지우기"
-                            >
-                              ✕
-                            </button>
+                            {isVoice ? (
+                              <div className="mt-1.5 pl-8">
+                                {voiceExpired ? (
+                                  <p className="text-[11px] text-slate-400">
+                                    만료된 음성 신호예요.
+                                  </p>
+                                ) : voiceUrl ? (
+                                  /* 자동재생 금지 — 사용자가 재생 버튼을 누른다.
+                                     다운로드/공유 버튼은 만들지 않는다(nodownload 는
+                                     보조 수단일 뿐 완전 차단은 아님). */
+                                  <audio
+                                    src={voiceUrl}
+                                    controls
+                                    controlsList="nodownload"
+                                    preload="metadata"
+                                    className="h-[34px] w-full"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void handleLoadVoiceUrl(signal);
+                                    }}
+                                    disabled={voiceLoadingId === signal.id}
+                                    className="rounded-full bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-white active:scale-95 disabled:opacity-40"
+                                  >
+                                    {voiceLoadingId === signal.id
+                                      ? "불러오는 중..."
+                                      : "▶ 음성 듣기"}
+                                  </button>
+                                )}
+                                {voiceError ? (
+                                  <p className="mt-1 text-[11px] text-rose-500">
+                                    {voiceError}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </li>
                         );
                       })}

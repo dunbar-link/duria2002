@@ -11,7 +11,9 @@ import {
   type SignalGridCategoryId,
   type SignalItem,
 } from "./signal-data";
-import VoiceSignalPreview from "./voice-signal-preview";
+import VoiceSignalPreview, {
+  type VoiceSendPayload,
+} from "./voice-signal-preview";
 
 // P2-5: 신호 "받는 사람". receiverId = 연결 PID(userId/dlUserId/acceptedPersonId),
 // personId = 로컬 person id(markContacted 용), name = 표시명.
@@ -202,6 +204,65 @@ export default function SignalBottomSheet({
     return null;
   }
 
+  // P4-1B: 2초 음성 신호 실전송(수신자 1명 제한). recipientMode 에서만 활성화.
+  // 서버(/api/signals/voice)가 세션 인증·연결 검증·크기/길이 검증을 다시 한다.
+  // 성공 시 시트를 닫는다(수신자 신호함은 realtime 으로 갱신됨).
+  async function handleSendVoice(
+    payload: VoiceSendPayload,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const ids = Array.from(
+      new Set(selected.map((r) => r.receiverId.trim()).filter(Boolean)),
+    );
+    if (ids.length === 0) {
+      return { ok: false, error: "받는 사람을 1명 선택해줘요." };
+    }
+    if (ids.length > 1) {
+      return { ok: false, error: "음성 신호는 1명에게만 보낼 수 있어요." };
+    }
+
+    const form = new FormData();
+    form.append(
+      "audio",
+      new File([payload.blob], "voice-signal", { type: payload.mime }),
+    );
+    form.append("receiverId", ids[0]);
+    form.append("durationMs", String(payload.durationMs));
+
+    try {
+      const res = await fetch("/api/signals/voice", {
+        method: "POST",
+        body: form,
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+
+      if (!res.ok || !data?.ok) {
+        if (res.status === 401) {
+          return { ok: false, error: "로그인 후 보낼 수 있어요." };
+        }
+        if (res.status === 403) {
+          return { ok: false, error: "연결된 친구에게만 보낼 수 있어요." };
+        }
+        if (data?.error === "too_long" || data?.error === "too_large") {
+          return { ok: false, error: "녹음이 너무 길어요. 다시 녹음해줘요." };
+        }
+        if (data?.error === "unsupported_mime") {
+          return {
+            ok: false,
+            error: "이 브라우저 녹음 형식은 아직 지원하지 않아요.",
+          };
+        }
+        return { ok: false, error: "전송에 실패했어요. 잠시 후 다시 시도해줘요." };
+      }
+
+      onClose();
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "네트워크 문제로 전송하지 못했어요." };
+    }
+  }
+
   function handleSelect(emoji: string) {
     // 받는 사람 선택 모드: 0명이면 전송 막음, 아니면 선택된 모두에게 보낸다.
     if (recipientMode) {
@@ -321,9 +382,12 @@ export default function SignalBottomSheet({
           </div>
         ) : null}
 
-        {/* P4-1A2: 2초 음성 신호가 메인 영역(기본 펼침, local preview 전용). */}
+        {/* P4-1A2: 2초 음성 신호가 메인 영역(기본 펼침).
+            P4-1B: 받는 사람 선택 모드에서는 실전송(1명 제한), 아니면 미리듣기 전용. */}
         <div className="mb-[12px]">
-          <VoiceSignalPreview />
+          <VoiceSignalPreview
+            onSend={recipientMode ? handleSendVoice : undefined}
+          />
         </div>
 
         {/* 이모지 신호: 보조 영역(기본 접힘). 전송 로직은 기존 그대로. */}
