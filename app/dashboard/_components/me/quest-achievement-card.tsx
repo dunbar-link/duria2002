@@ -12,7 +12,6 @@
  * computed-only · 서버 write 없음 · wallet/coin 미연동.
  */
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { buildQuestMissions } from "./quest-missions";
@@ -32,7 +31,6 @@ export function QuestAchievementCard({
 }) {
   const [mounted, setMounted] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [showMissions, setShowMissions] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -42,23 +40,6 @@ export function QuestAchievementCard({
   const totalCount = missions.length;
   const readinessPct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
   const allDone = totalCount > 0 && doneCount === totalCount;
-  const nextMission = missions.find((m) => !m.done) ?? null;
-
-  const missionsToShow = allDone
-    ? showMissions
-      ? missions
-      : []
-    : showMissions
-      ? missions
-      : missions.slice(0, 3);
-  const missionToggleVisible = allDone || missions.length > 3;
-  const missionToggleLabel = allDone
-    ? showMissions
-      ? "완료 미션 접기"
-      : "완료 미션 보기"
-    : showMissions
-      ? "접기"
-      : `전체 보기 (${totalCount})`;
 
   if (!mounted) return null;
 
@@ -131,80 +112,18 @@ export function QuestAchievementCard({
       </div>
 
       {!expanded ? null : (
-        <>
-          {/* 완료 요약(100%) 또는 다음 미션(<100%) — compact */}
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#ECEAE2] pt-3">
-            {allDone ? (
-              <>
-                <span className="text-[13px] font-semibold text-[#4B6B57]">
-                  모든 준비 미션 완료 🎉
-                </span>
-                <span className="shrink-0 rounded-full bg-[#EEF7F0] px-3 py-1 text-[12px] font-semibold text-[#4B6B57]">
-                  인맥지도 준비 완료
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="min-w-0 truncate text-[12px] text-[#8D99AE]">
-                  다음 미션 · {nextMission?.label}
-                </span>
-                {nextMission ? (
-                  <Link
-                    href={nextMission.href}
-                    className="shrink-0 rounded-full bg-[#2C2C2A] px-3.5 py-1 text-[12px] font-semibold text-[#F1EFE8] active:scale-[0.98]"
-                  >
-                    하러 가기
-                  </Link>
-                ) : null}
-              </>
-            )}
-          </div>
-
-          {/* 미션 리스트: milestone 완료 체크(누적 Point 와 별개라 점수 미표기) */}
-          {missionsToShow.length > 0 ? (
-            <ul className="mt-2.5 flex flex-col gap-[8px]">
-              {missionsToShow.map((mission) => (
-                <li key={mission.key} className="flex items-center gap-[8px]">
-                  <span
-                    aria-hidden="true"
-                    className={`flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full text-[10px] ${
-                      mission.done
-                        ? "bg-[#6C8A77] text-white"
-                        : "border border-[#CDD2CB] text-transparent"
-                    }`}
-                  >
-                    ✓
-                  </span>
-                  <span
-                    className={`truncate text-[13px] ${
-                      mission.done ? "text-[#A0A8B4] line-through" : "text-[#334155]"
-                    }`}
-                  >
-                    {mission.label}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          <div className="mt-2.5 flex items-center justify-between gap-3">
-            {missionToggleVisible ? (
-              <button
-                type="button"
-                onClick={() => setShowMissions((v) => !v)}
-                aria-expanded={showMissions}
-                className="text-[12px] font-semibold text-[#6C8A77] active:opacity-70"
-              >
-                {missionToggleLabel}
-              </button>
-            ) : (
-              <span />
-            )}
-            <span className="shrink-0 text-[12px] font-semibold text-[#4B6B57]">
-              누적 Point {pointTotal}P
-            </span>
-          </div>
-        </>
+        <div className="mt-3 border-t border-[#ECEAE2] pt-3">
+          {/* 상태판 — 미션 표가 아니라 짧은 상태 문구만. 행동 유도는 실제 입력
+              위치의 빨간 점/포인트 힌트가 담당한다. */}
+          <p className="text-[12px] leading-snug text-[#8D99AE]">
+            {allDone
+              ? "좋아요. 인맥지도 기본 준비가 끝났어요."
+              : "다음 포인트는 화면에 표시된 곳(빨간 점)에서 얻을 수 있어요."}
+          </p>
+          <p className="mt-1.5 text-[12px] font-semibold text-[#4B6B57]">
+            누적 Point {pointTotal}P
+          </p>
+        </div>
       )}
     </section>
   );

@@ -251,6 +251,7 @@ function CompactField({
   type = "text",
   required = false,
   labelHidden = false,
+  hint,
 }: {
   label: string;
   value: string;
@@ -261,7 +262,10 @@ function CompactField({
   type?: string;
   required?: boolean;
   labelHidden?: boolean;
+  // 값이 비어 있을 때만 라벨 옆에 작게 표시하는 포인트 힌트(예: "+5P").
+  hint?: string;
 }) {
+  const showHint = Boolean(hint) && value.trim() === "";
   return (
     <div className="rounded-[14px] bg-white px-3 py-1 ring-1 ring-[#E2E0D8]">
       {labelHidden ? (
@@ -274,6 +278,11 @@ function CompactField({
           <label className="text-[11px] font-semibold text-[#64748B]">
             {label}
             {required ? <span className="text-[#D94848]"> *</span> : null}
+            {showHint ? (
+              <span className="ml-1 rounded-full bg-[#FBF4E9] px-1.5 py-0.5 text-[10px] font-semibold text-[#C8890B]">
+                {hint}
+              </span>
+            ) : null}
           </label>
           {onPublicChange ? (
             // P2-6C: 비공개 체크박스는 유지하되 작고 덜 튀게(연한 색/작은 박스).
@@ -512,6 +521,14 @@ export default function DashboardMePage() {
     profile.company,
     profile.address,
   ].some((value) => value.trim() !== "");
+
+  // 다음 추천 행동 "1곳"에만 빨간 점(우선순위: 이름 → 추가정보 빈 필드).
+  // 여러 곳을 동시에 빨갛게 만들지 않는다.
+  const nextDot: "name" | "fields" | null = !hasProfileName
+    ? "name"
+    : profileFieldCount < 7
+      ? "fields"
+      : null;
 
   // 성취도 milestone(준비도/완료수) — Point 와 같은 통일 소스 사용.
   const questMissions = useMemo(
@@ -869,8 +886,21 @@ export default function DashboardMePage() {
       </section>
 
       <section className="mt-2 rounded-[28px] bg-[#FAFAF8] px-3 py-2 shadow-sm ring-1 ring-[#D3D1C7]">
-        <h2 className="text-[18px] font-bold">
-          이름 <span className="text-[#D94848]">*</span>
+        <h2 className="flex items-center gap-1.5 text-[18px] font-bold">
+          <span>
+            이름 <span className="text-[#D94848]">*</span>
+          </span>
+          {nextDot === "name" ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="inline-block h-[8px] w-[8px] rounded-full bg-[#E5484D]"
+              />
+              <span className="rounded-full bg-[#FBF4E9] px-1.5 py-0.5 text-[11px] font-semibold text-[#C8890B]">
+                +10P
+              </span>
+            </>
+          ) : null}
         </h2>
         <div className="mt-2">
           <CompactField
@@ -940,6 +970,17 @@ export default function DashboardMePage() {
             <span className="shrink-0 rounded-full bg-[#EFEDE6] px-2 py-0.5 text-[11px] font-semibold text-[#8D99AE]">
               입력 {countAdditionalFilled(profile)}/7
             </span>
+            {nextDot === "fields" ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-[8px] w-[8px] shrink-0 rounded-full bg-[#E5484D]"
+                />
+                <span className="shrink-0 rounded-full bg-[#FBF4E9] px-1.5 py-0.5 text-[11px] font-semibold text-[#C8890B]">
+                  +5P
+                </span>
+              </>
+            ) : null}
           </span>
           <span
             aria-hidden="true"
@@ -953,17 +994,29 @@ export default function DashboardMePage() {
         {additionalOpen ? (
         <>
         <div className="mt-2 grid grid-cols-1 gap-1.5">
-          <CompactField label="전화번호" value={profile.phone} onChange={(value) => updateProfile("phone", value)} placeholder="휴대폰 번호" checked={profile.phonePublic} onPublicChange={(next) => updateProfile("phonePublic", next)} />
-          <CompactField label="이메일" value={profile.email} onChange={(value) => updateProfile("email", value)} placeholder="이메일" checked={profile.emailPublic} onPublicChange={(next) => updateProfile("emailPublic", next)} />
-          <CompactField label="주소" value={profile.address} onChange={(value) => updateProfile("address", value)} placeholder="주소" checked={profile.addressPublic} onPublicChange={(next) => updateProfile("addressPublic", next)} />
-          <CompactField label="생일" type="date" value={profile.birthday} onChange={(value) => updateProfile("birthday", value)} placeholder="생일" checked={profile.birthdayPublic} onPublicChange={(next) => updateProfile("birthdayPublic", next)} />
+          <CompactField label="전화번호" hint="+5P" value={profile.phone} onChange={(value) => updateProfile("phone", value)} placeholder="휴대폰 번호" checked={profile.phonePublic} onPublicChange={(next) => updateProfile("phonePublic", next)} />
+          <CompactField label="이메일" hint="+5P" value={profile.email} onChange={(value) => updateProfile("email", value)} placeholder="이메일" checked={profile.emailPublic} onPublicChange={(next) => updateProfile("emailPublic", next)} />
+          <CompactField label="주소" hint="+5P" value={profile.address} onChange={(value) => updateProfile("address", value)} placeholder="주소" checked={profile.addressPublic} onPublicChange={(next) => updateProfile("addressPublic", next)} />
+          <CompactField label="생일" hint="+5P" type="date" value={profile.birthday} onChange={(value) => updateProfile("birthday", value)} placeholder="생일" checked={profile.birthdayPublic} onPublicChange={(next) => updateProfile("birthdayPublic", next)} />
           <CompactField label="초등학교" value={profile.elementarySchool} onChange={(value) => updateProfile("elementarySchool", value)} placeholder="초등학교" checked={profile.elementarySchoolPublic} onPublicChange={(next) => updateProfile("elementarySchoolPublic", next)} />
           <CompactField label="중학교" value={profile.middleSchool} onChange={(value) => updateProfile("middleSchool", value)} placeholder="중학교" checked={profile.middleSchoolPublic} onPublicChange={(next) => updateProfile("middleSchoolPublic", next)} />
           <CompactField label="고등학교" value={profile.highSchool} onChange={(value) => updateProfile("highSchool", value)} placeholder="고등학교" checked={profile.highSchoolPublic} onPublicChange={(next) => updateProfile("highSchoolPublic", next)} />
           {/* P2-6C: 대학교/회사 그룹은 강한 box-in-box 대신 소제목 + 왼쪽 연한
               구분선 + 여백으로 묶는다(중첩 border 약화). 필드/저장 구조는 그대로. */}
           <div>
-            <p className="text-[12px] font-semibold text-[#64748B]">대학교</p>
+            <p className="flex items-center gap-1 text-[12px] font-semibold text-[#64748B]">
+              대학교
+              {!(
+                profile.schoolName.trim() ||
+                profile.major.trim() ||
+                profile.studentId.trim() ||
+                profile.universityMajor.trim()
+              ) ? (
+                <span className="rounded-full bg-[#FBF4E9] px-1.5 py-0.5 text-[10px] font-semibold text-[#C8890B]">
+                  +5P
+                </span>
+              ) : null}
+            </p>
             <div className="mt-1 space-y-1.5 border-l-2 border-[#E2E0D8] pl-2.5">
               <CompactField label="학교명" value={profile.schoolName} onChange={(value) => updateProfile("schoolName", value)} placeholder="학교명" checked={profile.schoolNamePublic} onPublicChange={(next) => updateProfile("schoolNamePublic", next)} />
               <CompactField label="학과" value={profile.major} onChange={(value) => updateProfile("major", value)} placeholder="학과" checked={profile.majorPublic} onPublicChange={(next) => updateProfile("majorPublic", next)} />
@@ -971,7 +1024,19 @@ export default function DashboardMePage() {
             </div>
           </div>
           <div>
-            <p className="text-[12px] font-semibold text-[#64748B]">회사</p>
+            <p className="flex items-center gap-1 text-[12px] font-semibold text-[#64748B]">
+              회사
+              {!(
+                profile.companyName.trim() ||
+                profile.jobTitle.trim() ||
+                profile.department.trim() ||
+                profile.company.trim()
+              ) ? (
+                <span className="rounded-full bg-[#FBF4E9] px-1.5 py-0.5 text-[10px] font-semibold text-[#C8890B]">
+                  +5P
+                </span>
+              ) : null}
+            </p>
             <div className="mt-1 space-y-1.5 border-l-2 border-[#E2E0D8] pl-2.5">
               <CompactField label="회사명" value={profile.companyName} onChange={(value) => updateProfile("companyName", value)} placeholder="회사명" checked={profile.companyNamePublic} onPublicChange={(next) => updateProfile("companyNamePublic", next)} />
               <CompactField label="직위" value={profile.jobTitle} onChange={(value) => updateProfile("jobTitle", value)} placeholder="직위" checked={profile.jobTitlePublic} onPublicChange={(next) => updateProfile("jobTitlePublic", next)} />
