@@ -15,6 +15,7 @@ export const POINT_RULES = {
   personTier: 5,
   inviteSent: 10,
   connection: 20,
+  signalDay: 5,
 } as const;
 
 export type PointScoreInput = {
@@ -26,6 +27,9 @@ export type PointScoreInput = {
   // 초대/연결은 휘발성 token 이 아니라 안정 identity 로 dedup 한 "관계 수".
   inviteSentCount: number;
   connectionCount: number;
+  // 신호를 보낸 고유 날짜 수(KST). 라이브 총점 반영은 호출부 플래그로 제어한다
+  // (sender_id 가 기기별 id 라 계정 일치가 보장되기 전에는 0 을 넘기는 것이 안전).
+  signalDayCount: number;
 };
 
 export type PointBreakdown = {
@@ -35,6 +39,8 @@ export type PointBreakdown = {
   tierPoints: number;
   inviteSentPoints: number;
   connectionPoints: number;
+  signalDayCount: number;
+  signalPoints: number;
   totalPoints: number;
 };
 
@@ -48,13 +54,16 @@ export function buildDeterministicPointScore(
   const tierPoints = Math.max(0, input.tieredCount) * POINT_RULES.personTier;
   const inviteSentPoints = Math.max(0, input.inviteSentCount) * POINT_RULES.inviteSent;
   const connectionPoints = Math.max(0, input.connectionCount) * POINT_RULES.connection;
+  const signalDayCount = Math.max(0, input.signalDayCount);
+  const signalPoints = signalDayCount * POINT_RULES.signalDay;
   const totalPoints =
     namePoints +
     profileFieldPoints +
     peoplePoints +
     tierPoints +
     inviteSentPoints +
-    connectionPoints;
+    connectionPoints +
+    signalPoints;
   return {
     namePoints,
     profileFieldPoints,
@@ -62,6 +71,8 @@ export function buildDeterministicPointScore(
     tierPoints,
     inviteSentPoints,
     connectionPoints,
+    signalDayCount,
+    signalPoints,
     totalPoints,
   };
 }

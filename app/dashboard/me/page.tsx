@@ -12,6 +12,7 @@ import {
   readPointEffectSeen,
   writePointEffectSeen,
 } from "../_components/me/point-ledger";
+import { countSignalSendDaysKST } from "@/lib/signal/read-signals";
 
 const PROFILE_STORAGE_KEY = "dunbar-link-me-profile-v3";
 const LEGACY_PROFILE_STORAGE_KEY_V2 = "dunbar-link-me-profile-v2";
@@ -433,6 +434,26 @@ export default function DashboardMePage() {
     void usePeopleStore.getState().syncAcceptedInvitesToPeople().catch(() => {});
   }, []);
 
+  // P3-2B: 신호 발송일수(KST) read-only 집계.
+  // ⚠ 라이브 총점 반영은 OFF(SIGNAL_IN_LIVE_TOTAL=false). sender_id 가 기기별
+  // dl-user-id(getCurrentUserId)라 기기 간 값이 갈릴 수 있어(PC/모바일 발산 하드룰
+  // 위반), 계정 일치가 보장되는 서버 auth 기반 집계(P3-2B-2) 전까지 총점에 넣지
+  // 않는다. 지금은 debugPoint=1 에서 값만 확인한다.
+  const SIGNAL_IN_LIVE_TOTAL = false;
+  const [signalDayCount, setSignalDayCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const me = getCurrentUserId();
+    void countSignalSendDaysKST(me ? [me] : [])
+      .then((days) => {
+        if (!cancelled) setSignalDayCount(days);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const statsAcceptedCount =
     stats.status === "ready" ? stats.acceptedCount : 0;
   // fallback(서버 stats 준비 전): 연결된 사람(remote id 존재) 수. people 기준이라
@@ -508,6 +529,9 @@ export default function DashboardMePage() {
         tieredCount: tieredPeopleCount,
         inviteSentCount,
         connectionCount,
+        // 기기별 sender_id 발산 방지 위해 라이브 총점엔 0(플래그 OFF). 서버 auth
+        // 기반 계정 일치(P3-2B-2) 후 flag 를 켜면 그대로 반영된다.
+        signalDayCount: SIGNAL_IN_LIVE_TOTAL ? signalDayCount : 0,
       }),
     [
       hasProfileName,
@@ -516,6 +540,8 @@ export default function DashboardMePage() {
       tieredPeopleCount,
       inviteSentCount,
       connectionCount,
+      SIGNAL_IN_LIVE_TOTAL,
+      signalDayCount,
     ]
   );
   const pointTotal = pointBreakdown.totalPoints;
@@ -881,7 +907,9 @@ export default function DashboardMePage() {
         <p className="mt-1 px-1 text-[10px] leading-relaxed text-[#B7BEC8]">
           debug · fields {profileFieldCount} · people {peopleCount} · tier{" "}
           {tieredPeopleCount} · sent {inviteSentCount} · success{" "}
-          {inviteSuccessCount} · conn {connectionCount} · total {pointTotal}
+          {inviteSuccessCount} · conn {connectionCount} · signalDays{" "}
+          {signalDayCount} · signalPts {signalDayCount * 5}
+          {SIGNAL_IN_LIVE_TOTAL ? "" : " (off)"} · total {pointTotal}
         </p>
       ) : null}
 
