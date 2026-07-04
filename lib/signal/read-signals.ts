@@ -231,9 +231,13 @@ export async function readSignalsBetweenUsers(
     return [] as SignalRecord[];
   }
 
+  // P4-PIVOT: 상세 "2초 신호방"에서 voice row 재생을 위해 voice 컬럼 포함
+  // (P4-1B migration 적용 확인됨 — 2026-07-02).
   const { data, error } = await supabase
     .from("signals")
-    .select("id, sender_id, receiver_id, emoji, created_at, is_read")
+    .select(
+      "id, sender_id, receiver_id, emoji, created_at, is_read, type, audio_duration_ms, expires_at",
+    )
     .or(
       `and(sender_id.eq.${cleanMe},receiver_id.eq.${cleanOther}),and(sender_id.eq.${cleanOther},receiver_id.eq.${cleanMe})`,
     )

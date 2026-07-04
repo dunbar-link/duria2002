@@ -6,6 +6,7 @@ import { getCurrentUserId } from "@/lib/auth/current-user";
 import { isIncompleteMeName, readMeProfileImageUrl } from "@/lib/me/profile-name";
 import { usePeopleStore } from "../people/store";
 import { AccountSection } from "./account-section";
+import AccountLoginCard from "../_components/me/account-login-card";
 import QuestAchievementCard, { buildQuestMissions } from "../_components/me/quest-achievement-card";
 import {
   buildDeterministicPointScore,
@@ -1096,6 +1097,9 @@ export default function DashboardMePage() {
         </>
         ) : null}
       </section>
+
+      {/* P4-PIVOT Part B: 계정·간편로그인 안내(기본 접힘). 테스트용 2계정 경로 안내 전용. */}
+      <AccountLoginCard />
     </main>
   );
 }

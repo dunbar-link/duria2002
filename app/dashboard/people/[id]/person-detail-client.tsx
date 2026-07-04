@@ -18,6 +18,8 @@ import {
 import SignalBottomSheet, {
   type SignalRecipient,
 } from "../../_components/home/signal-bottom-sheet";
+import TwoSecondRoom from "../../_components/people/two-second-room";
+import { type VoiceSendPayload } from "../../_components/home/voice-signal-preview";
 import {
   DashboardPerson,
   getDashboardTierLabel,
@@ -47,22 +49,6 @@ import { InviteDraft, RemoteInviteDraftLike, usePeopleStore } from "../store";
 type Props = {
   person: DashboardPerson;
 };
-
-// 신호함(signals/page.tsx)과 동일한 시각 표기. "MM.DD HH:mm" 한국어.
-function formatSignalTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "방금";
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 type QuickActionFeedbackTone = "success" | "neutral";
 
@@ -618,6 +604,81 @@ export default function PersonDetailClient({ person }: Props) {
     );
   }
 
+  // P4-PIVOT: 2초 신호방 — 이 사람 1명에게 음성 신호 전송(P4-1B route 재사용).
+  // receiverId 는 상세 대상 고정. 서버가 세션 인증/연결 검증을 다시 한다.
+  async function handleSendVoiceSignal(
+    payload: VoiceSendPayload,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!isJoined || !receiverUserId) {
+      return { ok: false, error: "연결된 친구에게만 보낼 수 있어요." };
+    }
+    if (isIncompleteMeName(readMeProfileName())) {
+      return { ok: false, error: ME_NAME_REQUIRED_MESSAGE };
+    }
+
+    const form = new FormData();
+    form.append(
+      "audio",
+      new File([payload.blob], "voice-signal", { type: payload.mime }),
+    );
+    form.append("receiverId", receiverUserId);
+    form.append("durationMs", String(payload.durationMs));
+
+    try {
+      const res = await fetch("/api/signals/voice", {
+        method: "POST",
+        body: form,
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string }
+        | null;
+
+      if (!res.ok || !data?.ok) {
+        if (res.status === 401) {
+          return { ok: false, error: "로그인 후 보낼 수 있어요." };
+        }
+        if (res.status === 403) {
+          return { ok: false, error: "연결된 친구에게만 보낼 수 있어요." };
+        }
+        return { ok: false, error: "전송에 실패했어요. 잠시 후 다시 시도해줘요." };
+      }
+
+      markContacted(person.id);
+      setRelationshipCompleted(person.id);
+      setSavedMessageTone("success");
+      setSavedMessage("2초 음성 신호를 보냈어요.");
+      setRefreshKey((value) => value + 1);
+      // 방금 보낸 음성을 신호방 기록에 즉시 반영.
+      void readSignalsBetweenUsers(getCurrentUserId(), receiverUserId, 5).then(
+        (rows) => setRecentSignals(rows),
+      );
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "네트워크 문제로 전송하지 못했어요." };
+    }
+  }
+
+  // 이모지 신호(보조): 기존 시트/전송 흐름 그대로, 진입 게이트만 공유.
+  function handleOpenEmojiSheet() {
+    if (!isJoined || !receiverUserId) {
+      setSavedMessageTone("neutral");
+      setSavedMessage("가입 완료 후 신호를 보낼 수 있어요.");
+      return;
+    }
+    if (isIncompleteMeName(readMeProfileName())) {
+      setSavedMessageTone("neutral");
+      setSavedMessage(ME_NAME_REQUIRED_MESSAGE);
+      return;
+    }
+    setSignalOpen(true);
+  }
+
+  // 🎥 2초 영상: P4-2 전까지 준비중 안내만(실구현 금지).
+  function handleVideoNotice() {
+    setSavedMessageTone("neutral");
+    setSavedMessage("2초 영상 신호는 다음 단계에서 열려요.");
+  }
+
   function ensureInviteDraft() {
     return (
       latestInviteDraft ??
@@ -876,100 +937,46 @@ export default function PersonDetailClient({ person }: Props) {
 
         {/* P2-6B-2: 가입 안내는 헤더의 가입 칩과 중복이라 한 줄 스트립으로 압축
             (상태 + 신호 가능 여부를 한 문장으로). 정보는 유지, 카드 높이만 축소. */}
+        {/* P4-PIVOT: 상세페이지 = 2초 신호방. 짧은 정체성 한 줄 + 신호방이 메인. */}
         <section className="px-4 pt-3">
           <p className="rounded-[16px] bg-[#FAFAF8] px-4 py-2.5 text-[13px] leading-5 shadow-sm ring-1 ring-[#D3D1C7]">
             <span className="font-semibold text-[#079863]">
-              {isJoined ? "가입 완료" : "가입 전"}
+              2초 신호를 보내는 사람
             </span>
             <span className="text-[#64748B]">
               {" · "}
               {isJoined
-                ? "바로 짧은 신호를 보낼 수 있어요."
-                : "가입 완료 후 신호 보내기가 열려요."}
+                ? "길게 말하지 않아도 관계는 이어져요."
+                : "가입 완료 후 2초 신호가 열려요."}
             </span>
           </p>
         </section>
 
         <section className="mt-2.5 px-4">
-          <div className="rounded-[22px] bg-[#FAFAF8] px-4 py-3.5 shadow-sm ring-1 ring-[#D3D1C7]">
-            <button
-              type="button"
-              onClick={() => {
-                if (!isJoined || !receiverUserId) {
-                  setSavedMessageTone("neutral");
-                  setSavedMessage("가입 완료 후 신호를 보낼 수 있어요.");
-                  return;
-                }
-                if (isIncompleteMeName(readMeProfileName())) {
-                  setSavedMessageTone("neutral");
-                  setSavedMessage(ME_NAME_REQUIRED_MESSAGE);
-                  return;
-                }
-                setSignalOpen(true);
-              }}
-              className="flex h-[50px] w-full items-center justify-center rounded-[16px] bg-[#0F172A] text-[15px] font-bold text-white active:scale-95"
-            >
-              신호 보내기
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSnooze(3)}
-              className="mt-2.5 flex h-[44px] w-full items-center justify-center rounded-[16px] bg-white text-[14px] font-semibold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
-            >
-              3일 보류하기
-            </button>
-
-            {remainingSnoozeDays > 0 ? (
-              <p className="mt-2.5 text-center text-[12px] font-semibold text-[#936018]">
-                현재 {remainingSnoozeDays}일 보류 중
-              </p>
-            ) : null}
-          </div>
+          <TwoSecondRoom
+            connected={isJoined && Boolean(receiverUserId)}
+            currentUserId={currentUserId}
+            signals={recentSignals}
+            onSendVoice={handleSendVoiceSignal}
+            onOpenEmoji={handleOpenEmojiSheet}
+            onVideoNotice={handleVideoNotice}
+          />
         </section>
 
+        {/* 보류는 보조 액션으로 축소(신호방 아래 슬림 버튼). */}
         <section className="mt-2.5 px-4">
-          <div className="rounded-[22px] bg-[#FAFAF8] px-4 py-3.5 shadow-sm ring-1 ring-[#D3D1C7]">
-            <h2 className="text-[15px] font-bold">최근 신호</h2>
-
-            {!receiverUserId ? (
-              <p className="mt-2 text-[13px] leading-5 text-[#64748B]">
-                연결되면 주고받은 신호가 여기에 표시돼요.
-              </p>
-            ) : recentSignals === null ? (
-              <p className="mt-2 text-[13px] text-[#8D99AE]">불러오는 중...</p>
-            ) : recentSignals.length === 0 ? (
-              <p className="mt-2 text-[13px] leading-5 text-[#64748B]">
-                아직 주고받은 신호가 없어요.
-              </p>
-            ) : (
-              <ul className="mt-2.5 space-y-1.5">
-                {recentSignals.map((signal) => {
-                  const isSent = signal.sender_id === currentUserId;
-                  return (
-                    <li
-                      key={signal.id}
-                      className="flex items-center gap-2.5 rounded-[14px] bg-white px-2.5 py-1.5 ring-1 ring-[#D3D1C7]"
-                    >
-                      <span className="text-[20px] leading-none">{signal.emoji}</span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          isSent
-                            ? "bg-[#EFE7FA] text-[#4B2E83]"
-                            : "bg-[#DDF7EE] text-[#0B7A5D]"
-                        }`}
-                      >
-                        {isSent ? "보냄" : "받음"}
-                      </span>
-                      <span className="ml-auto text-[12px] text-[#8D99AE]">
-                        {formatSignalTime(signal.created_at)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => handleSnooze(3)}
+            className="flex h-[44px] w-full items-center justify-center rounded-[16px] bg-white text-[14px] font-semibold text-[#334155] ring-1 ring-[#D3D1C7] active:scale-95"
+          >
+            3일 보류하기
+          </button>
+          {remainingSnoozeDays > 0 ? (
+            <p className="mt-2 text-center text-[12px] font-semibold text-[#936018]">
+              현재 {remainingSnoozeDays}일 보류 중
+            </p>
+          ) : null}
         </section>
 
         <section className="mt-2.5 px-4">
