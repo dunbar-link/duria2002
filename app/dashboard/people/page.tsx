@@ -532,6 +532,10 @@ export default function DashboardPeoplePage() {
   const [openContactPickerId, setOpenContactPickerId] = useState<string | null>(null);
   const [isChannelSubmitting, setIsChannelSubmitting] = useState(false);
   const [remoteInvites, setRemoteInvites] = useState<RemoteInviteRow[]>([]);
+  // P4-sync: 계정 전체 legacy id 집합(내 다른 기기 id 포함). Home(store.ts)과
+  // 동일하게 이 집합으로 self/counterpart 를 가려야 People 목록에 "나 자신"이
+  // 유령 카드로 끼는 것을 막고 Home 과 사람 수가 일치한다.
+  const [myIds, setMyIds] = useState<string[]>([]);
 
   // 초대 수락 직후 People 로 이동해 오면(?accepted=1) 완료 화면 대신 여기서
   // 짧은 성공 toast 를 띄운다(대장 피드백). URL 쿼리는 즉시 정리해 새로고침/
@@ -599,6 +603,7 @@ export default function DashboardPeoplePage() {
         | {
             ok?: boolean;
             invites?: RemoteInviteRow[];
+            myIds?: string[];
           }
         | null;
 
@@ -608,6 +613,10 @@ export default function DashboardPeoplePage() {
 
       const rows =
         res.ok && payload?.ok === true ? payload.invites ?? [] : [];
+
+      if (res.ok && payload?.ok === true && Array.isArray(payload.myIds)) {
+        setMyIds(payload.myIds);
+      }
 
       setRemoteInvites(rows);
       syncInviteDraftsFromRemote(rows);
@@ -731,6 +740,11 @@ export default function DashboardPeoplePage() {
   const mergedPeopleSource = useMemo(() => {
   const map = new Map<string, DashboardPerson>();
   const deviceUserId = getCurrentUserId();
+  // Home(store.ts)과 동일 기준: 내 다른 legacy id 로 맺어진 row 도 self 로
+  // 판정해야 People 목록에 "나 자신"이 유령 카드로 끼지 않는다.
+  const selfIds = new Set<string>(
+    [...myIds, deviceUserId].filter((id): id is string => Boolean(id)),
+  );
 
   function getKey(p: any) {
     // dedup 키와 카드 React key 가 동일 helper 를 쓰도록 통일한다(이름 제외).
@@ -738,11 +752,10 @@ export default function DashboardPeoplePage() {
   }
 
   function isSelfPerson(p: any) {
-    if (!deviceUserId) return false;
+    if (selfIds.size === 0) return false;
     const candidates = [p.userId, p.dlUserId, p.acceptedPersonId, p.id];
     return candidates.some(
-      (value) =>
-        typeof value === "string" && value.trim() === deviceUserId,
+      (value) => typeof value === "string" && selfIds.has(value.trim()),
     );
   }
 
@@ -773,7 +786,7 @@ export default function DashboardPeoplePage() {
   //    증식하는 것처럼 보인다.)
   remoteAcceptedInvites.forEach((item) => {
     const pid = (item.accepted_person_id ?? "").trim();
-    if (deviceUserId && pid === deviceUserId) {
+    if (pid && selfIds.has(pid)) {
       return;
     }
     const src = (item.source_person_id ?? "").trim();
@@ -797,7 +810,7 @@ export default function DashboardPeoplePage() {
   });
 
   return Array.from(map.values());
-}, [people, remoteAcceptedInvites]);
+}, [people, remoteAcceptedInvites, myIds]);
 
   const enrichedPeople = useMemo<EnrichedPerson[]>(() => {
     return mergedPeopleSource

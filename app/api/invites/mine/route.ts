@@ -75,11 +75,23 @@ export async function GET(req: Request) {
     // 프로필 사진 cross-device sync용 추가 컬럼(마이그레이션 후 존재).
     const PHOTO_COLUMNS = "inviter_photo_url, accepted_person_photo_url";
 
+    // P4-sync: 한 계정이 legacy dl-user-id 를 여러 개 가질 수 있어(user_identity_links),
+    // client가 보낸 단일 userId 로만 조회하면 다른 기기 id 로 맺어진 accepted 연결을
+    // 놓친다(unread-senders 는 이미 이 패턴으로 고쳐져 있음, P4-1C-c). 여기서도
+    // 권한 검증은 그대로 두고, 실제 조회는 세션에 연결된 전체 legacy id 집합으로 한다.
+    const safeIds = legacyIds.filter((id) => SAFE_USER_ID.test(id));
+    if (safeIds.length === 0) {
+      // userId 자체가 legacyIds.includes(userId)로 이미 통과했으므로 이 경로는
+      // 실질적으로 발생하지 않지만, 방어적으로 빈 목록을 반환한다.
+      return NextResponse.json({ ok: true, invites: [] });
+    }
+    const idListSql = safeIds.join(",");
+
     const runQuery = (columns: string) => {
       let query = supabase
         .from("dl_invites")
         .select(columns)
-        .or(`inviter_user_id.eq.${userId},accepted_person_id.eq.${userId}`)
+        .or(`inviter_user_id.in.(${idListSql}),accepted_person_id.in.(${idListSql})`)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -106,7 +118,9 @@ export async function GET(req: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, invites: data ?? [] });
+    // client 가 "이 row 의 상대가 나 자신(내 다른 기기 legacy id)인지"를 판단할 수
+    // 있도록 계정 전체 id 집합을 함께 내려준다(단일 currentUserId 로는 못 함).
+    return NextResponse.json({ ok: true, invites: data ?? [], myIds: safeIds });
   } catch (err) {
     const message = err instanceof Error ? err.message : "server error";
     return NextResponse.json({ ok: false, message }, { status: 500 });

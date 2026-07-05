@@ -984,6 +984,7 @@ export const usePeopleStore = create<PeopleState>()(
           | {
               ok?: boolean;
               invites?: RemoteInviteDraftLike[];
+              myIds?: string[];
             }
           | null;
 
@@ -1000,9 +1001,18 @@ export const usePeopleStore = create<PeopleState>()(
 
         if (normalizedRows.length === 0) return;
 
+        // P4-sync: 서버가 이제 계정 전체 legacy id 기준으로 조회하므로, 응답에는
+        // 이 기기의 currentUserId 가 아닌 내 다른 legacy id 가 걸린 row 도 섞여
+        // 들어올 수 있다. "이 id 가 나 자신인지"는 currentUserId 단일 비교가 아니라
+        // 계정 전체 id 집합(selfIds)으로 판정해야 상대(counterpart)를 정확히 가른다.
+        const selfIds = new Set<string>(
+          [...(payload.myIds ?? []), currentUserId].filter(
+            (id): id is string => typeof id === "string" && id.length > 0,
+          ),
+        );
+
         set((state) => {
           const now = new Date().toISOString();
-          const deviceUserId = currentUserId;
 
           const updatedPeople = state.people.map((person) => {
             const extended = person as DashboardPerson &
@@ -1014,7 +1024,7 @@ export const usePeopleStore = create<PeopleState>()(
             const acceptedInvite = normalizedRows.find((item) => {
               if (
                 item.acceptedPersonId &&
-                item.acceptedPersonId === deviceUserId
+                selfIds.has(item.acceptedPersonId)
               )
                 return false;
               if (item.sourcePersonId && item.sourcePersonId === person.id)
@@ -1038,12 +1048,13 @@ export const usePeopleStore = create<PeopleState>()(
 
             // 방향 2(버그 수정): 상대가 "초대자"(내가 수락자)인 초대.
             // 이때 상대의 현재 이름은 inviterName 이다. 기존에는 이 방향이
-            // 위 matcher 의 `acceptedPersonId === deviceUserId` 조건에서 제외돼,
+            // 위 matcher 의 `selfIds.has(acceptedPersonId)` 조건에서 제외돼,
             // 상대가 Me 이름을 바꿔도(refresh-name → inviter_name 갱신) 기존
             // person.name 이 갱신되지 않았다. (철수 → 김철수 미반영 원인)
             const inviterInvite = normalizedRows.find((item) => {
-              if (item.acceptedPersonId !== deviceUserId) return false;
-              if (item.inviterUserId && item.inviterUserId === deviceUserId)
+              if (!item.acceptedPersonId || !selfIds.has(item.acceptedPersonId))
+                return false;
+              if (item.inviterUserId && selfIds.has(item.inviterUserId))
                 return false;
               if (item.sourcePersonId && item.sourcePersonId === person.id)
                 return true;
@@ -1063,27 +1074,27 @@ export const usePeopleStore = create<PeopleState>()(
             }
 
             // 상대의 현재 remote 이름: 방향1(acceptedPersonName) 우선,
-            // 없으면 방향2(inviterName). 본인(deviceUserId)이면 적용하지 않는다.
+            // 없으면 방향2(inviterName). 본인(selfIds, 내 다른 legacy id 포함)이면 적용하지 않는다.
             const acceptedName =
               acceptedInvite &&
-              acceptedInvite.acceptedPersonId !== deviceUserId
+              !selfIds.has(acceptedInvite.acceptedPersonId ?? "")
                 ? cleanText(acceptedInvite.acceptedPersonName)
                 : "";
             const inviterName =
-              inviterInvite && inviterInvite.inviterUserId !== deviceUserId
+              inviterInvite && !selfIds.has(inviterInvite.inviterUserId ?? "")
                 ? cleanText(inviterInvite.inviterName)
                 : "";
             const remoteName = acceptedName || inviterName;
 
             // 상대의 현재 remote 프로필 사진: 이름과 동일한 방향(acceptedPerson
-            // 우선, 없으면 inviter)으로 고른다. 본인(deviceUserId)이면 적용 안 함.
+            // 우선, 없으면 inviter)으로 고른다. 본인(selfIds)이면 적용 안 함.
             const acceptedPhoto =
               acceptedInvite &&
-              acceptedInvite.acceptedPersonId !== deviceUserId
+              !selfIds.has(acceptedInvite.acceptedPersonId ?? "")
                 ? cleanText(acceptedInvite.acceptedPersonPhotoUrl)
                 : "";
             const inviterPhoto =
-              inviterInvite && inviterInvite.inviterUserId !== deviceUserId
+              inviterInvite && !selfIds.has(inviterInvite.inviterUserId ?? "")
                 ? cleanText(inviterInvite.inviterPhotoUrl)
                 : "";
             const remotePhoto = acceptedPhoto || inviterPhoto;
@@ -1165,7 +1176,7 @@ export const usePeopleStore = create<PeopleState>()(
             .filter(
               (item) =>
                 !item.acceptedPersonId ||
-                item.acceptedPersonId !== currentUserId,
+                !selfIds.has(item.acceptedPersonId),
             )
             .map((item) => {
               // 자기 자신이 acceptedPerson인 케이스는 이미 위 filter에서
@@ -1174,7 +1185,7 @@ export const usePeopleStore = create<PeopleState>()(
               // snapshot 이름(acceptedPersonName/inviteeName)으로 fallback.
               const acceptedUserId = cleanText(item.acceptedPersonId);
               const isSelf =
-                Boolean(acceptedUserId) && acceptedUserId === deviceUserId;
+                Boolean(acceptedUserId) && selfIds.has(acceptedUserId);
               const acceptedName =
                 (isSelf ? readMeProfileName() : "") ||
                 cleanText(item.acceptedPersonName) ||
@@ -1227,11 +1238,11 @@ export const usePeopleStore = create<PeopleState>()(
             .filter(
               (item) =>
                 item.acceptedPersonId &&
-                item.acceptedPersonId === currentUserId,
+                selfIds.has(item.acceptedPersonId),
             )
             .filter(
               (item) =>
-                !item.inviterUserId || item.inviterUserId !== currentUserId,
+                !item.inviterUserId || !selfIds.has(item.inviterUserId),
             )
             .filter(
               (item) =>
@@ -1245,7 +1256,7 @@ export const usePeopleStore = create<PeopleState>()(
               // 다음 sync에서 회복된다.
               const inviterUserId = cleanText(item.inviterUserId);
               const isSelf =
-                Boolean(inviterUserId) && inviterUserId === deviceUserId;
+                Boolean(inviterUserId) && selfIds.has(inviterUserId);
               const inviterName =
                 (isSelf ? readMeProfileName() : "") ||
                 cleanText(item.inviterName) ||
@@ -1294,12 +1305,14 @@ export const usePeopleStore = create<PeopleState>()(
             ...inviterPeople,
           ]);
 
-          const cleanedPeople = deviceUserId
+          const cleanedPeople = selfIds.size > 0
             ? dedupedPeople.filter(
                 (person) =>
-                  getStoredUserId(
-                    person as DashboardPerson & Record<string, unknown>,
-                  ) !== deviceUserId,
+                  !selfIds.has(
+                    getStoredUserId(
+                      person as DashboardPerson & Record<string, unknown>,
+                    ),
+                  ),
               )
             : dedupedPeople;
 
