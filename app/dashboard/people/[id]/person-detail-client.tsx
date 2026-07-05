@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { sendSignal } from "@/lib/signal/send-signal";
+import { sendSignalPush } from "@/lib/push/push-client";
 import {
   readSignalsBetweenUsers,
   type SignalRecord,
@@ -1078,16 +1079,7 @@ export default function PersonDetailClient({ person }: Props) {
             );
           }
 
-          void fetch("/api/push/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              receiverIds,
-              title: "새 신호가 도착했어요",
-              body: `${emoji} 신호가 왔어요.`,
-              url: "/dashboard/signals",
-            }),
-          });
+          void sendSignalPush(receiverIds, emoji);
         }}
       />
     </>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getInviteSession } from "@/lib/auth/invite-auth";
-import { sendPushToUsers } from "@/lib/push/send-push";
+import { sendPushToUsers, expandToAccountIds } from "@/lib/push/send-push";
 
 // P4-1C: push 발송 인증 보강.
 // - 기존: 완전 무인증 공개 API(누구나 임의 receiverIds/문구로 발송 가능) → 스팸 구멍.
@@ -87,8 +87,16 @@ export async function POST(request: Request) {
 
     // 연결 검증: 세션 사용자와 accepted 초대로 이어진 상대만 발송 허용.
     const supabase = createAdminClient();
+
+    // P4-1C-e: 상대 계정도 legacy id 를 여러 개 가질 수 있다(P4-1C-c 와 동일 이유).
+    // client(person 카드)가 보낸 receiverIds 가 이 연결의 dl_invites row 에 박힌
+    // legacy id 와 다르면(상대가 다른 기기/세션에서 갱신) 그대로는 연결을 못 찾아
+    // 이모지 push 만 조용히 403 으로 빠진다(신호 자체는 client insert 라 무관하게
+    // 성공 — "보냈는데 알림만 안 옴" 증상의 원인). 계정 전체 id 로 확장해 매칭한다.
+    const expandedRequestedIds = await expandToAccountIds(supabase, requestedIds);
+
     const myList = myIds.join(",");
-    const recvList = requestedIds.join(",");
+    const recvList = expandedRequestedIds.join(",");
     const { data, error } = await supabase
       .from("dl_invites")
       .select("inviter_user_id, accepted_person_id")
@@ -106,7 +114,7 @@ export async function POST(request: Request) {
     }
 
     const mySet = new Set(myIds);
-    const requestedSet = new Set(requestedIds);
+    const requestedSet = new Set(expandedRequestedIds);
     const allowed = new Set<string>();
     for (const row of (data ?? []) as {
       inviter_user_id: string | null;

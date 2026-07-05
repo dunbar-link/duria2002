@@ -14,6 +14,44 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+// P4-1C-e: 이모지 신호 push 는 기존에 3곳 모두 `void fetch(...)` 로 응답을
+// 전혀 확인하지 않아, 401/403/500 이 나도 콘솔에조차 안 남고 조용히 사라졌다
+// ("신호는 갔는데 알림만 안 옴"). signal insert(sendSignal) 는 건드리지 않고,
+// push 발송만 이 helper 로 통일해 실패를 최소한 로그로는 남긴다(사용자 흐름은
+// 그대로 — 실패해도 신호 전송 자체를 막지 않는다).
+export async function sendSignalPush(
+  receiverIds: string[],
+  emoji: string,
+  url = "/dashboard/signals",
+): Promise<boolean> {
+  try {
+    const response = await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        receiverIds,
+        title: "새 신호가 도착했어요",
+        body: `${emoji} 신호가 왔어요.`,
+        url,
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.error("신호 push 발송 실패:", response.status, text);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error(
+      "신호 push 발송 실패(네트워크):",
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  }
+}
+
 export type PushSubscriptionStatus = {
   myIds: string[];
   subscriptionCount: number;

@@ -4,6 +4,7 @@
 import {
   subscribePushForUser,
   getPushSubscriptionStatus,
+  sendSignalPush,
 } from "@/lib/push/push-client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { createClient } from "@supabase/supabase-js";
@@ -688,11 +689,20 @@ const [signalCount, setSignalCount] = useState(0);
 const [currentUserId, setCurrentUserId] = useState("");
 
 const [notificationEnabled, setNotificationEnabled] = useState(false);
+const [notificationBlocked, setNotificationBlocked] = useState(false);
 
 useEffect(() => {
   if (!canUseBrowserNotification()) {
     return;
   }
+
+  if (Notification.permission === "denied") {
+    setNotificationBlocked(true);
+    setNotificationEnabled(false);
+    return;
+  }
+
+  setNotificationBlocked(false);
 
   if (Notification.permission !== "granted") {
     setNotificationEnabled(false);
@@ -736,11 +746,19 @@ useEffect(() => {
 }, []);
 
 async function handleEnableNotification() {
+  if (canUseBrowserNotification() && Notification.permission === "denied") {
+    setNotificationBlocked(true);
+    return;
+  }
+
   const userId = currentUserId || getCurrentUserId();
   setCurrentUserId(userId);
 
   const success = await subscribePushForUser(userId);
   setNotificationEnabled(success);
+  setNotificationBlocked(
+    canUseBrowserNotification() && Notification.permission === "denied",
+  );
 }
 
 
@@ -1423,7 +1441,11 @@ useEffect(() => {
   }}
   className="flex h-[42px] items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-[10px] text-[12px] font-semibold text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.12)] active:scale-95"
 >
-  {notificationEnabled ? "알림 ON" : "알림"}
+  {notificationBlocked
+    ? "알림 차단됨"
+    : notificationEnabled
+      ? "알림 ON"
+      : "알림"}
 </button>
 
         <Link
@@ -1682,18 +1704,7 @@ useEffect(() => {
 
     console.log("개인 신호 성공:", signalTarget.name, emoji);
 
-void fetch("/api/push/send", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    receiverIds: [signalTarget.receiverUserId],
-    title: "새 신호가 도착했어요",
-    body: `${emoji} 신호가 왔어요.`,
-    url: "/dashboard/signals",
-  }),
-});
+void sendSignalPush([signalTarget.receiverUserId], emoji);
 
 setSignalOpen(false);
   }}

@@ -46,7 +46,7 @@ type SubscriptionRow = {
 // user_id 가 같은 계정의 서로 다른 legacy id 로 어긋나면 "구독은 있는데 못 찾는"
 // 상태가 된다. 그래서 receiverIds 를 각자의 계정 전체 legacy id 집합으로 확장한다.
 // (같은 계정 내 확장이라 타인에게 새는 위험 없음 — 그 사람의 모든 기기에 알림.)
-async function expandToAccountIds(
+export async function expandToAccountIds(
   supabase: ReturnType<typeof createAdminClient>,
   ids: string[],
 ): Promise<string[]> {

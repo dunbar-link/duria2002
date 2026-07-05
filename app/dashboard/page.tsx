@@ -3,6 +3,7 @@
 import {
   subscribePushForUser,
   getPushSubscriptionStatus,
+  sendSignalPush,
 } from "@/lib/push/push-client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
@@ -730,10 +731,26 @@ function HomePersonActionSheet({
 }
 
 export default function DashboardPage() {
+  // P4-1C-e: 클릭했는데 브라우저 알림 권한이 이미 차단(denied)돼 있으면
+  // subscribePushForUser 가 아무 표시 없이 false 만 반환해 "버튼이 안 먹는 것"
+  // 처럼 보였다. 차단 상태를 먼저 가르고, 성공/실패를 짧은 토스트로 알린다.
   async function handleEnableNotification() {
+    if (canUseBrowserNotification() && Notification.permission === "denied") {
+      setNotificationBlocked(true);
+      notifyPushStatus("브라우저 설정에서 알림을 허용해 주세요");
+      return;
+    }
+
     const userId = getCurrentUserId();
     const success = await subscribePushForUser(userId);
     setNotificationEnabled(success);
+    setNotificationBlocked(
+      canUseBrowserNotification() && Notification.permission === "denied",
+    );
+
+    if (!success) {
+      notifyPushStatus("알림 등록을 다시 시도해 주세요");
+    }
   }
 
   const router = useRouter();
@@ -1042,6 +1059,7 @@ useEffect(() => {
   const [unreadSenderIds, setUnreadSenderIds] = useState<string[]>([]);
 
   const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [notificationBlocked, setNotificationBlocked] = useState(false);
   const [blueSignalSenderIds, setBlueSignalSenderIds] = useState<string[]>([]);
   const [redActionDismissedMap, setRedActionDismissedMap] = useState<
     Record<string, string>
@@ -1061,6 +1079,14 @@ useEffect(() => {
     if (!canUseBrowserNotification()) {
       return;
     }
+
+    if (Notification.permission === "denied") {
+      setNotificationBlocked(true);
+      setNotificationEnabled(false);
+      return;
+    }
+
+    setNotificationBlocked(false);
 
     if (Notification.permission !== "granted") {
       setNotificationEnabled(false);
@@ -1463,6 +1489,21 @@ useEffect(() => {
 
   const notifyCapBlocked = useCallback((blockedLayerId: string) => {
     setCapNotice(getLayerCapMessage(blockedLayerId));
+
+    if (capNoticeTimerRef.current !== null) {
+      window.clearTimeout(capNoticeTimerRef.current);
+    }
+
+    capNoticeTimerRef.current = window.setTimeout(() => {
+      setCapNotice(null);
+      capNoticeTimerRef.current = null;
+    }, 2800);
+  }, []);
+
+  // P4-1C-e: 알림 권한 차단/구독 실패를 같은 토스트로 짧게 알린다(새 UI 없이
+  // 기존 cap 차단 토스트 재사용).
+  const notifyPushStatus = useCallback((message: string) => {
+    setCapNotice(message);
 
     if (capNoticeTimerRef.current !== null) {
       window.clearTimeout(capNoticeTimerRef.current);
@@ -3019,7 +3060,11 @@ const isJoined =
                 className="flex h-[42px] items-center justify-center gap-[7px] whitespace-nowrap rounded-[20px] border border-[#D3D1C7] bg-[#FAFAF8] px-[13px] text-[13px] font-semibold text-[#2C2C2A] active:scale-95"
               >
                 <span className="h-[6px] w-[6px] rounded-full bg-[#1D9E75]" />
-                {notificationEnabled ? "알림 ON" : "알림"}
+                {notificationBlocked
+                  ? "알림 차단됨"
+                  : notificationEnabled
+                    ? "알림 ON"
+                    : "알림"}
               </button>
 
               <Link
@@ -3328,18 +3373,7 @@ const isJoined =
           // 보낸 신호는 상대방 화면의 파란점으로 표시된다.
           // 내 화면에는 파란점을 추가하지 않는다.
 
-          void fetch("/api/push/send", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              receiverIds,
-              title: "새 신호가 도착했어요",
-              body: `${emoji} 신호가 왔어요.`,
-              url: "/dashboard/signals",
-            }),
-          });
+          void sendSignalPush(receiverIds, emoji);
 
           setSignalOpen(false);
         }}
