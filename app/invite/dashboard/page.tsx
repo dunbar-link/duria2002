@@ -1,7 +1,10 @@
 "use client";
 
 
-import { subscribePushForUser } from "@/lib/push/push-client";
+import {
+  subscribePushForUser,
+  getPushSubscriptionStatus,
+} from "@/lib/push/push-client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import { createClient } from "@supabase/supabase-js";
 
@@ -691,7 +694,41 @@ useEffect(() => {
     return;
   }
 
-  setNotificationEnabled(Notification.permission === "granted");
+  if (Notification.permission !== "granted") {
+    setNotificationEnabled(false);
+    return;
+  }
+
+  // P4-1C-d: dashboard/page.tsx 와 동일 — 권한만으로 ON 표시하지 않고 서버
+  // push_subscriptions row 존재 여부를 확인, 없으면 조용히 재등록한다.
+  let cancelled = false;
+
+  void (async () => {
+    const status = await getPushSubscriptionStatus();
+
+    if (cancelled) return;
+
+    if (status && status.subscriptionCount > 0) {
+      setNotificationEnabled(true);
+      return;
+    }
+
+    const localUserId = getCurrentUserId();
+    const effectiveUserId =
+      status && status.myIds.length > 0 && !status.myIds.includes(localUserId)
+        ? status.myIds[0]
+        : localUserId;
+
+    const success = await subscribePushForUser(effectiveUserId);
+
+    if (!cancelled) {
+      setNotificationEnabled(success);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
 }, []);
 
 useEffect(() => {

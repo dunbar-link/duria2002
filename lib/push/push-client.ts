@@ -14,6 +14,42 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+export type PushSubscriptionStatus = {
+  myIds: string[];
+  subscriptionCount: number;
+  updatedAt: string | null;
+};
+
+// P4-1C-d: "알림 ON" 표시를 브라우저 권한만이 아니라 서버 저장 성공까지 검증하기
+// 위한 조회. 실패(비로그인 등)하면 null — 호출부는 "확인 불가"로 취급한다.
+export async function getPushSubscriptionStatus(): Promise<PushSubscriptionStatus | null> {
+  try {
+    const response = await fetch("/api/me/push-status", { cache: "no-store" });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          ok?: boolean;
+          myIds?: string[];
+          subscriptionCount?: number;
+          updatedAt?: string | null;
+        }
+      | null;
+    if (!payload?.ok) {
+      return null;
+    }
+    return {
+      myIds: Array.isArray(payload.myIds) ? payload.myIds : [],
+      subscriptionCount:
+        typeof payload.subscriptionCount === "number" ? payload.subscriptionCount : 0,
+      updatedAt: payload.updatedAt ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function subscribePushForUser(userId: string) {
   const cleanUserId = userId.trim();
 

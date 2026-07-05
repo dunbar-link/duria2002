@@ -1,6 +1,9 @@
 "use client";
 
-import { subscribePushForUser } from "@/lib/push/push-client";
+import {
+  subscribePushForUser,
+  getPushSubscriptionStatus,
+} from "@/lib/push/push-client";
 import { getCurrentUserId } from "@/lib/auth/current-user";
 import {
   isIncompleteMeName,
@@ -1059,7 +1062,43 @@ useEffect(() => {
       return;
     }
 
-    setNotificationEnabled(Notification.permission === "granted");
+    if (Notification.permission !== "granted") {
+      setNotificationEnabled(false);
+      return;
+    }
+
+    // P4-1C-d: 권한이 granted 여도 서버에 실제 push_subscriptions row 가 없으면
+    // (최초 가입 이후 미등록, P4-1C-b 인증 보강 이후 갱신 실패 등) "알림 ON"이
+    // 거짓으로 표시됐다. 서버 저장 상태를 확인하고, 없으면 조용히 재등록한다.
+    let cancelled = false;
+
+    void (async () => {
+      const status = await getPushSubscriptionStatus();
+
+      if (cancelled) return;
+
+      if (status && status.subscriptionCount > 0) {
+        setNotificationEnabled(true);
+        return;
+      }
+
+      const localUserId = getCurrentUserId();
+      // client 로컬 id 가 세션 id 집합에 없으면(불일치) 서버가 아는 id 를 우선한다.
+      const effectiveUserId =
+        status && status.myIds.length > 0 && !status.myIds.includes(localUserId)
+          ? status.myIds[0]
+          : localUserId;
+
+      const success = await subscribePushForUser(effectiveUserId);
+
+      if (!cancelled) {
+        setNotificationEnabled(success);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
