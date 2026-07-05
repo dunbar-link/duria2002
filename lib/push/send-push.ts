@@ -41,6 +41,52 @@ type SubscriptionRow = {
   auth: string;
 };
 
+// P4-1C-c: 한 계정은 legacy dl-user-id 를 여러 개 가질 수 있다(기기/세션마다 생성 →
+// user_identity_links 로 같은 auth 계정에 묶임). 신호 receiver_id 와 push 구독
+// user_id 가 같은 계정의 서로 다른 legacy id 로 어긋나면 "구독은 있는데 못 찾는"
+// 상태가 된다. 그래서 receiverIds 를 각자의 계정 전체 legacy id 집합으로 확장한다.
+// (같은 계정 내 확장이라 타인에게 새는 위험 없음 — 그 사람의 모든 기기에 알림.)
+async function expandToAccountIds(
+  supabase: ReturnType<typeof createAdminClient>,
+  ids: string[],
+): Promise<string[]> {
+  const union = new Set(ids);
+  try {
+    // 1) receiver legacy id → 소속 auth 계정.
+    const { data: links } = await supabase
+      .from("user_identity_links")
+      .select("auth_user_id, legacy_user_id")
+      .eq("status", "active")
+      .in("legacy_user_id", ids);
+    const authIds = Array.from(
+      new Set(
+        (links ?? [])
+          .map((r) => (r as { auth_user_id?: string }).auth_user_id ?? "")
+          .filter(Boolean),
+      ),
+    );
+    if (authIds.length > 0) {
+      // 2) 그 auth 계정들의 모든 legacy id.
+      const { data: siblings } = await supabase
+        .from("user_identity_links")
+        .select("legacy_user_id")
+        .eq("status", "active")
+        .in("auth_user_id", authIds);
+      for (const row of siblings ?? []) {
+        const legacy = (row as { legacy_user_id?: string }).legacy_user_id;
+        if (legacy) union.add(legacy);
+      }
+    }
+  } catch (err) {
+    // 확장 실패해도 원본 ids 로는 계속 발송한다(안전 강하).
+    console.warn(
+      "push receiver 확장 실패(원본 ids 로 진행):",
+      err instanceof Error ? err.message : err,
+    );
+  }
+  return Array.from(union);
+}
+
 // receiverIds 의 구독 전체에 발송한다. 실패해도 throw 하지 않는다(호출부에서
 // push 실패를 본 작업 실패로 취급하지 않기 위함). 404/410 응답 endpoint 는
 // push_subscriptions 에서 삭제한다(만료 구독 정리 — P4-1B 승인 항목).
@@ -64,10 +110,12 @@ export async function sendPushToUsers(
   }
 
   const supabase = createAdminClient();
+  // 같은 계정의 모든 legacy id 로 확장해 어느 기기에 구독돼 있든 찾는다(P4-1C-c).
+  const lookupIds = await expandToAccountIds(supabase, ids);
   const { data, error } = await supabase
     .from("push_subscriptions")
     .select("endpoint,p256dh,auth")
-    .in("user_id", ids);
+    .in("user_id", lookupIds);
 
   if (error) {
     console.error("push 구독 조회 실패:", error.message);

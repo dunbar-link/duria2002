@@ -185,6 +185,30 @@ export async function readUnreadReceivedSenderIds(userId: string) {
     return [] as string[];
   }
 
+  // P4-1C-c: 먼저 계정 전체 id(legacy 여러 개 + auth) 기준으로 서버에서 조회한다.
+  // 한 계정이 legacy dl-user-id 를 여러 개 가지면 상대가 내 "다른" id 로 보낸
+  // 신호를 단일 id 쿼리로는 놓친다(Home 빨간점 비대칭 원인). 세션 기반 route 가
+  // 정답이고, 실패(비로그인/네트워크) 시에만 아래 단일 id 쿼리로 폴백한다.
+  try {
+    const res = await fetch("/api/me/unread-senders", { cache: "no-store" });
+    if (res.ok) {
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; senderIds?: unknown }
+        | null;
+      if (json?.ok && Array.isArray(json.senderIds)) {
+        return Array.from(
+          new Set(
+            json.senderIds
+              .map((id) => (typeof id === "string" ? id.trim() : ""))
+              .filter((id) => id.length > 0),
+          ),
+        );
+      }
+    }
+  } catch {
+    // 폴백으로 진행.
+  }
+
   const { data, error } = await supabase
     .from("signals")
     .select("sender_id")
