@@ -1,15 +1,16 @@
+import type { LayerId } from "./home-page-types";
+
 export type LayerColor = {
   bg: string;
   text: string;
   border: string;
 };
 
-// Keys align with the canonical LayerId (DUNBAR-LABEL-001):
-// family / core / intimate / trust / maintain. The previous "friendly" key
-// was a dead alias — no code path stored "friendly" as a layerId, so
-// LAYER_COLOR_MAP.friendly only ever served as an accidental fallback for
-// the 150-tier layer whose real id is "maintain".
-export const LAYER_COLOR_MAP: Record<string, LayerColor> = {
+// Keyed by the canonical LayerId (DUNBAR-LABEL-001/003):
+// family / core / intimate / trust / maintain. Record<LayerId, LayerColor>
+// makes this exhaustive at compile time — a missing tier or a reintroduced
+// dead alias (e.g. "friendly") is now a type error, not a silent fallback.
+export const LAYER_COLOR_MAP: Record<LayerId, LayerColor> = {
   maintain: {
     bg: "#DDF7EE",
     text: "#0B7A5D",
