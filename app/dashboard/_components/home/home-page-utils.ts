@@ -17,24 +17,40 @@ import {
   FOLDER_HOVER_CENTER_MAX,
   FOLDER_HOVER_CENTER_MIN,
   HIDDEN_MIN_SLOT_COUNT,
+  LAYER_LABEL_MAP,
+  LAYER_TIER_MAP,
   SHEET_GRID_COLUMN_COUNT,
   VISIBLE_SLOT_COUNT,
   isDynamicConnectableEntityId,
   layerBlueprints,
   parseDynamicConnectableTargetPid,
   personCatalog,
+  type LayerId,
 } from "./home-page-types";
 
 export function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
+// Canonical helpers backed by LAYER_TIER_MAP / LAYER_LABEL_MAP (DUNBAR-LABEL-002).
+// Function names and fallbacks are preserved so previously duplicated locals
+// in page.tsx and invite/dashboard/page.tsx can be replaced with imports of
+// these without touching any call sites.
 export function getTierByLayerId(layerId: string): 1 | 5 | 15 | 50 | 150 {
-  if (layerId === "family") return 1;
-  if (layerId === "core") return 5;
-  if (layerId === "intimate") return 15;
-  if (layerId === "trust") return 50;
-  return 150;
+  return LAYER_TIER_MAP[layerId as LayerId] ?? 150;
+}
+
+export function getLayerLabelById(layerId: string): string {
+  return LAYER_LABEL_MAP[layerId as LayerId] ?? LAYER_LABEL_MAP.maintain;
+}
+
+export function getLayerIdByTier(tier: number): string {
+  for (const [layerId, mappedTier] of Object.entries(LAYER_TIER_MAP)) {
+    if (mappedTier === tier) {
+      return layerId;
+    }
+  }
+  return "maintain";
 }
 
 export function isPersonEntityId(entityId: string | null | undefined): boolean {

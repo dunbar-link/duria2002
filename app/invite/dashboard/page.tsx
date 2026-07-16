@@ -78,7 +78,10 @@ import {
   createInitialLayoutState,
   getEntityLabel,
   getHomeLayerDerivedStateMap,
+  getLayerIdByTier,
+  getLayerLabelById,
   getSuppressedConnectableEntityIds,
+  getTierByLayerId,
   insertExternalEntityToTarget,
   markConnectableCandidateAddedToLayer,
   markConnectableCandidateDeferred,
@@ -103,32 +106,6 @@ const PENDING_EXPLORE_STORAGE_KEY = "dunbar-link-pending-explore-v1";
 const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000;
 const DEFER_DURATION_MS = 60 * 60 * 1000;
 const HOME_ONBOARDING_STORAGE_KEY = "dunbar-link-home-onboarding-dismissed-v1";
-
-type HomeInviteTier = 1 | 5 | 15 | 50 | 150;
-
-function getTierByLayerId(layerId: string): HomeInviteTier {
-  if (layerId === "family") return 1;
-  if (layerId === "core") return 5;
-  if (layerId === "intimate") return 15;
-  if (layerId === "trust") return 50;
-  return 150;
-}
-
-function getLayerIdByTier(tier: number): string {
-  if (tier === 1) return "family";
-  if (tier === 5) return "core";
-  if (tier === 15) return "intimate";
-  if (tier === 50) return "trust";
-  return "maintain";
-}
-
-function getLayerLabelById(layerId: string): string {
-  if (layerId === "family") return "가족";
-  if (layerId === "core") return "핵심";
-  if (layerId === "intimate") return "신뢰";
-  if (layerId === "trust") return "친밀";
-  return "친근";
-}
 
 function getInitialsFromName(name: string) {
   const trimmed = name.trim();

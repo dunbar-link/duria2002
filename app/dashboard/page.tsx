@@ -99,7 +99,9 @@ import {
   getHomeLayerDerivedStateMap,
   getLayerCapMessage,
   getLayerCapViolation,
+  getLayerLabelById,
   getSuppressedConnectableEntityIds,
+  getTierByLayerId,
   insertExternalEntityToTarget,
   isPersonEntityId,
   markConnectableCandidateAddedToLayer,
@@ -301,29 +303,12 @@ function getAcceptedSelfNameFromRow(row: Record<string, unknown>) {
   return meName || acceptedName || "";
 }
 
-function getTierByLayerId(layerId: string): 1 | 5 | 15 | 50 | 150 {
-  if (layerId === "family") return 1;
-  if (layerId === "core") return 5;
-  if (layerId === "intimate") return 15;
-  if (layerId === "trust") return 50;
-  return 150;
-}
-
-
 function normalizeInviteTier(tier: number): 1 | 5 | 15 | 50 | 150 {
   if (tier === 1) return 1;
   if (tier === 5) return 5;
   if (tier === 15) return 15;
   if (tier === 50) return 50;
   return 150;
-}
-
-function getLayerLabelById(layerId: string): string {
-  if (layerId === "family") return "가족";
-  if (layerId === "core") return "핵심";
-  if (layerId === "intimate") return "신뢰";
-  if (layerId === "trust") return "친밀";
-  return "친근";
 }
 
 function getInitialsFromName(name: string) {
