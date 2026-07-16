@@ -119,7 +119,7 @@ function getLayerIdByTier(tier: number): string {
   if (tier === 5) return "core";
   if (tier === 15) return "intimate";
   if (tier === 50) return "trust";
-  return "friendly";
+  return "maintain";
 }
 
 function getLayerLabelById(layerId: string): string {

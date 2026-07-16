@@ -386,7 +386,7 @@ export function PersonFace({
     };
   }, [isMe]);
 
-  const layerColor = getLayerColor(layerId ?? "friendly");
+  const layerColor = getLayerColor(layerId ?? "maintain");
   const effectiveImageUrl = hasMounted
     ? isMe && meProfileImageDataUrl
       ? meProfileImageDataUrl

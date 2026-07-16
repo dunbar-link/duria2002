@@ -4,8 +4,13 @@ export type LayerColor = {
   border: string;
 };
 
+// Keys align with the canonical LayerId (DUNBAR-LABEL-001):
+// family / core / intimate / trust / maintain. The previous "friendly" key
+// was a dead alias — no code path stored "friendly" as a layerId, so
+// LAYER_COLOR_MAP.friendly only ever served as an accidental fallback for
+// the 150-tier layer whose real id is "maintain".
 export const LAYER_COLOR_MAP: Record<string, LayerColor> = {
-  friendly: {
+  maintain: {
     bg: "#DDF7EE",
     text: "#0B7A5D",
     border: "#8EE5CA",
@@ -37,5 +42,5 @@ export function getLayerColor(layerId: string): LayerColor {
   if (layerId === "core") return LAYER_COLOR_MAP.core;
   if (layerId === "trust") return LAYER_COLOR_MAP.trust;
   if (layerId === "intimate") return LAYER_COLOR_MAP.intimate;
-  return LAYER_COLOR_MAP.friendly;
+  return LAYER_COLOR_MAP.maintain;
 }

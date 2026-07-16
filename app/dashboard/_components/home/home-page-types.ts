@@ -206,6 +206,30 @@ export const layerBlueprints: LayerBlueprint[] = [
   },
 ];
 
+// Canonical mapping for the 5-tier relation model (DUNBAR-LABEL-001).
+// New code should import from here instead of re-declaring locally. Existing
+// duplicate helpers (getTierByLayerId in 3 files, getLayerLabelById in 2)
+// are intentionally left in place to keep this change minimal — they now
+// happen to match this canonical map after the label fixes shipped with
+// this commit.
+export type LayerId = "family" | "core" | "intimate" | "trust" | "maintain";
+
+export const LAYER_TIER_MAP: Record<LayerId, 1 | 5 | 15 | 50 | 150> = {
+  family: 1,
+  core: 5,
+  intimate: 15,
+  trust: 50,
+  maintain: 150,
+};
+
+export const LAYER_LABEL_MAP: Record<LayerId, string> = {
+  family: "가족",
+  core: "핵심",
+  intimate: "신뢰",
+  trust: "친밀",
+  maintain: "친근",
+};
+
 export const connectableCandidates: ConnectableCandidate[] = [];
 
 export const personCatalog: Record<string, LayerPerson | ConnectableCandidate> =

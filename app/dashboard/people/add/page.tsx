@@ -12,9 +12,9 @@ const tierOptions: Array<{
 }> = [
   { value: 1, label: "가족" },
   { value: 5, label: "핵심" },
-  { value: 15, label: "친밀" },
-  { value: 50, label: "신뢰" },
-  { value: 150, label: "유지" },
+  { value: 15, label: "신뢰" },
+  { value: 50, label: "친밀" },
+  { value: 150, label: "친근" },
 ];
 
 const relationshipTypeOptions: Array<{
